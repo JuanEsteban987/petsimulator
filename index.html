@@ -2,93 +2,126 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Pet Simulator</title>
     <style>
-        body { background: #2c3e50; color: white; font-family: 'Arial', sans-serif; text-align: center; }
-        #game-container { margin-top: 50px; }
-        #coins-display { font-size: 2em; color: #f1c40f; text-shadow: 2px 2px #000; }
-        
-        .pet-area { height: 200px; border: 2px dashed #7f8c8d; margin: 20px auto; width: 80%; position: relative; border-radius: 15px; }
-        .pet { font-size: 40px; position: absolute; transition: all 0.5s ease; cursor: pointer; }
-        
-        button { 
-            padding: 15px 30px; font-size: 1.2em; cursor: pointer; border-radius: 10px; border: none;
-            background: #27ae60; color: white; transition: 0.3s;
+        :root {
+            --primary: #ffcf33;
+            --secondary: #4a90e2;
+            --bg: #282c34;
         }
-        button:hover { background: #2ecc71; transform: scale(1.05); }
-        button:disabled { background: #95a5a6; cursor: not-allowed; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; margin: 0; overflow: hidden; }
         
-        .stats { margin-bottom: 20px; }
+        #hud { font-size: 2rem; margin-top: 20px; font-weight: bold; color: var(--primary); text-shadow: 2px 2px #000; }
+        
+        #game-area { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; }
+        
+        #main-coin { font-size: 100px; cursor: pointer; transition: transform 0.1s; user-select: none; }
+        #main-coin:active { transform: scale(0.9); }
+
+        #shop { background: #333; padding: 20px; border-radius: 15px; width: 80%; max-width: 400px; text-align: center; border: 3px solid var(--secondary); }
+        
+        button { background: var(--secondary); border: none; padding: 10px 20px; color: white; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 1rem; }
+        button:hover { background: #357abd; }
+        button:disabled { background: #777; cursor: not-allowed; }
+
+        #inventory { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .pet-card { background: #444; padding: 10px; border-radius: 8px; border: 1px solid var(--primary); font-size: 0.8rem; }
     </style>
 </head>
 <body>
 
-    <div id="game-container">
-        <h1>🐾 PET SIMULATOR HTML 🐾</h1>
-        <div class="stats">
-            <div id="coins-display">💰 Monedas: 0</div>
-            <p id="pet-count">Mascotas: 1 (Cada una genera 1 moneda/seg)</p>
-        </div>
+    <div id="hud">Monedas: <span id="coin-count">0</span></div>
+    <div id="multiplier-info">Poder por clic: <span id="multiplier">1</span></div>
 
-        <div class="pet-area" id="pet-area">
-            <span class="pet" id="pet1">🐶</span>
-        </div>
-
-        <button onclick="clickCoin()">¡Cosechar Monedas!</button>
-        <button id="buy-egg" onclick="buyEgg()">🥚 Comprar Huevo (50 Monedas)</button>
+    <div id="game-area">
+        <div id="main-coin">💰</div>
+        <p>¡Haz clic en la moneda!</p>
     </div>
 
+    <div id="shop">
+        <h3>Huevo de Mascota</h3>
+        <p>Costo: 50 Monedas</p>
+        <button id="buy-egg">Comprar Huevo (Gacha)</button>
+    </div>
+
+    <h3>Mis Mascotas</h3>
+    <div id="inventory"></div>
+
     <script>
+        // --- Estado del Juego ---
         let coins = 0;
-        let pets = ["🐶"];
-        const petIcons = ["🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐸", "🦁", "🦄"];
-        const petArea = document.getElementById('pet-area');
+        let power = 1;
+        let pets = [];
 
-        // Función para ganar monedas al hacer clic
-        function clickCoin() {
-            coins += 1 + (pets.length * 2); // Bonus por tener mascotas
+        const petTypes = [
+            { name: "Perro", emoji: "🐶", power: 2, chance: 0.5 },    // 50%
+            { name: "Gato", emoji: "🐱", power: 5, chance: 0.3 },     // 30%
+            { name: "Dragón", emoji: "🐉", power: 20, chance: 0.15 }, // 15%
+            { name: "Unicornio", emoji: "🦄", power: 100, chance: 0.05 } // 5%
+        ];
+
+        // --- Elementos del DOM ---
+        const coinDisplay = document.getElementById('coin-count');
+        const multiplierDisplay = document.getElementById('multiplier');
+        const mainCoin = document.getElementById('main-coin');
+        const buyBtn = document.getElementById('buy-egg');
+        const inventoryDiv = document.getElementById('inventory');
+
+        // --- Lógica ---
+
+        // 1. Ganar monedas
+        mainCoin.addEventListener('click', () => {
+            coins += power;
             updateUI();
-        }
+        });
 
-        // Comprar nuevas mascotas
-        function buyEgg() {
+        // 2. Comprar huevo
+        buyBtn.addEventListener('click', () => {
             if (coins >= 50) {
                 coins -= 50;
-                const randomPet = petIcons[Math.floor(Math.random() * petIcons.length)];
-                pets.push(randomPet);
-                
-                // Crear el elemento visual de la mascota
-                const newPet = document.createElement('span');
-                newPet.className = 'pet';
-                newPet.innerHTML = randomPet;
-                newPet.style.left = Math.random() * 80 + "%";
-                newPet.style.top = Math.random() * 60 + "%";
-                petArea.appendChild(newPet);
-                
-                updateUI();
+                hatchPet();
+            } else {
+                alert("¡No tienes suficientes monedas!");
             }
-        }
+        });
 
-        // Actualizar la interfaz
-        function updateUI() {
-            document.getElementById('coins-display').innerText = `💰 Monedas: ${coins}`;
-            document.getElementById('pet-count').innerText = `Mascotas: ${pets.length} (Bonus activo)`;
-            document.getElementById('buy-egg').disabled = coins < 50;
-        }
+        function hatchPet() {
+            const roll = Math.random();
+            let cumulativeChance = 0;
+            let selectedPet = petTypes[0];
 
-        // Generación automática de monedas (Ingreso pasivo)
-        setInterval(() => {
-            coins += pets.length;
-            updateUI();
+            for (let pet of petTypes) {
+                cumulativeChance += pet.chance;
+                if (roll <= cumulativeChance) {
+                    selectedPet = pet;
+                    break;
+                }
+            }
+
+            pets.push(selectedPet);
+            // El poder total es la suma de todas las mascotas + 1 inicial
+            power = 1 + pets.reduce((sum, p) => sum + p.power, 0);
             
-            // Mover mascotas aleatoriamente para que se vea "vivo"
-            const allPets = document.querySelectorAll('.pet');
-            allPets.forEach(p => {
-                p.style.left = Math.random() * 80 + "%";
-                p.style.top = Math.random() * 60 + "%";
-            });
-        }, 3000);
+            updateUI();
+            renderInventory();
+        }
 
+        function updateUI() {
+            coinDisplay.innerText = Math.floor(coins);
+            multiplierDisplay.innerText = power;
+            buyBtn.disabled = coins < 50;
+        }
+
+        function renderInventory() {
+            inventoryDiv.innerHTML = "";
+            pets.forEach(pet => {
+                const card = document.createElement('div');
+                card.className = "pet-card";
+                card.innerHTML = `${pet.emoji} <br> +${pet.power}`;
+                inventoryDiv.appendChild(card);
+            });
+        }
     </script>
 </body>
 </html>
