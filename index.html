@@ -1,353 +1,239 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Garry's Mod HTML5 - Hardcoded Edition</title>
-    <style>
-        :root { --hl2-orange: #ffb400; --ui-bg: rgba(0, 0, 0, 0.8); }
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Tahoma', sans-serif; color: white; }
-        
-        /* HUD UI */
-        #hud { position: fixed; bottom: 40px; left: 40px; display: flex; gap: 60px; pointer-events: none; z-index: 100; }
-        .hud-vitals { display: flex; flex-direction: column; }
-        .hud-val { font-size: 72px; font-weight: 900; color: var(--hl2-orange); line-height: 1; text-shadow: 4px 4px 0px #000; }
-        .hud-lbl { font-size: 14px; text-transform: uppercase; color: var(--hl2-orange); font-weight: bold; }
+<meta charset="UTF-8">
+<title>GMod Web Sandbox</title>
 
-        #crosshair { 
-            position: fixed; top: 50%; left: 50%; width: 20px; height: 20px; 
-            border: 1px solid var(--hl2-orange); transform: translate(-50%, -50%); border-radius: 50%;
-        }
-
-        /* MENUS */
-        #q-menu {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); display: none; z-index: 1000;
-            justify-content: center; align-items: center;
-        }
-        .spawn-window {
-            width: 80%; height: 80%; background: var(--ui-bg); border: 2px solid #555;
-            padding: 30px; display: flex; flex-direction: column;
-        }
-        .prop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; overflow-y: auto; }
-        .prop-item { 
-            background: #222; border: 1px solid #444; padding: 20px; text-align: center; cursor: pointer;
-            transition: 0.2s; border-radius: 4px;
-        }
-        .prop-item:hover { background: var(--hl2-orange); color: black; font-weight: bold; }
-
-        #debug-info { position: fixed; top: 10px; left: 10px; font-family: monospace; font-size: 12px; color: #0f0; }
-    </style>
+<style>
+body { margin:0; overflow:hidden; font-family:Arial; background:#000; }
+#hud { position:absolute; top:10px; left:10px; color:#0f0; }
+#menu {
+  position:absolute; top:50px; left:10px;
+  background:rgba(0,0,0,0.8);
+  padding:10px; color:white;
+}
+.hidden { display:none; }
+#toolbar {
+  position:absolute; bottom:10px; left:50%;
+  transform:translateX(-50%);
+}
+button { margin:3px; }
+</style>
 </head>
+
 <body>
 
-    <div id="debug-info">GMOD_WEB_BUILD_2026 | FPS: <span id="fps">60</span> | P2P: <span id="p2p-id">---</span></div>
-    <div id="crosshair"></div>
+<div id="hud">FPS: <span id="fps">0</span></div>
 
-    <div id="hud">
-        <div class="hud-vitals">
-            <span class="hud-lbl">Health</span>
-            <span class="hud-val" id="hp-val">100</span>
-        </div>
-        <div class="hud-vitals">
-            <span class="hud-lbl">Armor</span>
-            <span class="hud-val" id="ap-val">0</span>
-        </div>
-    </div>
+<div id="menu" class="hidden">
+  <h3>Spawn Menu</h3>
+  <button onclick="spawn('box')">Caja</button>
+  <button onclick="spawn('sphere')">Esfera</button>
+  <button onclick="spawn('cylinder')">Cilindro</button>
+</div>
 
-    <div id="q-menu">
-        <div class="spawn-window">
-            <h1>Spawn Menu (Q)</h1>
-            <div class="prop-grid" id="prop-grid">
-                </div>
-        </div>
-    </div>
+<div id="toolbar">
+  <button onclick="tool='move'">Mover</button>
+  <button onclick="tool='rotate'">Rotar</button>
+  <button onclick="tool='scale'">Escalar</button>
+  <button onclick="tool='freeze'">Freeze</button>
+  <button onclick="tool='physgun'">PhysGun</button>
+</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/cannon@0.6.2/build/cannon.min.js"></script>
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
 
-    <script>
-    /**
-     * GMOD WEB CORE - COMPLETO
-     */
-    class GmodEngine {
-        constructor() {
-            this.initGraphics();
-            this.initPhysics();
-            this.initPlayer();
-            this.initInput();
-            this.initNetworking();
-            
-            this.props = [];
-            this.meshes = [];
-            this.zombies = [];
-            this.noclip = false;
-            this.activeWeapon = 'physgun';
-            
-            // PhysGun State
-            this.pickedBody = null;
-            this.pickDistance = 10;
-            this.beam = this.createPhysBeam();
+<script>
+// ====== SCENE ======
+let scene = new THREE.Scene();
+let camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
+let renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
 
-            this.setupMap();
-            this.render();
-        }
+camera.position.set(0,2,5);
 
-        initGraphics() {
-            this.scene = new THREE.Scene();
-            this.scene.background = new THREE.Color(0x87ceeb);
-            this.scene.fog = new THREE.Fog(0x87ceeb, 20, 500);
+// luz
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444));
 
-            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-            this.renderer = new THREE.WebGLRenderer({ antialias: true });
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-            this.renderer.shadowMap.enabled = true;
-            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            document.body.appendChild(this.renderer.domElement);
+// suelo
+let floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(100,100),
+  new THREE.MeshStandardMaterial({color:0x555555})
+);
+floor.rotation.x = -Math.PI/2;
+scene.add(floor);
 
-            const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-            this.scene.add(ambient);
+// ====== PHYSICS ======
+let world = new CANNON.World();
+world.gravity.set(0,-9.82,0);
 
-            this.sun = new THREE.DirectionalLight(0xffffff, 1.2);
-            this.sun.position.set(100, 200, 100);
-            this.sun.castShadow = true;
-            this.sun.shadow.camera.left = -100;
-            this.sun.shadow.camera.right = 100;
-            this.sun.shadow.camera.top = 100;
-            this.sun.shadow.camera.bottom = -100;
-            this.scene.add(this.sun);
-        }
+let groundBody = new CANNON.Body({ mass:0 });
+groundBody.addShape(new CANNON.Plane());
+groundBody.quaternion.setFromEuler(-Math.PI/2,0,0);
+world.addBody(groundBody);
 
-        initPhysics() {
-            this.world = new CANNON.World();
-            this.world.gravity.set(0, -19.6, 0);
-            this.world.broadphase = new CANNON.SAPBroadphase(this.world);
-            this.world.solver.iterations = 10;
-            this.clock = new THREE.Clock();
-        }
+// ====== DATA ======
+let objects = [];
+let bodies = [];
+let tool = "move";
+let selected = null;
+let physgunHold = false;
 
-        initPlayer() {
-            const shape = new CANNON.Box(new CANNON.Vec3(0.6, 1.8, 0.6));
-            this.playerBody = new CANNON.Body({ mass: 85, fixedRotation: true });
-            this.playerBody.addShape(shape);
-            this.playerBody.position.set(0, 10, 0);
-            this.world.addBody(this.playerBody);
-            
-            this.moveState = { f: 0, b: 0, l: 0, r: 0, jump: false };
-            this.canJump = false;
+// ====== SPAWN ======
+function spawn(type){
+  let mesh, shape;
 
-            this.playerBody.addEventListener("collide", (e) => {
-                if(Math.abs(e.contact.ni.y) > 0.5) this.canJump = true;
-            });
-        }
+  if(type==="box"){
+    mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(),
+      new THREE.MeshStandardMaterial({color:Math.random()*0xffffff})
+    );
+    shape = new CANNON.Box(new CANNON.Vec3(0.5,0.5,0.5));
+  }
 
-        createPhysBeam() {
-            const material = new THREE.LineBasicMaterial({ color: 0x00ffff, linewidth: 2 });
-            const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-            const line = new THREE.Line(geometry, material);
-            line.visible = false;
-            this.scene.add(line);
-            return line;
-        }
+  if(type==="sphere"){
+    mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5),
+      new THREE.MeshStandardMaterial({color:Math.random()*0xffffff})
+    );
+    shape = new CANNON.Sphere(0.5);
+  }
 
-        setupMap() {
-            // Ground
-            const floorGeo = new THREE.PlaneGeometry(1000, 1000);
-            const floorMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
-            const floorMesh = new THREE.Mesh(floorGeo, floorMat);
-            floorMesh.rotation.x = -Math.PI / 2;
-            floorMesh.receiveShadow = true;
-            this.scene.add(floorMesh);
+  if(type==="cylinder"){
+    mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.5,0.5,1),
+      new THREE.MeshStandardMaterial({color:Math.random()*0xffffff})
+    );
+    shape = new CANNON.Cylinder(0.5,0.5,1,8);
+  }
 
-            const groundBody = new CANNON.Body({ mass: 0 });
-            groundBody.addShape(new CANNON.Plane());
-            groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
-            this.world.addBody(groundBody);
+  mesh.position.set(0,5,0);
+  scene.add(mesh);
 
-            // Spawn Menu Items
-            const items = ['Crate', 'Barrel', 'Sphere', 'Wall', 'Zombie NPC', 'Explosive'];
-            const grid = document.getElementById('prop-grid');
-            items.forEach(type => {
-                const div = document.createElement('div');
-                div.className = 'prop-item';
-                div.innerText = type;
-                div.onclick = () => this.spawn(type);
-                grid.appendChild(div);
-            });
-        }
+  let body = new CANNON.Body({ mass:1 });
+  body.addShape(shape);
+  body.position.copy(mesh.position);
+  world.addBody(body);
 
-        spawn(type) {
-            let shape, geo, color = Math.random() * 0xffffff;
-            let mass = 20;
+  objects.push(mesh);
+  bodies.push(body);
+}
 
-            switch(type) {
-                case 'Crate': 
-                    geo = new THREE.BoxGeometry(2, 2, 2); 
-                    shape = new CANNON.Box(new CANNON.Vec3(1, 1, 1)); 
-                    break;
-                case 'Barrel': 
-                    geo = new THREE.CylinderGeometry(0.7, 0.7, 2, 16); 
-                    shape = new CANNON.Cylinder(0.7, 0.7, 2, 16); 
-                    break;
-                case 'Zombie NPC':
-                    geo = new THREE.BoxGeometry(1.2, 3, 1.2);
-                    shape = new CANNON.Box(new CANNON.Vec3(0.6, 1.5, 0.6));
-                    color = 0xff0000;
-                    mass = 75;
-                    break;
-                default:
-                    geo = new THREE.SphereGeometry(1.5, 24, 24);
-                    shape = new CANNON.Sphere(1.5);
-            }
+// ====== CONTROLES ======
+let keys = {};
+let velocity = new THREE.Vector3();
 
-            const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color }));
-            mesh.castShadow = true;
-            const body = new CANNON.Body({ mass });
-            body.addShape(shape);
+document.addEventListener("keydown", e=>{
+  keys[e.key.toLowerCase()] = true;
 
-            const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-            body.position.set(this.camera.position.x + dir.x * 10, this.camera.position.y + dir.y * 10, this.camera.position.z + dir.z * 10);
+  if(e.key.toLowerCase()==="q")
+    document.getElementById("menu").classList.toggle("hidden");
+});
 
-            this.world.addBody(body);
-            this.scene.add(mesh);
-            this.props.push(body);
-            this.meshes.push(mesh);
-            if(type === 'Zombie NPC') this.zombies.push(body);
+document.addEventListener("keyup", e=>{
+  keys[e.key.toLowerCase()] = false;
+});
 
-            this.toggleMenu(false);
-        }
+// mouse look
+document.body.addEventListener("click", ()=>{
+  document.body.requestPointerLock();
+});
 
-        initInput() {
-            document.addEventListener('keydown', (e) => {
-                if(e.code === 'KeyW') this.moveState.f = 1;
-                if(e.code === 'KeyS') this.moveState.b = 1;
-                if(e.code === 'KeyA') this.moveState.l = 1;
-                if(e.code === 'KeyD') this.moveState.r = 1;
-                if(e.code === 'KeyV') this.noclip = !this.noclip;
-                if(e.code === 'Space' && this.canJump) { this.playerBody.velocity.y = 12; this.canJump = false; }
-                if(e.code === 'KeyQ') this.toggleMenu();
-            });
+document.addEventListener("mousemove", e=>{
+  if(document.pointerLockElement === document.body){
+    camera.rotation.y -= e.movementX*0.002;
+    camera.rotation.x -= e.movementY*0.002;
+  }
+});
 
-            document.addEventListener('keyup', (e) => {
-                if(e.code === 'KeyW') this.moveState.f = 0;
-                if(e.code === 'KeyS') this.moveState.b = 0;
-                if(e.code === 'KeyA') this.moveState.l = 0;
-                if(e.code === 'KeyD') this.moveState.r = 0;
-            });
+function movePlayer(){
+  velocity.set(0,0,0);
 
-            window.addEventListener('mousedown', (e) => {
-                if(document.pointerLockElement !== this.renderer.domElement) {
-                    this.renderer.domElement.requestPointerLock();
-                } else {
-                    this.pickObject();
-                }
-            });
+  if(keys["w"]) velocity.z -= 0.15;
+  if(keys["s"]) velocity.z += 0.15;
+  if(keys["a"]) velocity.x -= 0.15;
+  if(keys["d"]) velocity.x += 0.15;
 
-            window.addEventListener('mouseup', () => {
-                this.pickedBody = null;
-                this.beam.visible = false;
-            });
+  camera.translateX(velocity.x);
+  camera.translateZ(velocity.z);
+}
 
-            window.addEventListener('mousemove', (e) => {
-                if(document.pointerLockElement === this.renderer.domElement) {
-                    this.camera.rotation.y -= e.movementX * 0.002;
-                    this.camera.rotation.x -= e.movementY * 0.002;
-                    this.camera.rotation.x = Math.max(-1.5, Math.min(1.5, this.camera.rotation.x));
-                }
-            });
-        }
+// ====== RAYCAST ======
+let raycaster = new THREE.Raycaster();
+let mouse = new THREE.Vector2();
 
-        pickObject() {
-            const ray = new THREE.Raycaster();
-            ray.setFromCamera(new THREE.Vector2(0,0), this.camera);
-            const intersects = ray.intersectObjects(this.meshes);
-            if(intersects.length > 0) {
-                const index = this.meshes.indexOf(intersects[0].object);
-                this.pickedBody = this.props[index];
-                this.pickDistance = intersects[0].distance;
-            }
-        }
+document.addEventListener("mousedown", e=>{
+  mouse.x = (e.clientX/innerWidth)*2-1;
+  mouse.y = -(e.clientY/innerHeight)*2+1;
 
-        toggleMenu(force) {
-            const menu = document.getElementById('q-menu');
-            const show = force !== undefined ? force : menu.style.display !== 'flex';
-            menu.style.display = show ? 'flex' : 'none';
-            if(show) document.exitPointerLock();
-        }
+  raycaster.setFromCamera(mouse, camera);
+  let hits = raycaster.intersectObjects(objects);
 
-        initNetworking() {
-            this.peer = new Peer();
-            this.peer.on('open', (id) => document.getElementById('p2p-id').innerText = id);
-        }
+  if(hits.length){
+    selected = hits[0].object;
+    let i = objects.indexOf(selected);
 
-        updatePlayer(dt) {
-            if(this.noclip) {
-                this.playerBody.velocity.set(0,0,0);
-                const dir = new THREE.Vector3(this.moveState.r - this.moveState.l, 0, this.moveState.b - this.moveState.f).applyQuaternion(this.camera.quaternion);
-                this.playerBody.position.x += dir.x * 0.8;
-                this.playerBody.position.y += dir.y * 0.8;
-                this.playerBody.position.z += dir.z * 0.8;
-            } else {
-                const speed = 20;
-                const quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), this.camera.rotation.y);
-                const moveVec = new THREE.Vector3(this.moveState.r - this.moveState.l, 0, this.moveState.b - this.moveState.f).normalize().applyQuaternion(quat);
-                this.playerBody.velocity.x = moveVec.x * speed;
-                this.playerBody.velocity.z = moveVec.z * speed;
-            }
-            this.camera.position.set(this.playerBody.position.x, this.playerBody.position.y + 1, this.playerBody.position.z);
-        }
-
-        updatePhysGun() {
-            if(this.pickedBody) {
-                const target = new THREE.Vector3(0,0, -this.pickDistance).applyQuaternion(this.camera.quaternion).add(this.camera.position);
-                this.pickedBody.velocity.set(
-                    (target.x - this.pickedBody.position.x) * 15,
-                    (target.y - this.pickedBody.position.y) * 15,
-                    (target.z - this.pickedBody.position.z) * 15
-                );
-                this.pickedBody.angularVelocity.scale(0.9); // Amortiguar rotación
-                
-                this.beam.visible = true;
-                const pos = this.beam.geometry.attributes.position.array;
-                pos[0] = this.camera.position.x; pos[1] = this.camera.position.y - 0.5; pos[2] = this.camera.position.z;
-                pos[3] = this.pickedBody.position.x; pos[4] = this.pickedBody.position.y; pos[5] = this.pickedBody.position.z;
-                this.beam.geometry.attributes.position.needsUpdate = true;
-            }
-        }
-
-        updateZombies() {
-            this.zombies.forEach(z => {
-                const dx = this.playerBody.position.x - z.position.x;
-                const dz = this.playerBody.position.z - z.position.z;
-                const len = Math.sqrt(dx*dx + dz*dz);
-                if(len < 30) {
-                    z.velocity.x = (dx / len) * 5;
-                    z.velocity.z = (dz / len) * 5;
-                }
-            });
-        }
-
-        render() {
-            requestAnimationFrame(() => this.render());
-            const dt = Math.min(this.clock.getDelta(), 0.1);
-            this.world.step(1/60);
-
-            this.updatePlayer(dt);
-            this.updatePhysGun();
-            this.updateZombies();
-
-            // Sincronizar Mallas
-            for(let i=0; i<this.props.length; i++) {
-                this.meshes[i].position.copy(this.props[i].position);
-                this.meshes[i].quaternion.copy(this.props[i].quaternion);
-            }
-
-            this.renderer.render(this.scene, this.camera);
-            document.getElementById('fps').innerText = Math.round(1/dt);
-        }
+    if(tool==="freeze"){
+      bodies[i].mass = 0;
+      bodies[i].updateMassProperties();
     }
 
-    const Engine = new GmodEngine();
-    </script>
+    if(tool==="physgun"){
+      physgunHold = true;
+    }
+  }
+});
+
+document.addEventListener("mouseup", ()=>{
+  physgunHold = false;
+});
+
+// ====== PHYSGUN ======
+function updatePhysgun(){
+  if(!selected || !physgunHold) return;
+
+  let i = objects.indexOf(selected);
+
+  let dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+
+  let target = camera.position.clone().add(dir.multiplyScalar(5));
+
+  bodies[i].position.x += (target.x - bodies[i].position.x)*0.2;
+  bodies[i].position.y += (target.y - bodies[i].position.y)*0.2;
+  bodies[i].position.z += (target.z - bodies[i].position.z)*0.2;
+
+  bodies[i].velocity.set(0,0,0);
+}
+
+// ====== FPS ======
+let fpsEl = document.getElementById("fps");
+let lastTime = performance.now();
+
+// ====== LOOP ======
+function animate(){
+  requestAnimationFrame(animate);
+
+  world.step(1/60);
+
+  for(let i=0;i<objects.length;i++){
+    objects[i].position.copy(bodies[i].position);
+    objects[i].quaternion.copy(bodies[i].quaternion);
+  }
+
+  movePlayer();
+  updatePhysgun();
+
+  renderer.render(scene,camera);
+
+  let now = performance.now();
+  fpsEl.textContent = Math.round(1000/(now-lastTime));
+  lastTime = now;
+}
+
+animate();
+</script>
+
 </body>
 </html>
