@@ -2,305 +2,311 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Juego de Plataformas 2D</title>
+    <title>GMod 2D Sandbox</title>
     <style>
         body {
             margin: 0;
-            padding: 0;
-            overflow: hidden; /* Evita barras de desplazamiento */
-            background-color: #a0d8ef; /* Color del cielo */
-            font-family: sans-serif;
+            overflow: hidden;
+            background: #1e1e1e;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-
-        #gameCanvas {
+        canvas {
             display: block;
-            /* El fondo se dibuja en el script, pero podrías usar un background-image aquí */
+            background: #2c3e50;
         }
-
         #ui {
             position: absolute;
             top: 10px;
             left: 10px;
+            background: rgba(0, 0, 0, 0.7);
             color: white;
-            font-size: 20px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            pointer-events: none; /* Atraviesa los clics */
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: none;
+            border: 1px solid #555;
+        }
+        #menu {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(40, 40, 40, 0.9);
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+            border: 2px solid #3498db;
+        }
+        .tool-btn {
+            background: #34495e;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .tool-btn:hover {
+            background: #3498db;
+        }
+        .tool-btn.active {
+            background: #e74c3c;
+        }
+        #instructions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #bdc3c7;
+            text-align: right;
+            font-size: 0.8em;
         }
     </style>
 </head>
 <body>
 
-    <div id="ui">Puntuación: <span id="score">0</span></div>
-    <canvas id="gameCanvas"></canvas>
+<div id="ui">
+    <div style="font-size: 1.2em; color: #3498db; margin-bottom: 5px;">GMod HTML 2D</div>
+    <div>Herramienta: <span id="current-tool">Physics Gun</span></div>
+    <div>Entidades: <span id="entity-count">0</span></div>
+</div>
 
-    <script>
-        // --- Configuración Inicial ---
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const scoreElement = document.getElementById('score');
+<div id="instructions">
+    [WASD] Moverse | [Espacio] Saltar<br>
+    [Click Izquierdo] Usar Herramienta<br>
+    [Q] Menú de Spawn (Próximamente)<br>
+    [R] Limpiar todo
+</div>
 
-        // Ajustar canvas al tamaño de la ventana
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+<div id="menu" style="pointer-events: auto;">
+    <button class="tool-btn active" onclick="setTool('physgun', this)">Physics Gun</button>
+    <button class="tool-btn" onclick="setTool('spawner', this)">Spawn Box</button>
+    <button class="tool-btn" onclick="setTool('remover', this)">Remover</button>
+    <button class="tool-btn" onclick="spawnNPC()">Spawn NPC</button>
+</div>
 
-        // --- Variables del Juego ---
-        let score = 0;
-        let keys = {}; // Registra qué teclas están pulsadas
+<canvas id="gameCanvas"></canvas>
 
-        // Configuración de físicas
-        const gravity = 0.8;
-        const friction = 0.9; // Rozamiento horizontal
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const countDisplay = document.getElementById('entity-count');
+    const toolDisplay = document.getElementById('current-tool');
 
-        // --- Clases de Objetos ---
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
-        // 1. El Jugador
-        class Player {
-            constructor(x, y, width, height, color) {
-                this.x = x;
-                this.y = y;
-                this.width = width;
-                this.height = height;
-                this.color = color;
+    // Configuración
+    let gravity = 0.5;
+    let friction = 0.98;
+    let currentTool = 'physgun';
+    let entities = [];
+    let keys = {};
+    let mouse = { x: 0, y: 0, down: false, grabbedEntity: null };
 
-                this.speed = 5;
-                this.velX = 0;
-                this.velY = 0;
-                this.jumpStrength = 15;
-                this.onGround = false;
+    // Jugador (GMod Style)
+    const player = {
+        x: 100,
+        y: 100,
+        width: 30,
+        height: 60,
+        velX: 0,
+        velY: 0,
+        speed: 5,
+        jumpForce: 12,
+        grounded: false,
+        color: '#3498db'
+    };
+
+    class Entity {
+        constructor(x, y, width, height, type = 'prop', color = '#95a5a6') {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.velX = 0;
+            this.velY = 0;
+            this.type = type;
+            this.color = color;
+            this.isStatic = false;
+            this.grabbed = false;
+        }
+
+        update() {
+            if (this.isStatic || this.grabbed) return;
+
+            this.velY += gravity;
+            this.x += this.velX;
+            this.y += this.velY;
+
+            // Colisión con el suelo
+            if (this.y + this.height > canvas.height - 20) {
+                this.y = canvas.height - 20 - this.height;
+                this.velY *= -0.4; // Rebote
+                this.velX *= friction;
             }
 
-            draw() {
-                ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
-                // Opcional: Ojos para saber hacia dónde mira
-                ctx.fillStyle = "white";
-                ctx.fillRect(this.x + 5, this.y + 5, 10, 10);
-                ctx.fillRect(this.x + this.width - 15, this.y + 5, 10, 10);
-            }
-
-            update() {
-                // Control de movimiento horizontal
-                if (keys['ArrowRight'] || keys['d']) {
-                    if (this.velX < this.speed) this.velX++;
-                }
-                if (keys['ArrowLeft'] || keys['a']) {
-                    if (this.velX > -this.speed) this.velX--;
-                }
-
-                // Salto
-                if ((keys['ArrowUp'] || keys['w'] || keys[' ']) && this.onGround) {
-                    this.velY = -this.jumpStrength;
-                    this.onGround = false;
-                }
-
-                // Aplicar Físicas
-                this.velY += gravity; // Gravedad constante
-                this.velX *= friction; // Rozamiento
-
-                // Predecir nueva posición
-                let nextX = this.x + this.velX;
-                let nextY = this.y + this.velY;
-
-                this.onGround = false; // Asumimos que está en el aire hasta chocar
-
-                // --- Detección de Colisiones con Plataformas ---
-                for (let plat of platforms) {
-                    // Colisión Vertical (Suelo y Techo)
-                    if (nextX < plat.x + plat.width &&
-                        nextX + this.width > plat.x &&
-                        this.y < plat.y + plat.height &&
-                        this.y + this.height > plat.y) {
-                        
-                        // Choca con el suelo de la plataforma
-                        if (this.velY > 0 && this.y + this.height <= plat.y + 10) {
-                            this.velY = 0;
-                            nextY = plat.y - this.height; // Colocar justo encima
-                            this.onGround = true;
-                        }
-                        // Choca con el techo de la plataforma
-                        else if (this.velY < 0 && this.y >= plat.y + plat.height - 10) {
-                            this.velY = 0;
-                            nextY = plat.y + plat.height; // Colocar justo debajo
-                        }
-                    }
-
-                    // Colisión Horizontal (Paredes) - Se calcula DESPUÉS de la vertical para mejor precisión
-                    if (nextX < plat.x + plat.width &&
-                        nextX + this.width > plat.x &&
-                        nextY < plat.y + plat.height &&
-                        nextY + this.height > plat.y) {
-                        
-                        // Choca por la izquierda
-                        if (this.velX > 0 && this.x + this.width <= plat.x + 10) {
-                            this.velX = 0;
-                            nextX = plat.x - this.width;
-                        }
-                        // Choca por la derecha
-                        else if (this.velX < 0 && this.x >= plat.x + plat.width - 10) {
-                            this.velX = 0;
-                            nextX = plat.x + plat.width;
-                        }
-                    }
-                }
-
-                // Actualizar posición final
-                this.x = nextX;
-                this.y = nextY;
-
-                // --- Límites de la pantalla (Suelo/Paredes del mundo) ---
-                if (this.x < 0) this.x = 0;
-                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
-                
-                // Si cae por debajo de la pantalla (Muerte)
-                if (this.y > canvas.height) {
-                    this.reset();
-                }
-            }
-
-            reset() {
-                this.x = 100;
-                this.y = canvas.height - 150;
-                this.velX = 0;
-                this.velY = 0;
+            // Límites laterales
+            if (this.x < 0 || this.x + this.width > canvas.width) {
+                this.velX *= -1;
             }
         }
 
-        // 2. Las Plataformas
-        class Platform {
-            constructor(x, y, width, height, color = '#555') {
-                this.x = x;
-                this.y = y;
-                this.width = width;
-                this.height = height;
-                this.color = color;
-            }
-
-            draw() {
-                ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
-                
-                // Borde decorativo
-                ctx.strokeStyle = '#333';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(this.x, this.y, this.width, this.height);
-            }
-        }
-
-        // 3. El Objetivo (Moneda/Meta)
-        class Goal {
-            constructor(x, y, size) {
-                this.x = x;
-                this.y = y;
-                this.size = size;
-                this.color = '#ffd700'; // Dorado
-                this.angle = 0; // Para animación
-            }
-
-            draw() {
-                ctx.save();
-                ctx.translate(this.x + this.size/2, this.y + this.size/2);
-                ctx.rotate(this.angle);
-                ctx.fillStyle = this.color;
-                ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
-                
-                // Brillo
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(-this.size/2, -this.size/2, this.size, this.size);
-                ctx.restore();
-
-                this.angle += 0.05; // Girar
-            }
-
-            checkCollision(player) {
-                if (player.x < this.x + this.size &&
-                    player.x + player.width > this.x &&
-                    player.y < this.y + this.size &&
-                    player.y + player.height > this.y) {
-                    return true;
-                }
-                return false;
-            }
-        }
-
-        // --- Inicialización de Objetos ---
-        const player = new Player(100, canvas.height - 150, 40, 40, '#ff4444');
-        const goal = new Goal(canvas.width - 100, 150, 30);
-
-        const platforms = [];
-        // Suelo principal
-        platforms.push(new Platform(0, canvas.height - 40, canvas.width, 40, '#2e8b57')); // Hierba
-        
-        // Plataformas flotantes (puedes añadir las que quieras)
-        platforms.push(new Platform(200, canvas.height - 150, 200, 20));
-        platforms.push(new Platform(500, canvas.height - 250, 200, 20));
-        platforms.push(new Platform(150, canvas.height - 380, 150, 20));
-        platforms.push(new Platform(450, 200, 100, 20));
-        platforms.push(new Platform(canvas.width - 200, 250, 200, 20));
-
-        // Obstáculo vertical
-        platforms.push(new Platform(750, canvas.height - 120, 30, 80));
-
-
-        // --- Bucle Principal del Juego (Game Loop) ---
-        function gameLoop() {
-            // 1. Limpiar el canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Dibujar fondo (gradiente simple)
-            let grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            grd.addColorStop(0, "#87CEEB");
-            grd.addColorStop(1, "#a0d8ef");
-            ctx.fillStyle = grd;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // 2. Actualizar y Dibujar objetos
+        draw() {
+            ctx.fillStyle = this.grabbed ? '#00ff00' : this.color;
+            ctx.fillRect(this.x, this.y, this.width, this.height);
             
-            // Dibujar plataformas
-            platforms.forEach(plat => plat.draw());
+            // Efecto de borde para parecerse a props de Source
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
 
-            // Dibujar objetivo
-            goal.draw();
-
-            // Actualizar y dibujar jugador
-            player.update();
-            player.draw();
-
-            // 3. Lógica de victoria/puntuación
-            if (goal.checkCollision(player)) {
-                score += 100;
-                scoreElement.innerText = score;
-                // Mover el objetivo a una posición aleatoria para seguir jugando
-                goal.x = Math.random() * (canvas.width - 100) + 50;
-                goal.y = Math.random() * (canvas.height - 300) + 100;
+            if (this.type === 'npc') {
+                // Dibujar ojos simples para los NPCs
+                ctx.fillStyle = 'white';
+                ctx.fillRect(this.x + 5, this.y + 10, 5, 5);
+                ctx.fillRect(this.x + this.width - 10, this.y + 10, 5, 5);
             }
+        }
+    }
 
-            // 4. Llamar al siguiente frame
-            requestAnimationFrame(gameLoop);
+    // Funciones de Herramientas
+    function setTool(tool, btn) {
+        currentTool = tool;
+        toolDisplay.innerText = tool.charAt(0).toUpperCase() + tool.slice(1);
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    function spawnBox(x, y) {
+        const size = Math.random() * 30 + 20;
+        const colors = ['#95a5a6', '#7f8c8d', '#d35400', '#27ae60'];
+        entities.push(new Entity(x - size/2, y - size/2, size, size, 'prop', colors[Math.floor(Math.random() * colors.length)]));
+    }
+
+    function spawnNPC() {
+        const npc = new Entity(Math.random() * canvas.width, 50, 30, 60, 'npc', '#e74c3c');
+        entities.push(npc);
+    }
+
+    // Input Events
+    window.addEventListener('keydown', e => {
+        keys[e.code] = true;
+        if(e.code === 'KeyR') entities = [];
+    });
+    window.addEventListener('keyup', e => keys[e.code] = false);
+
+    canvas.addEventListener('mousedown', e => {
+        mouse.down = true;
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+
+        if (currentTool === 'spawner') {
+            spawnBox(mouse.x, mouse.y);
+        } else if (currentTool === 'remover') {
+            entities = entities.filter(ent => 
+                !(mouse.x > ent.x && mouse.x < ent.x + ent.width && 
+                  mouse.y > ent.y && mouse.y < ent.y + ent.height)
+            );
+        } else if (currentTool === 'physgun') {
+            entities.forEach(ent => {
+                if (mouse.x > ent.x && mouse.x < ent.x + ent.width && 
+                    mouse.y > ent.y && mouse.y < ent.y + ent.height) {
+                    mouse.grabbedEntity = ent;
+                    ent.grabbed = true;
+                }
+            });
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        mouse.down = false;
+        if (mouse.grabbedEntity) {
+            mouse.grabbedEntity.grabbed = false;
+            mouse.grabbedEntity = null;
+        }
+    });
+
+    canvas.addEventListener('mousemove', e => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+
+        if (mouse.grabbedEntity) {
+            mouse.grabbedEntity.x = mouse.x - mouse.grabbedEntity.width / 2;
+            mouse.grabbedEntity.y = mouse.y - mouse.grabbedEntity.height / 2;
+            mouse.grabbedEntity.velX = 0;
+            mouse.grabbedEntity.velY = 0;
+        }
+    });
+
+    function update() {
+        // Movimiento Jugador
+        if (keys['KeyA']) player.velX = -player.speed;
+        else if (keys['KeyD']) player.velX = player.speed;
+        else player.velX *= 0.8;
+
+        if (keys['Space'] && player.grounded) {
+            player.velY = -player.jumpForce;
+            player.grounded = false;
         }
 
-        // --- Manejo de Controles (Teclado) ---
-        window.addEventListener('keydown', function(e) {
-            keys[e.key] = true;
-        });
+        player.velY += gravity;
+        player.x += player.velX;
+        player.y += player.velY;
 
-        window.addEventListener('keyup', function(e) {
-            keys[e.key] = false;
-        });
+        // Suelo para Jugador
+        if (player.y + player.height > canvas.height - 20) {
+            player.y = canvas.height - 20 - player.height;
+            player.velY = 0;
+            player.grounded = true;
+        }
 
-        // Ajustar canvas si se cambia el tamaño de la ventana
-        window.addEventListener('resize', function() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            // Opcional: reposicionar suelo principal
-            platforms[0].width = canvas.width;
-            platforms[0].y = canvas.height - 40;
-        });
+        // Actualizar Entidades
+        entities.forEach(ent => ent.update());
+        countDisplay.innerText = entities.length;
+    }
 
-        // --- Iniciar el Juego ---
-        gameLoop();
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    </script>
+        // Dibujar Suelo
+        ctx.fillStyle = '#34495e';
+        ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+
+        // Dibujar Props/NPCs
+        entities.forEach(ent => ent.draw());
+
+        // Dibujar Rayo de Physgun si está agarrando algo
+        if (mouse.grabbedEntity) {
+            ctx.beginPath();
+            ctx.moveTo(player.x + player.width/2, player.y + 20);
+            ctx.lineTo(mouse.x, mouse.y);
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Glow effect
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ffff';
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // Dibujar Jugador
+        ctx.fillStyle = player.color;
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+        ctx.strokeStyle = 'white';
+        ctx.strokeRect(player.x, player.y, player.width, player.height);
+    }
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    loop();
+</script>
+
 </body>
 </html>
