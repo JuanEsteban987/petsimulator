@@ -2,446 +2,191 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>World of JS: P2P RPG Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro RPG 2.5D - Prototype</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Arial', sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; font-family: 'Courier New', Courier, monospace; background: #000; }
+        #ui { position: absolute; bottom: 20px; left: 20px; color: white; pointer-events: none; }
+        #hp-bar-container { width: 300px; height: 25px; background: #440000; border: 3px solid #fff; }
+        #hp-bar-fill { width: 100%; height: 100%; background: #ff0000; transition: width 0.3s; }
+        #instructions { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                        color: white; text-align: center; background: rgba(0,0,0,0.7); padding: 20px; border-radius: 10px; }
         canvas { display: block; }
-
-        /* INTERFAZ DE USUARIO ESTILO MMO */
-        #ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-        }
-
-        /* Barra de Vida Superior */
-        #player-frame {
-            position: absolute; top: 20px; left: 20px;
-            width: 250px; height: 60px; background: rgba(0,0,0,0.7);
-            border: 2px solid #666; pointer-events: auto;
-        }
-        .hp-bar-container { width: 90%; height: 20px; background: #333; margin: 5px auto; }
-        #hp-fill { width: 100%; height: 100%; background: #c0392b; transition: width 0.3s; }
-        .player-name { color: gold; padding: 5px 0 0 15px; font-weight: bold; font-size: 14px; }
-
-        /* Hotbar (Hechizos) */
-        #hotbar {
-            position: absolute; bottom: 20px; left: 50%;
-            transform: translateX(-50%); display: flex; gap: 5px;
-            background: rgba(0,0,0,0.5); padding: 10px; border-radius: 10px;
-            pointer-events: auto;
-        }
-        .spell-slot {
-            width: 50px; height: 50px; background: #222; border: 2px solid #8b5a2b;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 20px; cursor: pointer; position: relative;
-        }
-        .spell-slot:hover { border-color: gold; }
-        .keybind { position: absolute; top: 2px; left: 2px; font-size: 10px; color: #aaa; }
-
-        /* Inventario */
-        #inventory {
-            position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
-            width: 240px; background: rgba(30,30,30,0.95); border: 2px solid #5d4037;
-            display: none; padding: 15px; pointer-events: auto; color: #ddd;
-        }
-        .inv-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 10px; }
-        .inv-slot { width: 65px; height: 65px; background: #111; border: 1px solid #444; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .inv-slot:hover { border-color: #f1c40f; }
-
-        /* Notificaciones */
-        #chat {
-            position: absolute; bottom: 100px; left: 20px;
-            width: 300px; height: 150px; background: rgba(0,0,0,0.3);
-            color: white; font-size: 12px; padding: 10px; overflow-y: hidden;
-            display: flex; flex-direction: column-reverse;
-        }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
 </head>
 <body>
 
-    <div id="ui-layer">
-        <div id="player-frame">
-            <div class="player-name">Héroe Aventurero</div>
-            <div class="hp-bar-container"><div id="hp-fill"></div></div>
-        </div>
-
-        <div id="chat"></div>
-
-        <div id="hotbar">
-            <div class="spell-slot" onclick="castSpell(1)"><span class="keybind">1</span>⚔️</div>
-            <div class="spell-slot" onclick="castSpell(2)"><span class="keybind">2</span>🏹</div>
-            <div class="spell-slot" onclick="castSpell(3)"><span class="keybind">3</span>🔥</div>
-            <div class="spell-slot" onclick="castSpell(4)"><span class="keybind">4</span>🧪</div>
-        </div>
-
-        <div id="inventory">
-            <h3 style="margin: 0; text-align: center;">Mochila (E)</h3>
-            <div class="inv-grid" id="inv-grid"></div>
-        </div>
+    <div id="instructions">
+        <h1>RETRO QUEST 2.5D</h1>
+        <p>WASD: Mover | RATÓN: Girar Cámara | CLICK: Atacar</p>
+        <p>Haz clic para empezar</p>
     </div>
 
-    <script>
-        /**
-         * WORLD OF JS - CORE ENGINE
-         * Un RPG P2P construido desde cero
-         */
+    <div id="ui">
+        <div>JUGADOR HP</div>
+        <div id="hp-bar-container"><div id="hp-bar-fill"></div></div>
+    </div>
 
-        // --- 1. VARIABLES GLOBALES Y CONFIGURACIÓN ---
-        const GameConfig = {
-            playerSpeed: 0.15,
-            rotationSpeed: 0.005,
-            gravity: 0.015,
-            jumpForce: 0.3
-        };
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
 
-        let scene, camera, renderer, clock;
-        let player, playerVelocity = new THREE.Vector3();
-        let isGrounded = false;
-        let currentHP = 100;
-        let entities = []; // Enemigos y otros jugadores
-        let projectiles = [];
-        let particles = [];
-        let peer, connection;
-        let isRightClick = false;
-        let camAzimuth = 0, camElevation = 0.4, camDistance = 10;
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- 1. GENERACIÓN DE TEXTURAS (PROCEDURAL) ---
+        function createTexture(type) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+
+            if (type === 'player') {
+                // Pixel Art: Caballero Azul
+                ctx.fillStyle = '#1a237e'; ctx.fillRect(16, 16, 32, 32); // Cuerpo
+                ctx.fillStyle = '#90caf9'; ctx.fillRect(20, 20, 24, 8);  // Visor
+                ctx.fillStyle = '#5c6bc0'; ctx.fillRect(12, 32, 40, 10); // Hombros
+                ctx.fillStyle = '#000'; ctx.fillRect(24, 24, 4, 4); ctx.fillRect(36, 24, 4, 4); // Ojos
+            } 
+            else if (type === 'orc') {
+                // Pixel Art: Orco Verde
+                ctx.fillStyle = '#2e7d32'; ctx.fillRect(16, 16, 32, 32); // Cara
+                ctx.fillStyle = '#fdd835'; ctx.fillRect(20, 24, 6, 6); ctx.fillRect(38, 24, 6, 6); // Ojos
+                ctx.fillStyle = '#1b5e20'; ctx.fillRect(10, 20, 10, 20); ctx.fillRect(44, 20, 10, 20); // Orejas
+                ctx.fillStyle = '#fff'; ctx.fillRect(24, 40, 4, 6); ctx.fillRect(36, 40, 4, 6); // Colmillos
+            } 
+            else if (type === 'grass') {
+                // Patrón de césped
+                ctx.fillStyle = '#2d5a27'; ctx.fillRect(0, 0, 64, 64);
+                for(let i=0; i<40; i++) {
+                    ctx.fillStyle = Math.random() > 0.5 ? '#388e3c' : '#1b5e20';
+                    ctx.fillRect(Math.random()*64, Math.random()*64, 4, 4);
+                }
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.NearestFilter; // Mantiene el look Pixel Art
+            texture.minFilter = THREE.NearestFilter;
+            return texture;
+        }
+
+        // --- 2. CONFIGURACIÓN DE LA ESCENA ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Cielo azul
+        scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+        scene.add(ambientLight);
+
+        // --- 3. CREACIÓN DEL MUNDO ---
+        // Suelo
+        const grassTex = createTexture('grass');
+        grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
+        grassTex.repeat.set(20, 20);
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ map: grassTex }));
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        // Jugador (Sprite)
+        const playerMaterial = new THREE.SpriteMaterial({ map: createTexture('player') });
+        const player = new THREE.Sprite(playerMaterial);
+        player.scale.set(2, 2, 1);
+        player.position.y = 1;
+        scene.add(player);
+
+        // Enemigos
+        const enemies = [];
+        const orcMaterial = new THREE.SpriteMaterial({ map: createTexture('orc') });
+        for(let i=0; i<5; i++) {
+            const orc = new THREE.Sprite(orcMaterial);
+            orc.scale.set(2, 2, 1);
+            orc.position.set(Math.random()*30 - 15, 1, Math.random()*30 - 15);
+            orc.userData = { hp: 100, id: i };
+            scene.add(orc);
+            enemies.push(orc);
+        }
+
+        // --- 4. CONTROLES Y CÁMARA ---
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let yaw = 0, pitch = -0.5;
         const keys = {};
 
-        // --- 2. INICIALIZACIÓN DE ESCENA ---
-        function init() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x1a1a2e); // Atardecer oscuro
-            scene.fog = new THREE.Fog(0x1a1a2e, 20, 150);
+        document.addEventListener('keydown', (e) => keys[e.code] = true);
+        document.addEventListener('keyup', (e) => keys[e.code] = false);
 
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
-            document.body.appendChild(renderer.domElement);
+        // Pointer Lock
+        renderer.domElement.addEventListener('click', () => {
+            renderer.domElement.requestPointerLock();
+            document.getElementById('instructions').style.display = 'none';
+        });
 
-            clock = new THREE.Clock();
-
-            setupLights();
-            createEnvironment();
-            createPlayer();
-            setupP2P();
-            setupInventoryUI();
-            
-            // Eventos
-            window.addEventListener('resize', onWindowResize);
-            window.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'KeyE') toggleInventory(); });
-            window.addEventListener('keyup', e => keys[e.code] = false);
-            window.addEventListener('mousedown', e => { if(e.button === 2) isRightClick = true; });
-            window.addEventListener('mouseup', e => { if(e.button === 2) isRightClick = false; });
-            window.addEventListener('mousemove', onMouseMove);
-            window.addEventListener('contextmenu', e => e.preventDefault());
-
-            animate();
-            logChat("Bienvenido a World of JS. Usa WASD y E.");
-        }
-
-        function setupLights() {
-            const ambient = new THREE.AmbientLight(0x4040ff, 0.5); // Luz azulada nocturna
-            scene.add(ambient);
-
-            const sun = new THREE.DirectionalLight(0xffaa77, 1);
-            sun.position.set(50, 100, 50);
-            sun.castShadow = true;
-            scene.add(sun);
-        }
-
-        // --- 3. EL MUNDO (Castillo, Suelo, Obstáculos) ---
-        function createEnvironment() {
-            // Suelo con textura de rejilla básica
-            const groundGeo = new THREE.PlaneGeometry(1000, 1000);
-            const groundMat = new THREE.MeshStandardMaterial({ color: 0x1b4d3e });
-            const ground = new THREE.Mesh(groundGeo, groundMat);
-            ground.rotation.x = -Math.PI / 2;
-            ground.receiveShadow = true;
-            scene.add(ground);
-
-            // CASTILLO
-            const castle = new THREE.Group();
-            const stoneMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
-            
-            // Muros principales
-            const mainKeep = new THREE.Mesh(new THREE.BoxGeometry(30, 20, 30), stoneMat);
-            mainKeep.position.y = 10;
-            castle.add(mainKeep);
-
-            // Almenas y Torres
-            const towerGeo = new THREE.CylinderGeometry(4, 4, 35, 8);
-            const positions = [[15,15], [-15,15], [15,-15], [-15,-15]];
-            positions.forEach(pos => {
-                const tower = new THREE.Mesh(towerGeo, stoneMat);
-                tower.position.set(pos[0], 17.5, pos[1]);
-                castle.add(tower);
-            });
-
-            castle.position.set(0, 0, -60);
-            scene.add(castle);
-
-            // Generar algunos "Enemigos" (Cubos flotantes)
-            for(let i=0; i<5; i++) {
-                spawnEnemy(Math.random()*40-20, 1, Math.random()*40-80);
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === renderer.domElement) {
+                yaw -= e.movementX * 0.003;
+                pitch -= e.movementY * 0.003;
+                pitch = Math.max(-Math.PI/3, Math.min(0, pitch)); // Limitar rotación vertical
             }
-        }
+        });
 
-        function spawnEnemy(x, y, z) {
-            const enemyGeo = new THREE.OctahedronGeometry(1.5);
-            const enemyMat = new THREE.MeshStandardMaterial({ color: 0xff3300, emissive: 0xff0000 });
-            const enemy = new THREE.Mesh(enemyGeo, enemyMat);
-            enemy.position.set(x, y, z);
-            enemy.userData = { hp: 50, type: 'mob', speed: 0.05 };
-            scene.add(enemy);
-            entities.push(enemy);
-        }
-
-        // --- 4. EL JUGADOR ---
-        function createPlayer() {
-            player = new THREE.Group();
-            
-            // Cuerpo
-            const body = new THREE.Mesh(
-                new THREE.CapsuleGeometry(0.5, 1, 4, 8),
-                new THREE.MeshStandardMaterial({ color: 0x3498db })
-            );
-            body.position.y = 1;
-            body.castShadow = true;
-            player.add(body);
-
-            // "Ojos" para saber dirección
-            const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.2), new THREE.MeshBasicMaterial({color: 0xffffff}));
-            eyes.position.set(0, 1.5, -0.4);
-            player.add(eyes);
-
-            scene.add(player);
-        }
-
-        // --- 5. SISTEMA DE COMBATE Y PODERES ---
-        function castSpell(slot) {
-            logChat("Lanzando habilidad " + slot + "...");
-            
-            if (slot === 1) { // Ataque de Espada (Area)
-                createVisualEffect(player.position, 0xaaaaaa, "ring");
-                checkMeleeHit();
-            } else if (slot === 3) { // Bola de Fuego
-                launchProjectile(0xff4400, 0.8);
+        // --- 5. LÓGICA DE COMBATE ---
+        window.addEventListener('mousedown', (e) => {
+            if (e.button === 0 && document.pointerLockElement === renderer.domElement) {
+                attack();
             }
-        }
+        });
 
-        function launchProjectile(color, speedMult) {
-            const geo = new THREE.SphereGeometry(0.3);
-            const mat = new THREE.MeshBasicMaterial({ color: color });
-            const p = new THREE.Mesh(geo, mat);
-            
-            p.position.copy(player.position);
-            p.position.y += 1.2;
-
-            const dir = new THREE.Vector3(0, 0, -1);
-            dir.applyEuler(new THREE.Euler(0, camAzimuth, 0));
-
-            projectiles.push({
-                mesh: p,
-                velocity: dir.multiplyScalar(speedMult),
-                life: 120
-            });
-            scene.add(p);
-        }
-
-        function createVisualEffect(pos, color, type) {
-            const pGeo = new THREE.SphereGeometry(0.1);
-            const pMat = new THREE.MeshBasicMaterial({ color: color });
-            
-            for(let i=0; i<10; i++) {
-                const part = new THREE.Mesh(pGeo, pMat);
-                part.position.copy(pos);
-                const vel = new THREE.Vector3(Math.random()-0.5, Math.random()*0.5, Math.random()-0.5);
-                particles.push({ mesh: part, velocity: vel, life: 30 });
-                scene.add(part);
-            }
-        }
-
-        function checkMeleeHit() {
-            entities.forEach(en => {
-                if(en.position.distanceTo(player.position) < 4) {
-                    en.userData.hp -= 20;
-                    logChat("¡Golpeaste al enemigo! HP: " + en.userData.hp);
+        function attack() {
+            enemies.forEach((enemy, index) => {
+                const dist = player.position.distanceTo(enemy.position);
+                if (dist < 3) { // Rango de ataque
+                    enemy.userData.hp -= 40;
+                    enemy.material.color.set(0xff0000); // Feedback visual
+                    setTimeout(() => enemy.material.color.set(0xffffff), 100);
+                    
+                    if (enemy.userData.hp <= 0) {
+                        scene.remove(enemy);
+                        enemies.splice(index, 1);
+                    }
                 }
             });
         }
 
-        // --- 6. LOGICA P2P (PEERJS) ---
-        function setupP2P() {
-            peer = new Peer();
-            peer.on('open', (id) => {
-                document.getElementById('my-id').innerText = id;
-            });
-
-            peer.on('connection', (conn) => {
-                connection = conn;
-                handleData();
-            });
-        }
-
-        function handleData() {
-            connection.on('data', (data) => {
-                // Aquí se recibirían las posiciones de otros jugadores
-                // En esta versión simplificada, mostramos la conexión en chat
-                if(data.type === 'hello') logChat("Otro jugador se ha unido.");
-            });
-        }
-
-        // --- 7. BUCLE PRINCIPAL (GAMELOOP) ---
+        // --- 6. BUCLE DE ANIMACIÓN ---
+        const clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
+            const speed = 10 * delta;
 
-            updateMovement();
-            updateCamera();
-            updateProjectiles();
-            updateParticles();
-            updateAI();
-            
+            // Movimiento basado en la rotación de la cámara
+            const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
+            const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir).negate();
+
+            if (keys['KeyW']) player.position.addScaledVector(dir, speed);
+            if (keys['KeyS']) player.position.addScaledVector(dir, -speed);
+            if (keys['KeyA']) player.position.addScaledVector(side, -speed);
+            if (keys['KeyD']) player.position.addScaledVector(side, speed);
+
+            // La cámara sigue al jugador
+            const camOffset = new THREE.Vector3(0, 0, 8).applyEuler(new THREE.Euler(pitch, yaw, 0));
+            camera.position.copy(player.position).add(camOffset);
+            camera.lookAt(player.position);
+
             renderer.render(scene, camera);
         }
+        animate();
 
-        function updateMovement() {
-            // Rotación del jugador basada en la cámara solo si camina
-            const moveDir = new THREE.Vector3();
-            if (keys['KeyW']) moveDir.z -= 1;
-            if (keys['KeyS']) moveDir.z += 1;
-            if (keys['KeyA']) moveDir.x -= 1;
-            if (keys['KeyD']) moveDir.x += 1;
-
-            if (moveDir.length() > 0) {
-                moveDir.normalize();
-                moveDir.applyEuler(new THREE.Euler(0, camAzimuth, 0));
-                player.position.add(moveDir.multiplyScalar(GameConfig.playerSpeed));
-                player.rotation.y = Math.atan2(moveDir.x, moveDir.z) + Math.PI;
-            }
-
-            // Gravedad básica
-            if (player.position.y > 0) {
-                playerVelocity.y -= GameConfig.gravity;
-                isGrounded = false;
-            } else {
-                player.position.y = 0;
-                playerVelocity.y = 0;
-                isGrounded = true;
-            }
-            player.position.y += playerVelocity.y;
-
-            // Salto
-            if (keys['Space'] && isGrounded) {
-                playerVelocity.y = GameConfig.jumpForce;
-            }
-        }
-
-        function updateCamera() {
-            const idealX = player.position.x + camDistance * Math.sin(camAzimuth) * Math.cos(camElevation);
-            const idealZ = player.position.z + camDistance * Math.cos(camAzimuth) * Math.cos(camElevation);
-            const idealY = player.position.y + camDistance * Math.sin(camElevation);
-
-            camera.position.set(idealX, idealY, idealZ);
-            camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
-        }
-
-        function updateProjectiles() {
-            for (let i = projectiles.length - 1; i >= 0; i--) {
-                const p = projectiles[i];
-                p.mesh.position.add(p.velocity);
-                p.life--;
-
-                // Colisión con entidades
-                entities.forEach(en => {
-                    if(p.mesh.position.distanceTo(en.position) < 2) {
-                        en.userData.hp -= 10;
-                        p.life = 0;
-                        createVisualEffect(en.position, 0xff0000, "hit");
-                    }
-                });
-
-                if (p.life <= 0 || p.mesh.position.y < 0) {
-                    scene.remove(p.mesh);
-                    projectiles.splice(i, 1);
-                }
-            }
-        }
-
-        function updateParticles() {
-            for (let i = particles.length - 1; i >= 0; i--) {
-                const p = particles[i];
-                p.mesh.position.add(p.velocity);
-                p.life--;
-                if(p.life <= 0) {
-                    scene.remove(p.mesh);
-                    particles.splice(i, 1);
-                }
-            }
-        }
-
-        function updateAI() {
-            entities.forEach((en, idx) => {
-                if(en.userData.hp <= 0) {
-                    createVisualEffect(en.position, 0xffff00, "death");
-                    scene.remove(en);
-                    entities.splice(idx, 1);
-                    logChat("Enemigo derrotado.");
-                    return;
-                }
-                
-                // Seguir al jugador si está cerca
-                const dist = en.position.distanceTo(player.position);
-                if(dist < 15 && dist > 2) {
-                    const dir = new THREE.Vector3().subVectors(player.position, en.position).normalize();
-                    en.position.add(dir.multiplyScalar(en.userData.speed));
-                }
-            });
-        }
-
-        // --- 8. UTILIDADES E INTERFAZ ---
-        function onMouseMove(e) {
-            if (isRightClick) {
-                camAzimuth -= e.movementX * GameConfig.rotationSpeed;
-                camElevation += e.movementY * GameConfig.rotationSpeed;
-                camElevation = Math.max(0.05, Math.min(Math.PI / 2.1, camElevation));
-            }
-        }
-
-        function onWindowResize() {
+        // Ajuste de ventana
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function logChat(msg) {
-            const chat = document.getElementById('chat');
-            const div = document.createElement('div');
-            div.innerText = `[Sistema]: ${msg}`;
-            chat.prepend(div);
-        }
-
-        function setupInventoryUI() {
-            const grid = document.getElementById('inv-grid');
-            const items = ['⚔️', '🏹', '🔥', '🧪', '🛡️', '💎', '', '', ''];
-            items.forEach(icon => {
-                const slot = document.createElement('div');
-                slot.className = 'inv-slot';
-                slot.innerText = icon;
-                grid.appendChild(slot);
-            });
-        }
-
-        function toggleInventory() {
-            const inv = document.getElementById('inventory');
-            inv.style.display = inv.style.display === 'block' ? 'none' : 'block';
-        }
-
-        // INICIAR TODO
-        init();
-
+        });
     </script>
 </body>
 </html>
