@@ -174,6 +174,50 @@
             display: none;
             z-index: 50;
         }
+
+        /* HUD de monedas */
+        #coin-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 15px;
+            border-radius: 5px;
+            color: gold;
+            font-weight: bold;
+            font-size: 20px;
+            font-family: monospace;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        /* Tienda */
+        #shop-menu {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            background: rgba(0,0,0,0.9);
+            border: 2px solid #ffaa00;
+            border-radius: 10px;
+            padding: 20px;
+            display: none;
+            flex-direction: column;
+            z-index: 300;
+            color: white;
+        }
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 5px 0;
+            background: #222;
+            border-left: 4px solid #ffaa00;
+            cursor: pointer;
+        }
+        .shop-item:hover { background: #333; }
+        .shop-price { color: gold; font-weight: bold; }
     </style>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
@@ -197,6 +241,10 @@
             <div id="weapon-name">Physgun</div>
             <div id="ammo-info">∞ / ∞</div>
         </div>
+    </div>
+
+    <div id="coin-info">
+        🪙 <span id="coins-count">0</span>
     </div>
 
     <div id="main-menu">
@@ -236,6 +284,9 @@
             <button class="tool-btn" id="btn-start-wave" style="background-color: #500;">Iniciar Supervivencia</button>
             <button class="tool-btn" id="daynight-btn" style="background-color: #2266aa;">Alternar Día/Noche</button>
             <button class="tool-btn" id="spawn-zombie-btn" style="background-color: #aa4422;">Generar Zombie</button>
+
+            <h2 style="margin-top: 30px;">Tienda</h2>
+            <button class="tool-btn" id="open-shop-btn" style="background-color: #226622;">Abrir Tienda (B)</button>
         </div>
         <div class="menu-content">
             <h3>Construcción Básica</h3>
@@ -260,6 +311,29 @@
         <div class="inv-item" data-weapon="subfusil"><span>Subfusil MP5</span><span class="key">[5]</span></div>
         <div class="inv-item" data-weapon="lanzagranadas"><span>Lanzagranadas</span><span class="key">[6]</span></div>
     </div>
+
+    <!-- Tienda -->
+    <div id="shop-menu">
+        <h2 style="text-align:center; color:#ffaa00;">TIENDA</h2>
+        <div class="shop-item" data-weapon="escopeta">
+            <span>🔫 Escopeta SPAS-12</span>
+            <span class="shop-price">50 🪙</span>
+        </div>
+        <div class="shop-item" data-weapon="rifle">
+            <span>🔫 Rifle M4</span>
+            <span class="shop-price">100 🪙</span>
+        </div>
+        <div class="shop-item" data-weapon="subfusil">
+            <span>🔫 Subfusil MP5</span>
+            <span class="shop-price">75 🪙</span>
+        </div>
+        <div class="shop-item" data-weapon="lanzagranadas">
+            <span>💥 Lanzagranadas</span>
+            <span class="shop-price">150 🪙</span>
+        </div>
+        <button id="close-shop-btn" style="margin-top:20px; background:#444; border:none; padding:10px; color:white; cursor:pointer;">Cerrar</button>
+    </div>
+
     <div id="reload-msg">Recargando...</div>
 
     <div id="console-ui">Motor Iniciando Secuencia...<br>Cargando Dependencias...</div>
@@ -345,16 +419,31 @@
         // Nuevas armas
         weapons.rifle = {
             name: "Rifle M4", ammo: 30, maxAmmo: 30, damage: 22, range: 80,
-            cooldown: 0.12, type: "hitscan", reloadTime: 2.0
+            cooldown: 0.12, type: "hitscan", reloadTime: 2.0, price: 100
         };
         weapons.subfusil = {
             name: "Subfusil MP5", ammo: 50, maxAmmo: 50, damage: 18, range: 70,
-            cooldown: 0.08, type: "hitscan", reloadTime: 2.2
+            cooldown: 0.08, type: "hitscan", reloadTime: 2.2, price: 75
         };
         weapons.lanzagranadas = {
             name: "Lanzagranadas", ammo: 6, maxAmmo: 6, damage: 100, range: 100,
-            cooldown: 1.2, type: "explosive", reloadTime: 3.0
+            cooldown: 1.2, type: "explosive", reloadTime: 3.0, price: 150
         };
+        weapons.escopeta.price = 50;
+
+        // Sistema de monedas y compras
+        let coins = 0;
+        const ownedWeapons = ['cuchillo', 'pistola']; // Inicio solo estas
+        if (!isHost) {
+            // Clientes solo tienen estas al inicio
+        } else {
+            // Host tiene todas (para pruebas)
+            ownedWeapons.push('escopeta', 'rifle', 'subfusil', 'lanzagranadas');
+        }
+
+        // Objetos recogibles en el suelo (monedas, armas)
+        let droppedItems = []; // { type, mesh, body, value, weaponId? }
+        let dropIdCounter = 0;
 
         // Recarga
         let isReloading = false;
@@ -367,8 +456,30 @@
         // Día/Noche
         let isNight = false;
 
-        // Cooldown de daño por zombie (para evitar daño continuo)
-        const zombieDamageCooldown = new Map(); // zombie.id -> lastDamageTime
+        // Cooldown de daño por zombie
+        const zombieDamageCooldown = new Map();
+
+        // Tienda
+        const shopDiv = document.getElementById('shop-menu');
+        let shopVisible = false;
+
+        // Árboles decorativos (solo visuales)
+        function addTree(x, z) {
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B5A2B });
+            const foliageMat = new THREE.MeshStandardMaterial({ color: 0x3A9B3A });
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 2.5, 6), trunkMat);
+            trunk.position.set(x, 1.25, z);
+            trunk.castShadow = true;
+            const foliage1 = new THREE.Mesh(new THREE.ConeGeometry(1.5, 2, 8), foliageMat);
+            foliage1.position.set(x, 2.8, z);
+            foliage1.castShadow = true;
+            const foliage2 = new THREE.Mesh(new THREE.ConeGeometry(1.2, 1.8, 8), foliageMat);
+            foliage2.position.set(x, 4.2, z);
+            foliage2.castShadow = true;
+            scene.add(trunk);
+            scene.add(foliage1);
+            scene.add(foliage2);
+        }
 
         /* ======================================================================
            INICIALIZACIÓN DEL MOTOR
@@ -380,8 +491,8 @@
             logConsole("Inicializando Three.js y Cannon-es...");
 
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x1a1a1a);
-            scene.fog = new THREE.FogExp2(0x1a1a1a, 0.015);
+            scene.background = new THREE.Color(0x87CEEB); // Azul cielo por defecto
+            scene.fog = null; // Sin niebla en día
 
             camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 1000);
 
@@ -391,10 +502,11 @@
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             document.body.appendChild(renderer.domElement);
 
-            const ambientLight = new THREE.AmbientLight(0x222222);
+            // Luces más brillantes para el día
+            const ambientLight = new THREE.AmbientLight(0x404060); // Más brillante
             scene.add(ambientLight);
             
-            const dirLight = new THREE.DirectionalLight(0x99aaff, 1.2);
+            const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.5);
             dirLight.position.set(100, 200, 50);
             dirLight.castShadow = true;
             dirLight.shadow.camera.top = 100;
@@ -404,6 +516,11 @@
             dirLight.shadow.mapSize.width = 2048;
             dirLight.shadow.mapSize.height = 2048;
             scene.add(dirLight);
+
+            // Luz de relleno extra
+            const fillLight = new THREE.PointLight(0xccaa88, 0.5);
+            fillLight.position.set(0, 10, 0);
+            scene.add(fillLight);
 
             world = new CANNON.World();
             world.gravity.set(0, -15, 0);
@@ -435,6 +552,15 @@
             jointBody.collisionFilterMask = 0;
             world.addBody(jointBody);
 
+            // Añadir árboles decorativos alrededor del mapa
+            for (let i = 0; i < 150; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 180 + Math.random() * 70;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                addTree(x, z);
+            }
+
             stats = new Stats();
             document.getElementById('stats-container').appendChild(stats.dom);
             
@@ -449,7 +575,7 @@
             document.addEventListener('wheel', onMouseWheel);
 
             document.body.addEventListener('click', () => {
-                if (gameActive && !isDead && document.getElementById('spawn-menu').style.display !== 'flex') {
+                if (gameActive && !isDead && document.getElementById('spawn-menu').style.display !== 'flex' && !shopVisible) {
                     controls.lock();
                 }
             });
@@ -492,6 +618,8 @@
             document.getElementById('btn-host').onclick = () => {
                 isHost = true;
                 gameActive = true;
+                // El host tiene todas las armas (para pruebas)
+                ownedWeapons.push('escopeta', 'rifle', 'subfusil', 'lanzagranadas');
                 document.getElementById('main-menu').style.display = 'none';
                 controls.lock();
                 logConsole("Servidor creado. Eres el HOST autoritativo.");
@@ -512,6 +640,10 @@
                     document.getElementById('main-menu').style.display = 'none';
                     controls.lock();
                     logConsole("Conectado al Host exitosamente.");
+                    // Cliente solo tiene cuchillo y pistola inicialmente
+                    ownedWeapons.length = 0;
+                    ownedWeapons.push('cuchillo', 'pistola');
+                    equipWeapon('pistola');
                 });
             };
         }
@@ -586,9 +718,66 @@
                             scene.background = new THREE.Color(0x87CEEB);
                             scene.fog = null;
                             const dirLight = scene.children.find(c => c instanceof THREE.DirectionalLight);
-                            if (dirLight) dirLight.intensity = 1.2;
+                            if (dirLight) dirLight.intensity = 1.5;
                             const ambient = scene.children.find(c => c instanceof THREE.AmbientLight);
-                            if (ambient) ambient.intensity = 0.22;
+                            if (ambient) ambient.intensity = 0.45;
+                        }
+                    }
+                    break;
+
+                case 'drop_coin':
+                    if (!isHost) {
+                        // Cliente recibe una moneda nueva
+                        spawnCoin(data.payload.pos, data.payload.value, data.payload.id);
+                    }
+                    break;
+
+                case 'pickup_coin':
+                    if (isHost) {
+                        // Host registra que un cliente recogió una moneda
+                        const drop = droppedItems.find(d => d.id === data.payload.id);
+                        if (drop) {
+                            removeDrop(drop);
+                            // Sumar monedas al cliente
+                            // Enviar actualización de monedas al cliente
+                            connections.forEach(conn => {
+                                if (conn.peer === senderId) {
+                                    conn.send({ type: 'update_coins', payload: { coins: data.payload.coins } });
+                                }
+                            });
+                        }
+                    }
+                    break;
+
+                case 'update_coins':
+                    if (!isHost) {
+                        coins = data.payload.coins;
+                        document.getElementById('coins-count').innerText = coins;
+                    }
+                    break;
+
+                case 'buy_weapon':
+                    if (isHost) {
+                        const weapon = data.payload.weapon;
+                        const price = weapons[weapon]?.price;
+                        if (price && data.payload.coins >= price) {
+                            // Restar monedas al cliente y otorgar arma
+                            const newCoins = data.payload.coins - price;
+                            connections.forEach(conn => {
+                                if (conn.peer === senderId) {
+                                    conn.send({ type: 'update_coins', payload: { coins: newCoins } });
+                                    conn.send({ type: 'unlock_weapon', payload: { weapon } });
+                                }
+                            });
+                        }
+                    }
+                    break;
+
+                case 'unlock_weapon':
+                    if (!isHost) {
+                        if (!ownedWeapons.includes(data.payload.weapon)) {
+                            ownedWeapons.push(data.payload.weapon);
+                            logConsole(`¡Arma desbloqueada: ${weapons[data.payload.weapon].name}!`);
                         }
                     }
                     break;
@@ -719,13 +908,13 @@
             playerBody.updateMassProperties();
             world.addBody(playerBody);
 
-            // Mejor detección de suelo con raycast
+            // Detección de suelo con raycast
             const rayFrom = new CANNON.Vec3();
             const rayTo = new CANNON.Vec3();
             playerBody.addEventListener("preStep", () => {
                 rayFrom.copy(playerBody.position);
                 rayTo.copy(playerBody.position);
-                rayTo.y -= 1.3; // distancia de los pies al suelo
+                rayTo.y -= 1.3;
                 const result = new CANNON.RaycastResult();
                 world.raycastClosest(rayFrom, rayTo, {}, result);
                 canJump = result.hasHit && result.hitPointWorld.y <= playerBody.position.y + 0.1;
@@ -854,6 +1043,10 @@
         }
 
         function equipWeapon(weaponId) {
+            if (!ownedWeapons.includes(weaponId)) {
+                logConsole(`No tienes ${weapons[weaponId]?.name}. Cómprala en la tienda.`);
+                return;
+            }
             currentTool = weaponId;
             const wInfo = weapons[weaponId];
             document.getElementById('weapon-name').innerText = wInfo.name;
@@ -884,8 +1077,6 @@
                 weapon.ammo--;
                 document.getElementById('ammo-info').innerText = `${weapon.ammo} / ${weapon.maxAmmo}`;
             }
-
-            // Eliminado el recoil que rotaba la cámara bruscamente
 
             const camPos = controls.getObject().position;
             const camDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -970,7 +1161,7 @@
         }
 
         /* ======================================================================
-           SISTEMA DE ZOMBIES Y OLEADAS (Manejado por el Host)
+           SISTEMA DE ZOMBIES Y OLEADAS
            ====================================================================== */
         function startWaveSurvival() {
             if (!isHost) return;
@@ -999,15 +1190,12 @@
 
             const shape = new CANNON.Cylinder(1, 1, 3, 8);
             const body = new CANNON.Body({ mass: 60, material: playerMaterial });
-            // Posición aleatoria alrededor del jugador o del mapa
             let angle, dist;
             if (Math.random() < 0.7) {
-                // Cerca del jugador
                 angle = Math.random() * Math.PI * 2;
                 dist = 15 + Math.random() * 25;
                 body.position.set(playerBody.position.x + Math.cos(angle) * dist, 5, playerBody.position.z + Math.sin(angle) * dist);
             } else {
-                // Lejos
                 angle = Math.random() * Math.PI * 2;
                 dist = 100 + Math.random() * 80;
                 body.position.set(Math.cos(angle) * dist, 5, Math.sin(angle) * dist);
@@ -1043,6 +1231,11 @@
                     zombies.splice(index, 1);
                     if (waveActive) zombiesAlive--;
                     
+                    // Dropear monedas
+                    const coinValue = 10 + Math.floor(Math.random() * 15);
+                    const pos = z.body.position;
+                    spawnCoin({ x: pos.x, y: pos.y + 1, z: pos.z }, coinValue);
+                    
                     updateWaveUI(currentWave, zombiesAlive);
                     broadcast('wave_state', { wave: currentWave, alive: zombiesAlive });
 
@@ -1053,6 +1246,69 @@
                         }, 5000);
                     }
                 }
+            }
+        }
+
+        function spawnCoin(pos, value, customId = null) {
+            const id = customId || ++dropIdCounter;
+            const geometry = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 8);
+            const material = new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0x442200 });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(pos.x, pos.y, pos.z);
+            mesh.castShadow = true;
+            scene.add(mesh);
+            
+            const shape = new CANNON.Box(new CANNON.Vec3(0.3, 0.05, 0.3));
+            const body = new CANNON.Body({ mass: 1, material: physicsMaterial });
+            body.addShape(shape);
+            body.position.set(pos.x, pos.y, pos.z);
+            world.addBody(body);
+            
+            droppedItems.push({ id, type: 'coin', mesh, body, value });
+            
+            if (isHost && !customId) {
+                // Notificar a clientes sobre la nueva moneda
+                broadcast('drop_coin', { pos, value, id });
+            }
+        }
+
+        function removeDrop(drop) {
+            world.removeBody(drop.body);
+            scene.remove(drop.mesh);
+            drop.mesh.geometry.dispose();
+            const index = droppedItems.indexOf(drop);
+            if (index !== -1) droppedItems.splice(index, 1);
+        }
+
+        function updateCoins(amount) {
+            coins += amount;
+            document.getElementById('coins-count').innerText = coins;
+            if (!isHost) {
+                // Enviar al host la actualización
+                connections[0]?.send({ type: 'update_coins', payload: { coins } });
+            }
+        }
+
+        function buyWeapon(weaponId) {
+            const weapon = weapons[weaponId];
+            if (!weapon || ownedWeapons.includes(weaponId)) {
+                logConsole("Ya tienes esta arma.");
+                return;
+            }
+            const price = weapon.price;
+            if (coins >= price) {
+                if (isHost) {
+                    // Host compra directamente
+                    coins -= price;
+                    ownedWeapons.push(weaponId);
+                    document.getElementById('coins-count').innerText = coins;
+                    logConsole(`Has comprado ${weapon.name}.`);
+                } else {
+                    // Cliente envía solicitud de compra al host
+                    connections[0]?.send({ type: 'buy_weapon', payload: { weapon: weaponId, coins } });
+                }
+            } else {
+                logConsole(`No tienes suficientes monedas. Faltan ${price - coins}.`);
             }
         }
 
@@ -1089,15 +1345,13 @@
                     z.body.velocity.x = 0;
                     z.body.velocity.z = 0;
                     
-                    // Ataque con cooldown
                     const lastDamage = zombieDamageCooldown.get(z.id) || 0;
-                    if (now - lastDamage > 500) { // medio segundo entre ataques
+                    if (now - lastDamage > 500) {
                         zombieDamageCooldown.set(z.id, now);
                         if (targetPos === playerBody.position) {
                             takeDamage(10);
                         } else {
-                            // Daño a cliente (no implementado completamente, pero el host se encarga)
-                            // Para simplificar, el daño a clientes se puede enviar con un mensaje, pero aquí solo host recibe daño.
+                            // Daño a cliente (simplificado)
                         }
                     }
                 }
@@ -1289,6 +1543,7 @@
                         reloadWeapon();
                     }
                     break;
+                case 'KeyB': toggleShop(); break;
             }
         }
 
@@ -1306,12 +1561,13 @@
             const isShowing = menu.style.display === 'flex';
             if (forceState === false || isShowing) {
                 menu.style.display = 'none';
-                controls.lock();
+                if (!shopVisible) controls.lock();
             } else if (forceState === true || !isShowing) {
                 menu.style.display = 'flex';
                 controls.unlock();
                 moveData.forward = moveData.backward = moveData.left = moveData.right = false;
                 if (inventoryVisible) toggleInventory();
+                if (shopVisible) toggleShop();
             }
         }
 
@@ -1345,6 +1601,19 @@
             });
         }
 
+        function toggleShop() {
+            if (!gameActive || isDead) return;
+            shopVisible = !shopVisible;
+            shopDiv.style.display = shopVisible ? 'flex' : 'none';
+            if (shopVisible) {
+                controls.unlock();
+                if (document.getElementById('spawn-menu').style.display === 'flex') toggleQMenu(false);
+                if (inventoryVisible) toggleInventory();
+            } else {
+                controls.lock();
+            }
+        }
+
         function toggleDayNight() {
             if (!isHost) {
                 logConsole("Solo el Host puede cambiar el clima.");
@@ -1363,9 +1632,9 @@
                 scene.background = new THREE.Color(0x87CEEB);
                 scene.fog = null;
                 const dirLight = scene.children.find(c => c instanceof THREE.DirectionalLight);
-                if (dirLight) dirLight.intensity = 1.2;
+                if (dirLight) dirLight.intensity = 1.5;
                 const ambient = scene.children.find(c => c instanceof THREE.AmbientLight);
-                if (ambient) ambient.intensity = 0.22;
+                if (ambient) ambient.intensity = 0.45;
                 logConsole("☀️ Modo Día activado.");
             }
             broadcast('daynight_change', { isNight });
@@ -1376,7 +1645,6 @@
                 logConsole("Solo el Host puede generar zombies manualmente.");
                 return;
             }
-            // Crear un zombie adicional sin afectar la oleada
             const id = ++zombieIdCounter;
             const geo = new THREE.CapsuleGeometry(1, 3, 4, 8);
             const mesh = new THREE.Mesh(geo, zombieMaterial);
@@ -1385,7 +1653,6 @@
 
             const shape = new CANNON.Cylinder(1, 1, 3, 8);
             const body = new CANNON.Body({ mass: 60, material: playerMaterial });
-            // Posición aleatoria cerca del jugador
             const angle = Math.random() * Math.PI * 2;
             const dist = 15 + Math.random() * 20;
             body.position.set(playerBody.position.x + Math.cos(angle) * dist, 5, playerBody.position.z + Math.sin(angle) * dist);
@@ -1420,6 +1687,8 @@
                     btn.onclick = toggleDayNight;
                 } else if (btn.id === 'spawn-zombie-btn') {
                     btn.onclick = spawnManualZombie;
+                } else if (btn.id === 'open-shop-btn') {
+                    btn.onclick = toggleShop;
                 } else {
                     btn.onclick = (e) => {
                         toolBtns.forEach(t => t.classList.remove('active'));
@@ -1439,6 +1708,16 @@
                     selectWeapon(item.dataset.weapon);
                 });
             });
+
+            // Tienda items
+            document.querySelectorAll('.shop-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const weapon = item.dataset.weapon;
+                    buyWeapon(weapon);
+                    toggleShop(); // Cerrar tienda después de comprar (opcional)
+                });
+            });
+            document.getElementById('close-shop-btn').onclick = toggleShop;
         }
 
         function logConsole(msg) {
@@ -1512,6 +1791,22 @@
             if (isHost) {
                 for (let i = 0; i < zombies.length; i++) {
                     zombies[i].mesh.position.copy(zombies[i].body.position);
+                }
+            }
+
+            // Actualizar recogida de monedas (solo host)
+            if (isHost) {
+                const playerPos = playerBody.position;
+                for (let i = 0; i < droppedItems.length; i++) {
+                    const drop = droppedItems[i];
+                    const dist = playerPos.distanceTo(drop.body.position);
+                    if (dist < 1.5) {
+                        updateCoins(drop.value);
+                        removeDrop(drop);
+                        i--;
+                        // Notificar a clientes sobre la recogida
+                        broadcast('pickup_coin', { id: drop.id, coins: coins });
+                    }
                 }
             }
 
