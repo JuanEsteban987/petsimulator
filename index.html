@@ -2,19 +2,64 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Mini Slime Rancher 3D</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Korblox: Slime Prototype</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        #ui { position: absolute; top: 20px; left: 20px; color: white; text-shadow: 2px 2px 4px black; pointer-events: none; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        canvas { display: block; }
+        
+        /* Interfaz de Usuario */
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            cursor: pointer;
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
 
-    <div id="ui">
-        <h1>Mini Slime Rancher</h1>
-        <p>WASD para mover | Clic para Capturar | Esc para salir</p>
+    <div id="overlay">
+        <h1>Haz clic para empezar a recolectar</h1>
     </div>
+
+    <div id="ui">
+        <div style="font-size: 24px;">Slimes en Inventario: <span id="counter">0</span></div>
+        <div style="font-size: 12px; margin-top: 5px;">[WASD] Mover | [Click Izq] Succión | [Click Der] Disparar</div>
+    </div>
+
     <div id="crosshair"></div>
 
     <script type="importmap">
@@ -30,144 +75,215 @@
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
-        // --- Configuración Escena ---
+        // --- Configuración Básica ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb); // Cielo azul
+        scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.y = 1.6; // Altura de los ojos
+
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // --- Luces ---
-        const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
-        scene.add(light);
+        // --- Iluminación ---
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+        scene.add(hemiLight);
 
-        // --- Suelo (El Rancho) ---
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 10, 2);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // --- Suelo y Límites ---
         const floorGeo = new THREE.PlaneGeometry(100, 100);
-        const floorMat = new THREE.MeshLambertMaterial({ color: 0x7cfc00 });
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x7cfc00 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
         scene.add(floor);
 
-        // --- El Slime (Pink Slime) ---
+        // --- Lógica de Juego ---
         const slimes = [];
-        function createSlime(x, z) {
-            const slimeGroup = new THREE.Group();
-            
-            // Cuerpo
-            const bodyGeo = new THREE.SphereGeometry(0.5, 32, 32);
-            const bodyMat = new THREE.MeshPhongMaterial({ color: 0xff69b4, transparent: true, opacity: 0.9 });
-            const body = new THREE.Mesh(bodyGeo, bodyMat);
-            slimeGroup.add(body);
-
-            // Ojos
-            const eyeGeo = new THREE.SphereGeometry(0.05, 16, 16);
-            const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-            const eyeL = eyeMat.clone();
-            const eye1 = new THREE.Mesh(eyeGeo, eyeL);
-            eye1.position.set(0.2, 0.2, 0.4);
-            const eye2 = new THREE.Mesh(eyeGeo, eyeL);
-            eye2.position.set(-0.2, 0.2, 0.4);
-            slimeGroup.add(eye1, eye2);
-
-            slimeGroup.position.set(x, 0.5, z);
-            scene.add(slimeGroup);
-            slimes.push(slimeGroup);
-        }
-
-        // Crear unos cuantos slimes
-        for(let i=0; i<10; i++) {
-            createSlime(Math.random()*20-10, Math.random()*20-10);
-        }
-
-        // --- Controles ---
+        let inventoryCount = 0;
+        const inventoryEl = document.getElementById('counter');
+        
+        // Controles
         const controls = new PointerLockControls(camera, document.body);
-        document.addEventListener('click', () => {
-            if (!controls.isLocked) {
-                controls.lock();
-            } else {
-                // Mecánica de succión
-                checkVacPack();
-            }
-        });
+        const overlay = document.getElementById('overlay');
+
+        overlay.addEventListener('click', () => controls.lock());
+        controls.addEventListener('lock', () => overlay.style.display = 'none');
+        controls.addEventListener('unlock', () => overlay.style.display = 'flex');
 
         // Movimiento
-        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-        const onKeyDown = (e) => {
-            if(e.code === 'KeyW') moveForward = true;
-            if(e.code === 'KeyS') moveBackward = true;
-            if(e.code === 'KeyA') moveLeft = true;
-            if(e.code === 'KeyD') moveRight = true;
-        };
-        const onKeyUp = (e) => {
-            if(e.code === 'KeyW') moveForward = false;
-            if(e.code === 'KeyS') moveBackward = false;
-            if(e.code === 'KeyA') moveLeft = false;
-            if(e.code === 'KeyD') moveRight = false;
-        };
-        document.addEventListener('keydown', onKeyDown);
-        document.addEventListener('keyup', onKeyUp);
+        const moveKeys = { forward: false, backward: false, left: false, right: false };
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyW') moveKeys.forward = true;
+            if (e.code === 'KeyS') moveKeys.backward = true;
+            if (e.code === 'KeyA') moveKeys.left = true;
+            if (e.code === 'KeyD') moveKeys.right = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'KeyW') moveKeys.forward = false;
+            if (e.code === 'KeyS') moveKeys.backward = false;
+            if (e.code === 'KeyA') moveKeys.left = false;
+            if (e.code === 'KeyD') moveKeys.right = false;
+        });
 
-        // --- Lógica de Succión (Raycasting) ---
-        const raycaster = new THREE.Raycaster();
-        function checkVacPack() {
-            // El rayo sale del centro de la pantalla
-            raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-            const intersects = raycaster.intersectObjects(slimes, true);
-            
-            if (intersects.length > 0) {
-                const target = intersects[0].object.parent; // El grupo del slime
-                if(intersects[0].distance < 5) { // Solo si está cerca
-                    scene.remove(target);
-                    const index = slimes.indexOf(target);
-                    if (index > -1) slimes.splice(index, 1);
-                    console.log("¡Slime capturado!");
+        // Mouse Actions
+        let isSucking = false;
+        document.addEventListener('mousedown', (e) => {
+            if (e.button === 0) isSucking = true;
+            if (e.button === 2) shootSlime();
+        });
+        document.addEventListener('mouseup', (e) => {
+            if (e.button === 0) isSucking = false;
+        });
+        document.addEventListener('contextmenu', e => e.preventDefault());
+
+        // --- Clase Slime ---
+        class Slime {
+            constructor(position, color = 0xff69b4) {
+                this.mesh = new THREE.Group();
+                
+                // Cuerpo
+                const body = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.4, 16, 16),
+                    new THREE.MeshStandardMaterial({ color: color })
+                );
+                body.castShadow = true;
+                this.mesh.add(body);
+
+                // Ojos
+                const eyeGeo = new THREE.SphereGeometry(0.05, 8, 8);
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+                const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+                eyeL.position.set(0.15, 0.1, 0.35);
+                const eyeR = eyeL.clone();
+                eyeR.position.x = -0.15;
+                this.mesh.add(eyeL, eyeR);
+
+                this.mesh.position.copy(position);
+                scene.add(this.mesh);
+
+                // Física y Estado
+                this.velocity = new THREE.Vector3(0, 0, 0);
+                this.isGrounded = true;
+                this.nextJump = Date.now() + Math.random() * 3000;
+            }
+
+            update(delta) {
+                // Gravedad simple
+                if (this.mesh.position.y > 0.4) {
+                    this.velocity.y -= 9.8 * delta;
+                    this.isGrounded = false;
+                } else {
+                    this.mesh.position.y = 0.4;
+                    this.velocity.y = 0;
+                    this.velocity.x *= 0.9; // Fricción
+                    this.velocity.z *= 0.9;
+                    this.isGrounded = true;
+                }
+
+                // Salto aleatorio (IA Wander)
+                if (this.isGrounded && Date.now() > this.nextJump) {
+                    this.velocity.y = 4;
+                    this.velocity.x = (Math.random() - 0.5) * 5;
+                    this.velocity.z = (Math.random() - 0.5) * 5;
+                    this.nextJump = Date.now() + 2000 + Math.random() * 3000;
+                }
+
+                // Aplicar movimiento
+                this.mesh.position.add(this.velocity.clone().multiplyScalar(delta));
+
+                // Mirar hacia donde se mueven
+                if (this.velocity.length() > 0.1) {
+                    const lookAtTarget = this.mesh.position.clone().add(this.velocity);
+                    lookAtTarget.y = this.mesh.position.y;
+                    this.mesh.lookAt(lookAtTarget);
                 }
             }
         }
 
+        // --- Generación Inicial ---
+        const colors = [0xff69b4, 0x00ff7f, 0x1e90ff, 0xffd700];
+        for (let i = 0; i < 15; i++) {
+            const pos = new THREE.Vector3((Math.random() - 0.5) * 40, 0.4, (Math.random() - 0.5) * 40);
+            slimes.push(new Slime(pos, colors[Math.floor(Math.random() * colors.length)]));
+        }
+
+        function shootSlime() {
+            if (inventoryCount <= 0) return;
+            
+            inventoryCount--;
+            inventoryEl.innerText = inventoryCount;
+
+            const spawnPos = camera.position.clone().add(new THREE.Vector3(0, -0.2, 0));
+            const newSlime = new Slime(spawnPos, colors[Math.floor(Math.random() * colors.length)]);
+            
+            // Impulso inicial
+            const direction = new THREE.Vector3();
+            camera.getWorldDirection(direction);
+            newSlime.velocity.copy(direction.multiplyScalar(15));
+            newSlime.velocity.y += 2; // Un poco hacia arriba
+
+            slimes.push(newSlime);
+        }
+
         // --- Bucle de Animación ---
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
+        const clock = new THREE.Clock();
 
         function animate() {
             requestAnimationFrame(animate);
+            const delta = clock.getDelta();
 
             if (controls.isLocked) {
-                // Suavizado de movimiento
-                velocity.x -= velocity.x * 10.0 * 0.016;
-                velocity.z -= velocity.z * 10.0 * 0.016;
-
-                direction.z = Number(moveForward) - Number(moveBackward);
-                direction.x = Number(moveRight) - Number(moveLeft);
-                direction.normalize();
-
-                if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * 0.016;
-                if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * 0.016;
-
-                controls.moveRight(-velocity.x * 0.016);
-                controls.moveForward(-velocity.z * 0.016);
+                // Movimiento del jugador
+                const speed = 10 * delta;
+                if (moveKeys.forward) controls.moveForward(speed);
+                if (moveKeys.backward) controls.moveForward(-speed);
+                if (moveKeys.left) controls.moveRight(-speed);
+                if (moveKeys.right) controls.moveRight(speed);
             }
 
-            // Animación simple de rebote para los slimes
-            const time = Date.now() * 0.005;
-            slimes.forEach(s => {
-                s.position.y = 0.5 + Math.abs(Math.sin(time + s.position.x)) * 0.3;
-                s.scale.y = 1 - Math.abs(Math.sin(time + s.position.x)) * 0.2;
-            });
+            // Actualizar Slimes
+            for (let i = slimes.length - 1; i >= 0; i--) {
+                const s = slimes[i];
+                s.update(delta);
+
+                // Lógica de succión
+                if (isSucking) {
+                    const dist = s.mesh.position.distanceTo(camera.position);
+                    if (dist < 8) {
+                        // Atraer hacia la cámara
+                        const target = camera.position.clone();
+                        target.y -= 0.5; // Apuntar un poco más abajo del centro
+                        s.mesh.position.lerp(target, 0.1);
+                        
+                        // Capturar
+                        if (dist < 1.2) {
+                            scene.remove(s.mesh);
+                            slimes.splice(i, 1);
+                            inventoryCount++;
+                            inventoryEl.innerText = inventoryCount;
+                        }
+                    }
+                }
+            }
 
             renderer.render(scene, camera);
         }
 
-        camera.position.y = 1.6; // Altura de los ojos
-        animate();
-
-        // Ajuste de ventana
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        animate();
     </script>
 </body>
 </html>
