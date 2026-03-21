@@ -2,234 +2,210 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Micro Pet Simulator 2D</title>
+    <title>Emoji Pet Simulator</title>
     <style>
-        :root { --p: #ffdf00; --s: #4a90e2; --bg: #1a1d24; --zone: #a1c4fd; }
-        body { font-family: 'Courier New', monospace; background: var(--bg); color: #fff; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        #game { width: 480px; height: 320px; background: url('https://i.imgur.com/kP1p04p.png') no-repeat center center/cover; position: relative; border: 4px solid #fff; box-shadow: 0 0 20px rgba(0,0,0,0.5); image-rendering: pixelated; }
+        :root { --p: #ffdf00; --bg: #1a1d24; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: #fff; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         
-        /* UI COMPACTA */
-        #hud { position: absolute; top: 10px; left: 10px; font-size: 14px; text-shadow: 1px 1px #000; display: flex; flex-direction: column; gap: 4px; z-index: 10; }
-        .stat-icon { color: var(--p); }
+        /* CONTENEDOR PRINCIPAL */
+        #game-container { width: 500px; border: 5px solid #333; border-radius: 15px; overflow: hidden; background: #000; position: relative; }
 
-        /* ESCENARIO Y OBJETOS */
-        #world { width: 100%; height: 100%; position: relative; }
-        #player { width: 16px; height: 16px; background: cyan; position: absolute; bottom: 20px; left: 20px; }
+        /* ESCENARIO (CAMBIA DE COLOR) */
+        #world { width: 100%; height: 300px; background-color: #4CAF50; /* Verde inicial */ position: relative; transition: background 0.5s; overflow: hidden; }
         
-        .coin { width: 14px; height: 14px; background: var(--p); border-radius: 50%; position: absolute; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: #000; box-shadow: 0 0 5px #fff; animation: bounce 0.5s infinite alternate; }
-        @keyframes bounce { to { transform: translateY(-3px); } }
+        /* UI SUPERIOR */
+        #hud { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 20px; font-weight: bold; }
 
-        .pet { width: 12px; height: 12px; border: 1px solid #fff; position: absolute; animation: pet-float 1s infinite ease-in-out; }
-        @keyframes pet-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+        /* MONEDAS */
+        .coin { position: absolute; font-size: 20px; cursor: pointer; user-select: none; z-index: 5; transition: transform 0.1s; }
+        .coin:hover { transform: scale(1.2); }
 
-        /* MENÚS Y BOTONES */
-        #shop-menu { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
-        button { background: #333; border: 2px solid #fff; color: #fff; padding: 4px 8px; cursor: pointer; font-size: 12px; font-family: inherit; }
-        button:hover { background: #555; }
+        /* MASCOTAS (EMOJIS) */
+        .pet { position: absolute; font-size: 24px; transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 6; pointer-events: none; }
 
-        #zones-menu { position: absolute; top: 10px; right: 10px; width: 120px; height: 80px; background: rgba(0,0,0,0.8); border: 2px solid #fff; font-size: 10px; padding: 5px; display: none; overflow-y: scroll; z-index: 10; }
-        #zones-menu h4 { margin: 0 0 5px; text-align: center; }
-        .zone-btn { width: 100%; text-align: left; margin-bottom: 3px; }
+        /* PANEL INFERIOR (TIENDA E INV) */
+        #ui-bottom { background: #222; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+        #inventory { display: flex; gap: 5px; }
+        .slot { width: 35px; height: 35px; background: #333; border: 2px solid #555; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        
+        button { background: #4a90e2; border: none; color: white; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        button:hover { background: #357abd; }
+        button:disabled { background: #555; }
 
-        /* INVENTARIO */
-        #inventory { position: absolute; bottom: 10px; left: 10px; display: flex; gap: 2px; }
-        .inventory-slot { width: 16px; height: 16px; border: 1px solid #fff; background: rgba(0,0,0,0.5); text-align: center; font-size: 10px; }
-
+        /* MENÚ DE ZONAS */
+        #zone-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #333; padding: 20px; border-radius: 10px; display: none; z-index: 20; border: 2px solid #fff; }
     </style>
 </head>
 <body>
 
-    <div id="game">
-        <div id="hud">
-            <div><span class="stat-icon">💰</span> <span id="coin-count">0</span></div>
-            <div><span class="stat-icon">🌟</span> <span id="zone-name">Granja</span></div>
+    <div id="game-container">
+        <div id="hud">💰 <span id="coin-count">0</span> | 📍 <span id="zone-name">Pradera</span></div>
+
+        <div id="world" id="world-bg">
+            </div>
+
+        <div id="ui-bottom">
+            <div id="inventory">
+                <div class="slot" id="s0"></div>
+                <div class="slot" id="s1"></div>
+                <div class="slot" id="s2"></div>
+                <div class="slot" id="s3"></div>
+                <div class="slot" id="s4"></div>
+            </div>
+            <div style="display: flex; gap: 5px;">
+                <button onclick="document.getElementById('zone-menu').style.display='block'">Zonas</button>
+                <button id="btn-buy" onclick="buyEgg()">Huevo (50 💰)</button>
+            </div>
         </div>
 
-        <div id="world">
-            <div id="player"></div>
-            <div id="entities"></div>
-        </div>
-
-        <div id="inventory">
-            <div class="inventory-slot" id="p1">1</div>
-            <div class="inventory-slot" id="p2">2</div>
-            <div class="inventory-slot" id="p3">3</div>
-            <div class="inventory-slot" id="p4">4</div>
-            <div class="inventory-slot" id="p5">5</div>
-        </div>
-
-        <div id="shop-menu">
-            <button onclick="toggleZones()">Zonas</button>
-            <button onclick="buyEgg()">Huevo (50💰)</button>
-        </div>
-
-        <div id="zones-menu">
-            <h4>Zonas</h4>
-            <div id="zone-list"></div>
+        <div id="zone-menu">
+            <h3>Viajar a:</h3>
+            <div id="zone-options"></div>
+            <br>
+            <button onclick="this.parentElement.style.display='none'">Cerrar</button>
         </div>
     </div>
 
     <script>
-        // --- ESTADO DEL JUEGO ---
-        let game = { coins: 0, equippedPets: [], coinsInWorld: 0, currentZone: 0 };
-        const maxCoins = 15;
-        
-        // --- BASE DE DATOS ---
-        const petDb = [
-            {id: 'dog', n: 'Perro', col: '#ff9f43', pow: 1, c: 0.5},
-            {id: 'cat', n: 'Gato', col: '#54a0ff', pow: 3, c: 0.3},
-            {id: 'dra', n: 'Dragón', col: '#ee5253', pow: 10, c: 0.15},
-            {id: 'uni', n: 'Uni', col: '#5f27cd', pow: 50, c: 0.05}
+        // --- CONFIGURACIÓN ---
+        let coins = 0;
+        let myPets = [];
+        let currentZoneIdx = 0;
+
+        const zones = [
+            { n: 'Pradera', color: '#7cfc00', cost: 0, mult: 1 },
+            { n: 'Océano', color: '#00bfff', cost: 500, mult: 5 },
+            { n: 'Infierno', color: '#ff4500', cost: 2500, mult: 20 },
+            { n: 'Cielo', color: '#e0ffff', cost: 10000, mult: 100 }
         ];
 
-        const zonesDb = [
-            {n: 'Granja', cpw: 1, cost: 0, bg: 'https://i.imgur.com/kP1p04p.png'},
-            {n: 'Bosque', cpw: 5, cost: 500, bg: 'https://i.imgur.com/8FkS0fE.png'},
-            {n: 'Desierto', cpw: 25, cost: 5000, bg: 'https://i.imgur.com/nJb7wTf.png'}
+        const petPool = [
+            { e: '🐶', p: 1, prob: 0.5 },
+            { e: '🐱', p: 3, prob: 0.3 },
+            { e: '🦊', p: 8, prob: 0.15 },
+            { e: '🦄', p: 50, prob: 0.05 }
         ];
 
-        // --- INICIALIZACIÓN ---
-        init();
+        const world = document.getElementById('world');
 
-        function init() {
-            renderZoneList();
-            spawnCoins();
-            renderInventory();
+        // --- LÓGICA DE MONEDAS ---
+        function spawnCoin() {
+            if (document.querySelectorAll('.coin').length >= 15) return;
+            
+            const c = document.createElement('div');
+            c.className = 'coin';
+            c.innerHTML = '🪙';
+            c.style.left = Math.random() * 90 + '%';
+            c.style.top = Math.random() * 80 + '%';
+            
+            c.onclick = () => {
+                attackCoin(c);
+            };
+            world.appendChild(c);
         }
 
-        // --- SISTEMA DE MONEDAS ---
-        function spawnCoins() {
-            const entities = document.getElementById('entities');
-            for(let i = game.coinsInWorld; i < maxCoins; i++) {
-                const c = document.createElement('div');
-                c.className = 'coin';
-                c.style.left = Math.random() * (480 - 20) + 'px';
-                c.style.top = Math.random() * (220 - 20) + 100 + 'px'; // Solo en la mitad inferior
-                c.onclick = (e) => clickCoin(e.target);
-                entities.appendChild(c);
-                game.coinsInWorld++;
-            }
-        }
+        function attackCoin(coinEl) {
+            const rect = coinEl.getBoundingClientRect();
+            const worldRect = world.getBoundingClientRect();
+            
+            // Mover mascotas al objetivo
+            const petElements = document.querySelectorAll('.pet');
+            petElements.forEach(pet => {
+                pet.style.left = (rect.left - worldRect.left) + 'px';
+                pet.style.top = (rect.top - worldRect.top) + 'px';
+            });
 
-        function clickCoin(coinEl) {
-            sendPetsToCoin(coinEl);
-            // Simular ataque (1 segundo de viaje + recolección)
+            // Dar recompensa tras "ataque"
             setTimeout(() => {
-                let totalPower = 1 + game.equippedPets.reduce((sum, p) => sum + p.pow, 0);
-                game.coins += totalPower * zonesDb[game.currentZone].cpw;
+                let power = 1;
+                myPets.forEach(p => power += p.p);
+                coins += power * zones[currentZoneIdx].mult;
+                
                 coinEl.remove();
-                game.coinsInWorld--;
-                updateHud();
-                spawnCoins(); // Reaparecer monedas
-            }, 1000);
+                updateUI();
+                spawnCoin();
+                
+                // Volver a posición original
+                petElements.forEach((pet, i) => {
+                    pet.style.left = (10 + (i * 35)) + 'px';
+                    pet.style.top = '260px';
+                });
+            }, 500);
         }
 
         // --- SISTEMA DE MASCOTAS ---
+        function buyEgg() {
+            if (coins >= 50 && myPets.length < 5) {
+                coins -= 50;
+                const roll = Math.random();
+                let acc = 0;
+                let selected = petPool[0];
+                for(let p of petPool) {
+                    acc += p.prob;
+                    if(roll <= acc) { selected = p; break; }
+                }
+                myPets.push(selected);
+                renderPets();
+                updateUI();
+            } else if (myPets.length >= 5) {
+                alert("¡Equipo lleno!");
+            }
+        }
+
         function renderPets() {
-            // Eliminar mascotas visuales antiguas
+            // Limpiar visuales
             document.querySelectorAll('.pet').forEach(p => p.remove());
-            // Crear nuevas mascotas visuales alrededor del jugador
-            game.equippedPets.forEach((p, i) => {
+            myPets.forEach((p, i) => {
+                // Crear en el mundo
                 const petEl = document.createElement('div');
                 petEl.className = 'pet';
-                petEl.style.backgroundColor = p.col;
-                petEl.style.left = (20 + (i * 15)) + 'px';
-                petEl.style.bottom = '20px';
-                petEl.id = 'pet-v-' + i;
-                document.getElementById('world').appendChild(petEl);
+                petEl.innerHTML = p.e;
+                petEl.style.left = (10 + (i * 35)) + 'px';
+                petEl.style.top = '260px';
+                world.appendChild(petEl);
+                
+                // Actualizar inventario inferior
+                document.getElementById('s' + i).innerHTML = p.e;
             });
-        }
-
-        function sendPetsToCoin(coinEl) {
-            game.equippedPets.forEach((p, i) => {
-                const petEl = document.getElementById('pet-v-' + i);
-                const coinX = parseInt(coinEl.style.left);
-                const coinY = 320 - parseInt(coinEl.style.top); // Coordenada Y invertida
-
-                // Mover visualmente
-                petEl.style.transition = '1s ease-out';
-                petEl.style.left = coinX + 'px';
-                petEl.style.bottom = coinY + 'px';
-
-                // Volver al jugador después del ataque
-                setTimeout(() => {
-                    petEl.style.left = (20 + (i * 15)) + 'px';
-                    petEl.style.bottom = '20px';
-                }, 1200);
-            });
-        }
-
-        function buyEgg() {
-            if (game.coins >= 50 && game.equippedPets.length < 5) {
-                game.coins -= 50;
-                hatchPet();
-            } else if (game.equippedPets.length >= 5) {
-                alert("Inventario lleno (max 5)");
-            } else {
-                alert("No tienes suficientes monedas");
-            }
-        }
-
-        function hatchPet() {
-            const roll = Math.random();
-            let pet = petDb[0];
-            let cumulative = 0;
-            for(let p of petDb) {
-                cumulative += p.c;
-                if(roll <= cumulative) { pet = p; break; }
-            }
-            game.equippedPets.push(pet);
-            updateHud();
-            renderPets();
-            renderInventory();
         }
 
         // --- SISTEMA DE ZONAS ---
-        function toggleZones() {
-            const menu = document.getElementById('zones-menu');
-            menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
-        }
-
-        function renderZoneList() {
-            const list = document.getElementById('zone-list');
-            zonesDb.forEach((z, i) => {
-                const btn = document.createElement('button');
-                btn.className = 'zone-btn';
-                btn.innerText = (i === game.currentZone) ? `✅ ${z.n}` : `${z.n} (${z.cost}💰)`;
-                btn.onclick = () => travelZone(i);
-                list.appendChild(btn);
-            });
-        }
-
-        function travelZone(i) {
-            if(game.coins >= zonesDb[i].cost) {
-                game.coins -= zonesDb[i].cost;
-                game.currentZone = i;
-                document.getElementById('game').style.backgroundImage = `url('${zonesDb[i].bg}')`;
-                toggleZones();
-                updateHud();
-                // Limpiar monedas viejas y spawnear nuevas para la nueva zona
-                document.getElementById('entities').innerHTML = '';
-                game.coinsInWorld = 0;
-                spawnCoins();
+        function travel(idx) {
+            const zone = zones[idx];
+            if (coins >= zone.cost) {
+                if(idx !== currentZoneIdx) coins -= zone.cost;
+                currentZoneIdx = idx;
+                world.style.backgroundColor = zone.color;
+                document.getElementById('zone-name').innerText = zone.n;
+                document.getElementById('zone-menu').style.display = 'none';
+                updateUI();
             } else {
-                alert("No tienes suficientes monedas para viajar a esta zona");
+                alert("No tienes suficiente dinero");
             }
         }
 
-        // --- UI & MISC ---
-        function updateHud() {
-            document.getElementById('coin-count').innerText = Math.floor(game.coins);
-            document.getElementById('zone-name').innerText = zonesDb[game.currentZone].n;
-        }
-
-        function renderInventory() {
-            game.equippedPets.forEach((p, i) => {
-                const slot = document.getElementById('p' + (i+1));
-                slot.innerText = '';
-                slot.style.backgroundColor = p.col;
+        function setupZones() {
+            const container = document.getElementById('zone-options');
+            zones.forEach((z, i) => {
+                const b = document.createElement('button');
+                b.style.display = 'block';
+                b.style.margin = '5px 0';
+                b.style.width = '100%';
+                b.innerHTML = `${z.n} <br> <small>Coste: ${z.cost}</small>`;
+                b.onclick = () => travel(i);
+                container.appendChild(b);
             });
         }
+
+        function updateUI() {
+            document.getElementById('coin-count').innerText = Math.floor(coins);
+            document.getElementById('btn-buy').disabled = (coins < 50 || myPets.length >= 5);
+        }
+
+        // --- INICIO ---
+        setupZones();
+        for(let i=0; i<15; i++) spawnCoin();
+        updateUI();
 
     </script>
 </body>
