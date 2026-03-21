@@ -2,311 +2,556 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>GMod 2D Sandbox Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGMod Clone - Three.js + Cannon-es</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: 'Tahoma', sans-serif; }
-        canvas { display: block; background: #3d4d5d; cursor: crosshair; }
-
-        /* Interfaz estilo Source / GMod */
-        #hud {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 15px;
-            border-left: 4px solid #3498db;
-            color: #fff;
-            pointer-events: none;
-            text-shadow: 1px 1px 2px #000;
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        canvas { display: block; }
+        
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 10px; height: 10px;
+            background-color: rgba(255, 255, 255, 0.8); border-radius: 50%;
+            transform: translate(-50%, -50%); pointer-events: none; z-index: 10;
         }
 
-        #toolbar {
-            position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(30, 30, 30, 0.8);
-            padding: 10px;
-            border: 1px solid #555;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            border-radius: 4px;
+        /* Interfaz Q-Menu (Spawn Menu) */
+        #spawn-menu {
+            position: absolute; top: 10%; left: 10%; width: 80%; height: 80%;
+            background-color: rgba(30, 30, 30, 0.85); backdrop-filter: blur(5px);
+            border: 1px solid #555; border-radius: 8px; color: white;
+            display: none; flex-direction: row; z-index: 100;
         }
 
-        .tool-btn {
-            background: #444;
-            color: #ddd;
-            border: 1px solid #222;
-            padding: 12px;
-            cursor: pointer;
-            font-size: 12px;
-            text-transform: uppercase;
-            transition: 0.2s;
-        }
+        .menu-sidebar { width: 250px; background-color: rgba(20, 20, 20, 0.9); padding: 15px; border-right: 1px solid #444; overflow-y: auto; }
+        .menu-content { flex-grow: 1; padding: 20px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 15px; overflow-y: auto; }
+        
+        h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid #555; padding-bottom: 10px; }
+        h3 { font-size: 1rem; color: #aaa; }
 
-        .tool-btn:hover { background: #555; border-color: #3498db; }
-        .tool-btn.active { background: #3498db; color: white; border-color: #fff; }
-
-        #controls-tip {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            color: rgba(255,255,255,0.5);
-            font-size: 12px;
+        .item-btn {
+            width: 100px; height: 100px; background-color: #444; border: 2px solid transparent;
+            border-radius: 5px; cursor: pointer; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: white; transition: all 0.2s;
         }
+        .item-btn:hover { border-color: #0078D7; background-color: #555; }
+        
+        .tool-btn { width: 100%; padding: 10px; margin-bottom: 5px; background: #333; border: none; color: white; cursor: pointer; text-align: left; border-radius: 3px; }
+        .tool-btn:hover { background: #444; border-left: 4px solid #0078D7; }
+        .tool-btn.active { background: #0078D7; border-left: 4px solid white; }
+
+        /* Consola / Log UI */
+        #console-ui {
+            position: absolute; bottom: 10px; left: 10px; width: 300px; max-height: 150px;
+            background-color: rgba(0, 0, 0, 0.5); color: #0f0; font-family: monospace;
+            padding: 10px; border-radius: 5px; overflow-y: auto; pointer-events: none; font-size: 12px;
+        }
+        
+        #instructions { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); color: white; text-shadow: 1px 1px 2px black; text-align: center; pointer-events: none; }
+        
+        /* Stats.js container */
+        #stats-container { position: absolute; top: 0; left: 0; z-index: 50; }
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body>
 
-<div id="hud">
-    <div style="font-weight: bold; font-size: 18px; margin-bottom: 5px;">Garry's Mod 2D</div>
-    <div>Herramienta: <span id="tool-name" style="color: #3498db;">Physics Gun</span></div>
-    <div style="margin-top: 5px; font-size: 13px;">Objetos: <span id="obj-count">0</span></div>
-</div>
-
-<div id="toolbar">
-    <button class="tool-btn active" onclick="setTool('physgun', this)">Physics Gun</button>
-    <button class="tool-btn" onclick="spawnEntity('prop')">Spawn Caja</button>
-    <button class="tool-btn" onclick="spawnEntity('npc')">Spawn NPC</button>
-    <button class="tool-btn" onclick="setTool('remover', this)">Remover</button>
-    <button class="tool-btn" style="margin-top: 10px; background: #c0392b;" onclick="clearAll()">Limpiar Mapa</button>
-</div>
-
-<div id="controls-tip">
-    WASD: Mover | CLICK IZQ: Usar Tool | CLICK DER (con Physgun): Congelar/Descongelar | R: Reiniciar
-</div>
-
-<canvas id="game"></canvas>
-
-<script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
+    <div id="crosshair"></div>
+    <div id="stats-container"></div>
     
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    <div id="instructions">
+        Click para jugar | W,A,S,D: Mover | Espacio: Saltar | Q: Spawn Menu<br>
+        Physgun: Clic Izquierdo (Mover) | Rueda (Alejar/Acercar) | Clic Derecho (Congelar)
+    </div>
 
-    let entities = [];
-    let gravity = 0.4;
-    let friction = 0.9;
-    let currentTool = 'physgun';
-    const keys = {};
-    const mouse = { x: 0, y: 0, left: false, right: false, target: null };
+    <div id="spawn-menu">
+        <div class="menu-sidebar">
+            <h2>Herramientas</h2>
+            <button class="tool-btn active" id="tool-physgun">Physgun (Manipular)</button>
+            <button class="tool-btn" id="tool-weld">Weld (Soldar)</button>
+            <button class="tool-btn" id="tool-thruster">Thruster (Propulsor)</button>
+        </div>
+        <div class="menu-content">
+            <div style="width: 100%;"><h2>Objetos (Props)</h2></div>
+            <button class="item-btn" id="spawn-cube">Cubo<br>(Metal)</button>
+            <button class="item-btn" id="spawn-sphere">Esfera<br>(Goma)</button>
+            <button class="item-btn" id="spawn-box">Caja<br>(Madera)</button>
+        </div>
+    </div>
 
-    class Entity {
-        constructor(x, y, w, h, type) {
-            this.x = x; this.y = y;
-            this.w = w; this.h = h;
-            this.vx = 0; this.vy = 0;
-            this.type = type;
-            this.isFrozen = false;
-            this.isGrabbed = false;
-            this.color = type === 'npc' ? '#e74c3c' : '#95a5a6';
-            this.grounded = false;
-        }
+    <div id="console-ui">Motor Iniciado...</div>
 
-        update() {
-            if (this.isFrozen || this.isGrabbed) return;
-
-            this.vy += gravity;
-            this.vy *= 0.99; // Aire
-            this.vx *= friction;
-
-            // Integración de movimiento
-            this.x += this.vx;
-            this.y += this.vy;
-
-            // Colisión Suelo
-            if (this.y + this.h > canvas.height - 30) {
-                this.y = canvas.height - 30 - this.h;
-                this.vy = 0;
-                this.vx *= friction;
-                this.grounded = true;
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
             }
-
-            // Colisión Paredes
-            if (this.x < 0) { this.x = 0; this.vx *= -0.5; }
-            if (this.x + this.w > canvas.width) { this.x = canvas.width - this.w; this.vx *= -0.5; }
         }
+    </script>
 
-        draw() {
-            ctx.fillStyle = this.isFrozen ? '#2980b9' : (this.isGrabbed ? '#2ecc71' : this.color);
-            ctx.fillRect(this.x, this.y, this.w, this.h);
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import Stats from 'three/addons/libs/stats.module.js';
+        import * as CANNON from 'cannon-es';
+
+        // --- SISTEMA BASE ---
+        let camera, scene, renderer, controls, stats;
+        let world;
+        let lastTime = performance.now();
+        const objectsToSync = []; 
+        let currentTool = 'physgun';
+
+        // --- MATERIALES FÍSICOS ---
+        let physicsMaterial, playerMaterial;
+        let physicsContactMaterial;
+
+        // --- VARIABLES DEL JUGADOR ---
+        let playerBody;
+        const moveData = { forward: false, backward: false, left: false, right: false, jump: false };
+        const playerSpeed = 15;
+        const jumpForce = 8;
+        let canJump = false;
+
+        // --- VARIABLES DE LA PHYSGUN ---
+        const raycaster = new THREE.Raycaster();
+        let isManipulating = false;
+        let manipulatedBody = null;
+        let jointConstraint = null;
+        let jointBody = null; // Cuerpo cinemático que la cámara mueve
+        let manipulationDistance = 5;
+
+        // --- VARIABLES DE TOOLGUN (Weld) ---
+        let weldFirstBody = null;
+
+        init();
+        animate();
+
+        function init() {
+            // 1. Configuración de Three.js (Render)
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB); // Skybox básico
+            scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            // Luces
+            const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+            scene.add(ambientLight);
             
-            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(this.x, this.y, this.w, this.h);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+            dirLight.position.set(50, 100, 50);
+            dirLight.castShadow = true;
+            dirLight.shadow.camera.top = 50;
+            dirLight.shadow.camera.bottom = -50;
+            dirLight.shadow.camera.left = -50;
+            dirLight.shadow.camera.right = 50;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
 
-            if (this.type === 'npc') {
-                ctx.fillStyle = 'white';
-                ctx.fillRect(this.x + 5, this.y + 10, 6, 6);
-                ctx.fillRect(this.x + this.w - 11, this.y + 10, 6, 6);
-            }
+            // 2. Configuración de Cannon-es (Físicas)
+            world = new CANNON.World();
+            world.gravity.set(0, -9.81, 0);
+            world.broadphase = new CANNON.SAPBroadphase(world); // Optimización de colisiones
+            world.solver.iterations = 20;
+
+            // Materiales de física
+            physicsMaterial = new CANNON.Material("standard");
+            playerMaterial = new CANNON.Material("player");
+            
+            physicsContactMaterial = new CANNON.ContactMaterial(physicsMaterial, physicsMaterial, {
+                friction: 0.3,
+                restitution: 0.1
+            });
+            const playerContactMaterial = new CANNON.ContactMaterial(playerMaterial, physicsMaterial, {
+                friction: 0.0, // Cero fricción para que el jugador no se quede pegado a las paredes
+                restitution: 0.0
+            });
+            world.addContactMaterial(physicsContactMaterial);
+            world.addContactMaterial(playerContactMaterial);
+
+            // 3. Entorno (Suelo)
+            createFloor();
+
+            // 4. Jugador (Control y Físicas)
+            createPlayer();
+
+            // 5. Herramienta Physgun (Cuerpo cinemático oculto para las restricciones)
+            const jointShape = new CANNON.Sphere(0.1);
+            jointBody = new CANNON.Body({ mass: 0 }); // mass 0 en Cannon-es = Cinemático/Estático
+            jointBody.addShape(jointShape);
+            jointBody.collisionFilterGroup = 0; // No colisiona con nada
+            jointBody.collisionFilterMask = 0;
+            world.addBody(jointBody);
+
+            // 6. Stats & UI
+            stats = new Stats();
+            document.getElementById('stats-container').appendChild(stats.dom);
+            setupUI();
+
+            // 7. Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mouseup', onMouseUp);
+            document.addEventListener('wheel', onMouseWheel);
+
+            // Iniciar bloqueando el puntero
+            document.body.addEventListener('click', () => {
+                if (document.getElementById('spawn-menu').style.display !== 'flex') {
+                    controls.lock();
+                }
+            });
         }
-    }
 
-    const player = {
-        x: 100, y: 100, w: 30, h: 55, vx: 0, vy: 0,
-        speed: 5, jump: 10, grounded: false
-    };
+        function createFloor() {
+            // Three.js Render
+            const planeGeometry = new THREE.PlaneGeometry(200, 200);
+            const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8, metalness: 0.2 });
+            const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+            planeMesh.rotation.x = -Math.PI / 2;
+            planeMesh.receiveShadow = true;
+            scene.add(planeMesh);
 
-    function checkCollision(a, b) {
-        return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-    }
+            // Grid visual
+            const gridHelper = new THREE.GridHelper(200, 100, 0x000000, 0x000000);
+            gridHelper.material.opacity = 0.2;
+            gridHelper.material.transparent = true;
+            gridHelper.position.y = 0.01;
+            scene.add(gridHelper);
 
-    function resolveCollisions() {
-        const all = [...entities, player];
+            // Cannon.js Física
+            const groundShape = new CANNON.Plane();
+            const groundBody = new CANNON.Body({ mass: 0, material: physicsMaterial });
+            groundBody.addShape(groundShape);
+            groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+            world.addBody(groundBody);
+        }
 
-        for (let i = 0; i < all.length; i++) {
-            for (let j = i + 1; j < all.length; j++) {
-                let e1 = all[i];
-                let e2 = all[j];
+        function createPlayer() {
+            // Three.js Cámara control
+            controls = new PointerLockControls(camera, document.body);
+            scene.add(controls.getObject());
 
-                if (checkCollision(e1, e2)) {
-                    // Empuje básico (Simple AABB Resolve)
-                    let midX1 = e1.x + e1.w / 2;
-                    let midX2 = e2.x + e2.w / 2;
-                    let midY1 = e1.y + e1.h / 2;
-                    let midY2 = e2.y + e2.h / 2;
+            // Cannon.js Cuerpo del jugador (Esfera para deslizarse mejor por el suelo)
+            const radius = 1;
+            const sphereShape = new CANNON.Sphere(radius);
+            playerBody = new CANNON.Body({ mass: 80, material: playerMaterial });
+            playerBody.addShape(sphereShape);
+            playerBody.position.set(0, 5, 0);
+            playerBody.linearDamping = 0.9;
+            playerBody.angularDamping = 1.0; // Evitar que la esfera ruede visualmente la cámara
+            world.addBody(playerBody);
 
-                    let dx = midX1 - midX2;
-                    let dy = midY1 - midY2;
+            // Detección de salto (colisión con el suelo)
+            playerBody.addEventListener("collide", (e) => {
+                const contact = e.contact;
+                if (contact.bi.id == playerBody.id) {
+                    contact.ni.negate(contact.ni);
+                }
+                if (contact.ni.y > 0.5) canJump = true;
+            });
+        }
 
-                    if (Math.abs(dx) > Math.abs(dy)) {
-                        if (dx > 0) e1.x = e2.x + e2.w; else e1.x = e2.x - e1.w;
-                        e1.vx *= 0.5;
-                    } else {
-                        if (dy > 0) e1.y = e2.y + e2.h; else {
-                            e1.y = e2.y - e1.h;
-                            e1.grounded = true;
-                            if(e1 === player) player.vy = 0;
+        // --- SISTEMA DE SPAWN ---
+        function spawnObject(type) {
+            logConsole(`Spawneando: ${type}`);
+            let geometry, material, shape, mass;
+            const size = 1.5;
+
+            // Posición frente al jugador
+            const spawnPos = new THREE.Vector3(0, 0, -5);
+            spawnPos.applyQuaternion(camera.quaternion);
+            spawnPos.add(controls.getObject().position);
+
+            if (type === 'cube' || type === 'box') {
+                geometry = new THREE.BoxGeometry(size, size, size);
+                shape = new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2));
+                mass = (type === 'cube') ? 50 : 10; // Cubo = metal, Caja = madera
+                const color = (type === 'cube') ? 0x888888 : 0x8B4513;
+                material = new THREE.MeshStandardMaterial({ color: color, roughness: 0.4 });
+            } else if (type === 'sphere') {
+                geometry = new THREE.SphereGeometry(size / 2, 32, 32);
+                shape = new CANNON.Sphere(size / 2);
+                mass = 20;
+                material = new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.2, metalness: 0.1 });
+            }
+
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+
+            const body = new CANNON.Body({ mass: mass, material: physicsMaterial });
+            body.addShape(shape);
+            body.position.copy(spawnPos);
+            world.addBody(body);
+
+            // Usamos mesh normal (no InstancedMesh) porque cada objeto necesita su propio Rigidbody independiente
+            // para que las restricciones (Weld, Physgun) funcionen correctamente en Cannon-es.
+            objectsToSync.push({ mesh, body });
+            
+            // Cerrar menú si está abierto
+            toggleQMenu(false);
+        }
+
+        // --- LÓGICA DE HERRAMIENTAS (Physgun / Weld) ---
+        function onMouseDown(event) {
+            if (!controls.isLocked) return;
+            if (event.button !== 0 && event.button !== 2) return; // Solo clic izq (0) o der (2)
+
+            // Raycast desde el centro de la cámara
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            
+            // Extraer meshes de la lista de sincronización
+            const intersectableMeshes = objectsToSync.map(obj => obj.mesh);
+            const intersects = raycaster.intersectObjects(intersectableMeshes);
+
+            if (intersects.length > 0) {
+                const hitMesh = intersects[0].object;
+                const syncObj = objectsToSync.find(obj => obj.mesh === hitMesh);
+                
+                if (syncObj) {
+                    const body = syncObj.body;
+
+                    if (currentTool === 'physgun') {
+                        if (event.button === 0) {
+                            // Clic Izquierdo: Agarrar (Descongelar si estaba congelado)
+                            if (body.mass === 0) {
+                                body.mass = body.originalMass || 10;
+                                body.type = CANNON.Body.DYNAMIC;
+                                body.updateMassProperties();
+                                body.wakeUp();
+                            }
+                            startManipulation(body, intersects[0].point);
+                        } else if (event.button === 2) {
+                            // Clic Derecho: Congelar (Freeze)
+                            body.originalMass = body.mass;
+                            body.mass = 0;
+                            body.type = CANNON.Body.STATIC;
+                            body.updateMassProperties();
+                            body.velocity.set(0,0,0);
+                            body.angularVelocity.set(0,0,0);
+                            logConsole(`Objeto congelado (Freeze)`);
+                        }
+                    } else if (currentTool === 'weld') {
+                        if (event.button === 0) {
+                            if (!weldFirstBody) {
+                                weldFirstBody = body;
+                                logConsole("Weld: Selecciona el segundo objeto...");
+                            } else {
+                                if (weldFirstBody !== body) {
+                                    createWeldConstraint(weldFirstBody, body);
+                                    weldFirstBody = null;
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-    function spawnEntity(type) {
-        const size = type === 'npc' ? {w:30, h:60} : {w:40, h:40};
-        entities.push(new Entity(mouse.x || 100, 50, size.w, size.h, type));
-    }
-
-    function setTool(tool, btn) {
-        currentTool = tool;
-        document.getElementById('tool-name').innerText = btn.innerText;
-        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-    }
-
-    function clearAll() { entities = []; }
-
-    // Loop de Control
-    window.onkeydown = e => keys[e.code] = true;
-    window.onkeyup = e => keys[e.code] = false;
-
-    canvas.onmousedown = e => {
-        if (e.button === 0) mouse.left = true;
-        if (e.button === 2) mouse.right = true;
-
-        if (currentTool === 'remover' && mouse.left) {
-            entities = entities.filter(ent => !checkCollision({x:mouse.x, y:mouse.y, w:1, h:1}, ent));
-        }
-
-        if (currentTool === 'physgun') {
-            entities.forEach(ent => {
-                if (mouse.x > ent.x && mouse.x < ent.x + ent.w && mouse.y > ent.y && mouse.y < ent.y + ent.h) {
-                    if (mouse.left) {
-                        mouse.target = ent;
-                        ent.isGrabbed = true;
-                        ent.isFrozen = false;
-                    }
-                    if (mouse.right && !mouse.left) {
-                        ent.isFrozen = !ent.isFrozen;
-                    }
-                }
-            });
-        }
-    };
-
-    window.onmouseup = e => {
-        if (e.button === 0) {
-            mouse.left = false;
-            if (mouse.target) {
-                mouse.target.isGrabbed = false;
-                mouse.target = null;
+        function onMouseUp(event) {
+            if (event.button === 0 && isManipulating) {
+                stopManipulation();
             }
         }
-        if (e.button === 2) mouse.right = false;
-    };
 
-    window.onmousemove = e => {
-        mouse.x = e.clientX;
-        mouse.y = e.clientY;
-        if (mouse.target && mouse.left) {
-            mouse.target.x = mouse.x - mouse.target.w / 2;
-            mouse.target.y = mouse.y - mouse.target.h / 2;
-            mouse.target.vx = 0; mouse.target.vy = 0;
-        }
-    };
-
-    function gameLoop() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Movimiento Jugador
-        if (keys['KeyA']) player.vx = -player.speed;
-        else if (keys['KeyD']) player.vx = player.speed;
-        else player.vx *= friction;
-
-        player.vy += gravity;
-        player.x += player.vx;
-        player.y += player.vy;
-
-        if (player.y + player.h > canvas.height - 30) {
-            player.y = canvas.height - 30 - player.h;
-            player.vy = 0;
-            player.grounded = true;
+        function onMouseWheel(event) {
+            if (isManipulating) {
+                // Acercar / Alejar objeto con la rueda
+                manipulationDistance -= Math.sign(event.deltaY) * 0.5;
+                manipulationDistance = Math.max(1, Math.min(manipulationDistance, 50));
+            }
         }
 
-        if (keys['Space'] && player.grounded) {
-            player.vy = -player.jump;
-            player.grounded = false;
+        function startManipulation(body, hitPoint) {
+            manipulatedBody = body;
+            isManipulating = true;
+            
+            // Calcular distancia inicial
+            manipulationDistance = controls.getObject().position.distanceTo(hitPoint);
+
+            // Mover el cuerpo cinemático oculto al punto de impacto
+            jointBody.position.copy(hitPoint);
+
+            // Crear restricción punto a punto (PointToPointConstraint)
+            // Calculamos el punto de pivote local en el objeto agarrado
+            const localPivot = new CANNON.Vec3();
+            manipulatedBody.pointToLocalFrame(new CANNON.Vec3(hitPoint.x, hitPoint.y, hitPoint.z), localPivot);
+
+            jointConstraint = new CANNON.PointToPointConstraint(
+                manipulatedBody, localPivot,
+                jointBody, new CANNON.Vec3(0, 0, 0)
+            );
+            world.addConstraint(jointConstraint);
+            
+            // Reducir amortiguación para que se sienta más responsivo al mover
+            manipulatedBody.linearDamping = 0.9;
+            manipulatedBody.angularDamping = 0.9;
         }
 
-        // Colisiones y Updates
-        entities.forEach(ent => ent.update());
-        resolveCollisions();
-
-        // Dibujo
-        // Suelo
-        ctx.fillStyle = '#2c3e50';
-        ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
-
-        entities.forEach(ent => ent.draw());
-
-        // Rayo Physgun
-        if (mouse.target) {
-            ctx.beginPath();
-            ctx.moveTo(player.x + player.w/2, player.y + 15);
-            ctx.lineTo(mouse.x, mouse.y);
-            ctx.strokeStyle = '#3498db';
-            ctx.lineWidth = 3;
-            ctx.setLineDash([5, 5]);
-            ctx.stroke();
-            ctx.setLineDash([]);
+        function stopManipulation() {
+            if (!isManipulating) return;
+            world.removeConstraint(jointConstraint);
+            jointConstraint = null;
+            
+            // Restaurar amortiguación normal
+            manipulatedBody.linearDamping = 0.01;
+            manipulatedBody.angularDamping = 0.01;
+            
+            manipulatedBody = null;
+            isManipulating = false;
         }
 
-        // Dibujar Player
-        ctx.fillStyle = '#3498db';
-        ctx.fillRect(player.x, player.y, player.w, player.h);
-        ctx.strokeStyle = '#fff';
-        ctx.strokeRect(player.x, player.y, player.w, player.h);
+        function createWeldConstraint(bodyA, bodyB) {
+            // LockConstraint fija la rotación y posición relativa entre dos objetos
+            const constraint = new CANNON.LockConstraint(bodyA, bodyB);
+            world.addConstraint(constraint);
+            logConsole("Weld: Objetos soldados exitosamente.");
+        }
 
-        document.getElementById('obj-count').innerText = entities.length;
-        requestAnimationFrame(gameLoop);
-    }
+        // --- CONTROLES Y ENTRADAS ---
+        function onKeyDown(event) {
+            switch (event.code) {
+                case 'KeyW': moveData.forward = true; break;
+                case 'KeyA': moveData.left = true; break;
+                case 'KeyS': moveData.backward = true; break;
+                case 'KeyD': moveData.right = true; break;
+                case 'Space': 
+                    if (canJump && controls.isLocked) {
+                        playerBody.velocity.y = jumpForce;
+                        canJump = false;
+                    }
+                    break;
+                case 'KeyQ': 
+                    toggleQMenu();
+                    break;
+            }
+        }
 
-    gameLoop();
-</script>
+        function onKeyUp(event) {
+            switch (event.code) {
+                case 'KeyW': moveData.forward = false; break;
+                case 'KeyA': moveData.left = false; break;
+                case 'KeyS': moveData.backward = false; break;
+                case 'KeyD': moveData.right = false; break;
+            }
+        }
+
+        function toggleQMenu(forceState) {
+            const menu = document.getElementById('spawn-menu');
+            const isShowing = menu.style.display === 'flex';
+            
+            if (forceState === false || isShowing) {
+                menu.style.display = 'none';
+                controls.lock(); // Volver al juego
+            } else if (forceState === true || !isShowing) {
+                menu.style.display = 'flex';
+                controls.unlock(); // Liberar ratón para usar el menú
+                moveData.forward = moveData.backward = moveData.left = moveData.right = false; // Detener jugador
+            }
+        }
+
+        function setupUI() {
+            // Botones de Spawn
+            document.getElementById('spawn-cube').onclick = () => spawnObject('cube');
+            document.getElementById('spawn-sphere').onclick = () => spawnObject('sphere');
+            document.getElementById('spawn-box').onclick = () => spawnObject('box');
+
+            // Botones de Herramientas
+            const tools = ['physgun', 'weld', 'thruster'];
+            tools.forEach(tool => {
+                document.getElementById(`tool-${tool}`).onclick = (e) => {
+                    tools.forEach(t => document.getElementById(`tool-${t}`).classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentTool = tool;
+                    weldFirstBody = null; // Reset estado si cambiamos
+                    logConsole(`Herramienta equipada: ${tool.toUpperCase()}`);
+                };
+            });
+        }
+
+        function logConsole(msg) {
+            const consoleEl = document.getElementById('console-ui');
+            consoleEl.innerHTML += `<br>> ${msg}`;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- BUCLE PRINCIPAL (RENDER Y FÍSICAS) ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = performance.now();
+            const dt = (time - lastTime) / 1000;
+            lastTime = time;
+
+            // 1. Lógica del Jugador (Físicas aplicadas al Input)
+            if (controls.isLocked) {
+                // Obtener dirección de la cámara ignorando el eje Y
+                const cameraDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                cameraDir.y = 0;
+                cameraDir.normalize();
+
+                const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+                cameraRight.y = 0;
+                cameraRight.normalize();
+
+                const velocity = new THREE.Vector3();
+                if (moveData.forward) velocity.add(cameraDir);
+                if (moveData.backward) velocity.sub(cameraDir);
+                if (moveData.right) velocity.add(cameraRight);
+                if (moveData.left) velocity.sub(cameraRight);
+
+                velocity.normalize().multiplyScalar(playerSpeed);
+                
+                // Aplicar velocidad al cuerpo de Cannon, manteniendo la velocidad en Y (gravedad/salto)
+                playerBody.velocity.x = velocity.x;
+                playerBody.velocity.z = velocity.z;
+
+                // Sincronizar Cámara con el cuerpo físico (añadiendo altura de los ojos)
+                controls.getObject().position.copy(playerBody.position);
+                controls.getObject().position.y += 1.5; // Altura de la vista
+            }
+
+            // 2. Lógica de la Physgun (Actualizar posición del joint)
+            if (isManipulating && controls.isLocked) {
+                // Calcular posición objetivo basada en la cámara y la distancia de manipulación
+                const targetPos = new THREE.Vector3(0, 0, -manipulationDistance);
+                targetPos.applyQuaternion(camera.quaternion);
+                targetPos.add(controls.getObject().position);
+                
+                // Mover el cuerpo cinemático oculto a esa posición
+                jointBody.position.copy(targetPos);
+            }
+
+            // 3. Avanzar simulación de físicas
+            world.step(1 / 60, dt, 3);
+
+            // 4. Sincronizar Físicas -> Three.js (Render)
+            for (let i = 0; i < objectsToSync.length; i++) {
+                objectsToSync[i].mesh.position.copy(objectsToSync[i].body.position);
+                objectsToSync[i].mesh.quaternion.copy(objectsToSync[i].body.quaternion);
+            }
+
+            // Renderizar y actualizar stats
+            renderer.render(scene, camera);
+            stats.update();
+        }
+    </script>
 </body>
 </html>
