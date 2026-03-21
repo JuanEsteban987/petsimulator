@@ -2,498 +2,278 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>JS-CRAFT: PRO EDITION</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebPhys Sandbox - GMod Clone</title>
     <style>
-        :root { --mc-gui: #c6c6c6; --mc-border: #373737; }
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; user-select: none; }
-        canvas { display: block; image-rendering: pixelated; }
-
-        /* HUD & UI */
-        #ui-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        #crosshair { 
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            width: 10px; height: 10px; border: 2px solid white;
+            border-radius: 50%; transform: translate(-50%, -50%);
+            pointer-events: none; mix-blend-mode: difference;
+        }
+        #ui-overlay {
+            position: absolute; bottom: 20px; left: 20px;
+            color: white; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px;
+        }
+        #q-menu {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; 
+            width: 600px; height: 400px; background: rgba(20, 20, 20, 0.9);
+            border: 2px solid #555; display: none; color: white; padding: 20px;
+            grid-template-columns: 1fr 3fr; gap: 15px;
         }
-
-        #hotbar {
-            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
-            display: flex; background: rgba(0,0,0,0.5); padding: 4px; border: 3px solid var(--mc-border);
-            pointer-events: auto;
+        .spawn-item {
+            background: #444; padding: 10px; text-align: center; cursor: pointer; border-radius: 4px;
         }
-        .slot {
-            width: 44px; height: 44px; border: 2px solid #555; background: #8b8b8b;
-            margin: 2px; display: flex; justify-content: center; align-items: center;
-            position: relative; font-size: 20px;
-        }
-        .slot.active { border-color: #fff; box-shadow: inset 0 0 10px #fff; background: #aaa; }
-        .slot .count { position: absolute; bottom: 2px; right: 4px; font-size: 11px; text-shadow: 1px 1px #000; color: white; }
-
-        /* MENU MULTIJUGADOR */
-        #network-panel {
-            position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8);
-            color: #0f0; padding: 15px; border: 2px solid #444; font-size: 12px; pointer-events: auto;
-        }
-        input { background: #222; border: 1px solid #555; color: #0f0; padding: 5px; margin: 5px 0; width: 150px; }
-        button { background: #444; color: white; border: 1px solid #777; cursor: pointer; padding: 5px 10px; }
-        button:hover { background: #666; }
-
-        /* MOBILE CONTROLS */
-        #mobile-controls { position: absolute; bottom: 30px; left: 30px; width: 150px; height: 150px; display: none; }
-        .joystick-base { width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; position: relative; pointer-events: auto; }
-        .joystick-stick { width: 50px; height: 50px; background: rgba(255,255,255,0.4); border-radius: 50%; position: absolute; top: 35px; left: 35px; }
-        
-        #mobile-actions { position: absolute; bottom: 30px; right: 30px; display: none; flex-direction: column; gap: 15px; }
-        .m-btn { 
-            width: 70px; height: 70px; background: rgba(255,255,255,0.2); border-radius: 50%;
-            display: flex; justify-content: center; align-items: center; color: white; 
-            font-weight: bold; pointer-events: auto; font-size: 14px;
-        }
-
-        /* INVENTARIO COMPLETO (E) */
-        #inventory-screen {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: var(--mc-gui); border: 4px solid var(--mc-border); padding: 20px;
-            display: none; flex-direction: column; align-items: center; pointer-events: auto;
-        }
+        .spawn-item:hover { background: #666; }
     </style>
 </head>
 <body>
 
-<div id="ui-wrapper">
-    <div id="network-panel">
-        <div>MI ID: <span id="peer-id-display">CONECTANDO...</span></div>
-        <input type="text" id="remote-id" placeholder="ID DEL AMIGO">
-        <button id="btn-connect">CONECTAR P2P</button>
-        <div id="status-msg"></div>
-    </div>
-
     <div id="crosshair"></div>
-
-    <div id="hotbar"></div>
-
-    <div id="mobile-controls">
-        <div class="joystick-base" id="joy-base"><div class="joystick-stick" id="joy-stick"></div></div>
-    </div>
-    <div id="mobile-actions">
-        <div class="m-btn" id="m-btn-jump">SALTAR</div>
-        <div class="m-btn" id="m-btn-place">PONER</div>
-    </div>
-
-    <div id="inventory-screen">
-        <h2 style="margin-top:0">CRAFTEO</h2>
-        <div id="crafting-area" style="display:flex; gap:10px; margin-bottom:20px;">
-            <div style="display:grid; grid-template-columns: repeat(2, 50px); gap:5px;">
-                <div class="slot"></div><div class="slot"></div>
-                <div class="slot"></div><div class="slot"></div>
-            </div>
-            <div style="align-self:center; font-size:30px">→</div>
-            <div class="slot" style="align-self:center; border-color:gold"></div>
-        </div>
-        <div id="full-inv-grid" style="display:grid; grid-template-columns: repeat(9, 50px); gap:5px;"></div>
-    </div>
-</div>
-
-<script type="importmap">
-    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
-</script>
-
-<script type="module">
-import * as THREE from 'three';
-import { PointerLockControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
-
-/** * --- CONSTANTES Y ESTADO --- 
- */
-const CHUNK_SIZE = 32;
-const WORLD_HEIGHT = 16;
-const worldData = new Map();
-const players = new Map();
-const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-let inventory = Array(9).fill(null).map((_, i) => ({
-    type: i === 0 ? 'grass' : (i === 1 ? 'wood' : (i === 2 ? 'stone' : null)),
-    count: 64
-}));
-let selectedSlot = 0;
-let isInventoryOpen = false;
-
-/** * --- GENERACIÓN DE TEXTURAS (Pixel-Art 8x8) --- 
- */
-function createMinecraftTexture(color1, color2, noise = 0.2) {
-    const size = 8;
-    const canvas = document.createElement('canvas');
-    canvas.width = size; canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    for(let x=0; x<size; x++) {
-        for(let y=0; y<size; y++) {
-            ctx.fillStyle = Math.random() > noise ? color1 : color2;
-            ctx.fillRect(x, y, 1, 1);
-        }
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.magFilter = THREE.NearestFilter;
-    tex.minFilter = THREE.NearestFilter;
-    return new THREE.MeshLambertMaterial({ map: tex });
-}
-
-const materials = {
-    grass: createMinecraftTexture('#5d994d', '#4a7a3d'),
-    dirt: createMinecraftTexture('#795548', '#60443a'),
-    stone: createMinecraftTexture('#888888', '#707070'),
-    wood: createMinecraftTexture('#5d4037', '#453028'),
-    leaves: createMinecraftTexture('#3d6e35', '#2a4a25', 0.4),
-    crafting: createMinecraftTexture('#ab8b63', '#7a5a3a', 0.5)
-};
-
-const blockIcons = { grass:'🌿', dirt:'🟫', stone:'🧱', wood:'🪵', leaves:'🍃', crafting:'🛠️' };
-
-/** * --- MOTOR DE ESCENA --- 
- */
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 20, 60);
-
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: false });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 1); // Optimización
-document.body.appendChild(renderer.domElement);
-
-const controls = new PointerLockControls(camera, document.body);
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-scene.add(ambientLight);
-
-const sunLight = new THREE.DirectionalLight(0xffffff, 0.6);
-sunLight.position.set(10, 20, 10);
-scene.add(sunLight);
-
-/** * --- GESTIÓN DEL MUNDO (Voxel Logic) --- 
- */
-const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-
-function addBlock(x, y, z, type, isStatic = false) {
-    const key = `${x},${y},${z}`;
-    if (worldData.has(key)) return;
-
-    const mesh = new THREE.Mesh(boxGeo, materials[type]);
-    mesh.position.set(x, y, z);
-    mesh.name = type;
+    <div id="ui-overlay">WASD: Mover | Espacio: Salto | Clic: Physics Gun | Q: Menu</div>
     
-    // Face Culling Simplificado: Solo añadir al render si está cerca de la superficie
-    // En un motor real, esto se haría regenerando geometrías (Chunky Meshing)
-    scene.add(mesh);
-    worldData.set(key, { mesh, type });
-}
+    <div id="q-menu">
+        <div id="categories">
+            <h3>Categorías</h3>
+            <div style="color: cyan;">Props</div>
+            <div>NPCs</div>
+            <div>Herramientas</div>
+        </div>
+        <div id="items" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+            <div class="spawn-item" onclick="spawnProp('box')">Caja</div>
+            <div class="spawn-item" onclick="spawnProp('sphere')">Esfera</div>
+            <div class="spawn-item" onclick="spawnProp('wall')">Pared</div>
+        </div>
+    </div>
 
-function removeBlock(x, y, z) {
-    const key = `${x},${y},${z}`;
-    if (worldData.has(key)) {
-        const entry = worldData.get(key);
-        scene.remove(entry.mesh);
-        worldData.delete(key);
-        return entry.type;
-    }
-    return null;
-}
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/+esm"
+            }
+        }
+    </script>
 
-// Generador de Terreno con Cuevas y Árboles
-function initWorld() {
-    for(let x = -CHUNK_SIZE/2; x < CHUNK_SIZE/2; x++) {
-        for(let z = -CHUNK_SIZE/2; z < CHUNK_SIZE/2; z++) {
-            // Función de altura (Perlin Noise Simplificado)
-            const h = Math.floor(Math.sin(x/6) * 2 + Math.cos(z/6) * 2);
-            
-            for(let y = -5; y <= h; y++) {
-                // Generador de Cuevas (3D Noise sim)
-                const caveValue = Math.sin(x/2) * Math.cos(y/2) * Math.sin(z/2);
-                if (y < h - 1 && caveValue > 0.7) continue;
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import * as CANNON from 'cannon-es';
 
-                let type = 'stone';
-                if (y === h) type = 'grass';
-                else if (y > h - 3) type = 'dirt';
-                
-                addBlock(x, y, z, type);
+        // --- 1. CONFIGURACIÓN DEL MOTOR DE FÍSICAS ---
+        class PhysicsEngine {
+            constructor() {
+                this.world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+                this.world.allowSleep = true; // Optimización de rendimiento
+                this.meshes = [];
+                this.bodies = [];
             }
 
-            // Árboles aleatorios
-            if (Math.random() > 0.985 && x % 4 === 0) {
-                const baseH = h + 1;
-                for(let th=0; th<4; th++) addBlock(x, baseH + th, z, 'wood');
-                for(let lx=-1; lx<=1; lx++) {
-                    for(let lz=-1; lz<=1; lz++) {
-                        addBlock(x+lx, baseH + 4, z+lz, 'leaves');
-                    }
+            update() {
+                this.world.fixedStep();
+                for (let i = 0; i < this.meshes.length; i++) {
+                    this.meshes[i].position.copy(this.bodies[i].position);
+                    this.meshes[i].quaternion.copy(this.bodies[i].quaternion);
                 }
             }
         }
-    }
-}
 
-/** * --- FÍSICA Y COLISIONES (AABB) --- 
- */
-let velocity = new THREE.Vector3();
-let moveState = { forward: 0, back: 0, left: 0, right: 0 };
-let canJump = false;
+        // --- 2. CONFIGURACIÓN DE LA ESCENA ---
+        class SceneSetup {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x87ceeb); // Cielo básico
+                
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                document.body.appendChild(this.renderer.domElement);
 
-function isBlockAt(x, y, z) {
-    return worldData.has(`${Math.round(x)},${Math.round(y)},${Math.round(z)}`);
-}
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+                this.scene.add(ambientLight);
 
-function updatePhysics(delta) {
-    if (!controls.isLocked && !isMobile) return;
+                const sun = new THREE.DirectionalLight(0xffffff, 1);
+                sun.position.set(10, 20, 10);
+                sun.castShadow = true;
+                this.scene.add(sun);
 
-    // Gravedad
-    velocity.y -= 18.0 * delta;
-
-    const oldPos = camera.position.clone();
-    
-    // Aplicar Velocidad Vertical
-    camera.position.y += velocity.y * delta;
-    if (isBlockAt(camera.position.x, camera.position.y - 1.6, camera.position.z)) {
-        camera.position.y = oldPos.y;
-        velocity.y = 0;
-        canJump = true;
-    }
-
-    // Aplicar Movimiento Horizontal
-    const dir = new THREE.Vector3();
-    dir.z = moveState.forward - moveState.back;
-    dir.x = moveState.right - moveState.left;
-    dir.normalize();
-
-    const speed = 5.0;
-    if (dir.length() > 0) {
-        // Colisión eje X
-        controls.moveRight(dir.x * speed * delta);
-        if (isBlockAt(camera.position.x, camera.position.y - 1, camera.position.z)) {
-            camera.position.x = oldPos.x;
-        }
-        // Colisión eje Z
-        controls.moveForward(dir.z * speed * delta);
-        if (isBlockAt(camera.position.x, camera.position.y - 1, camera.position.z)) {
-            camera.position.z = oldPos.z;
-        }
-    }
-
-    // Caída al vacío (Reset)
-    if (camera.position.y < -20) camera.position.set(0, 10, 0);
-}
-
-/** * --- MULTIPLAYER P2P (PeerJS) --- 
- */
-const peer = new Peer();
-let connection = null;
-
-peer.on('open', (id) => {
-    document.getElementById('peer-id-display').innerText = id;
-});
-
-peer.on('connection', (conn) => {
-    setupConnection(conn);
-});
-
-document.getElementById('btn-connect').onclick = () => {
-    const remoteId = document.getElementById('remote-id').value;
-    if (remoteId) {
-        const conn = peer.connect(remoteId);
-        setupConnection(conn);
-    }
-};
-
-function setupConnection(conn) {
-    connection = conn;
-    document.getElementById('status-msg').innerText = "CONECTADO";
-    connection.on('data', (data) => {
-        if (data.type === 'move') {
-            updateRemotePlayer(data);
-        } else if (data.type === 'block-add') {
-            addBlock(data.x, data.y, data.z, data.blockType);
-        } else if (data.type === 'block-rem') {
-            removeBlock(data.x, data.y, data.z);
-        }
-    });
-}
-
-function updateRemotePlayer(data) {
-    if (!players.has(data.id)) {
-        const geo = new THREE.BoxGeometry(0.6, 1.8, 0.6);
-        const mat = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-        const mesh = new THREE.Mesh(geo, mat);
-        scene.add(mesh);
-        players.set(data.id, mesh);
-    }
-    const pMesh = players.get(data.id);
-    pMesh.position.set(data.x, data.y - 0.9, data.z);
-}
-
-/** * --- UI Y SISTEMA DE INVENTARIO --- 
- */
-function updateHotbarUI() {
-    const hotbar = document.getElementById('hotbar');
-    hotbar.innerHTML = '';
-    inventory.forEach((item, i) => {
-        const slot = document.createElement('div');
-        slot.className = `slot ${i === selectedSlot ? 'active' : ''}`;
-        slot.innerHTML = item.type ? blockIcons[item.type] : '';
-        if (item.count > 1) {
-            const c = document.createElement('span');
-            c.className = 'count';
-            c.innerText = item.count;
-            slot.appendChild(c);
-        }
-        hotbar.appendChild(slot);
-    });
-}
-
-function addToInventory(type) {
-    const existing = inventory.find(i => i.type === type);
-    if (existing) {
-        existing.count++;
-    } else {
-        const empty = inventory.find(i => i.type === null);
-        if (empty) {
-            empty.type = type;
-            empty.count = 1;
-        }
-    }
-    updateHotbarUI();
-}
-
-/** * --- INTERACCIÓN (Romper / Poner) --- 
- */
-function performAction(isBreaking) {
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const intersects = raycaster.intersectObjects(scene.children);
-
-    if (intersects.length > 0) {
-        const hit = intersects[0];
-        if (isBreaking) {
-            const type = removeBlock(hit.object.position.x, hit.object.position.y, hit.object.position.z);
-            if (type) {
-                addToInventory(type);
-                if (connection) connection.send({ type: 'block-rem', x: hit.object.position.x, y: hit.object.position.y, z: hit.object.position.z });
-            }
-        } else {
-            // Poner Bloque
-            const pos = hit.object.position.clone().add(hit.face.normal);
-            // Evitar poner bloque sobre el jugador
-            const pX = Math.round(camera.position.x);
-            const pZ = Math.round(camera.position.z);
-            const pY = Math.round(camera.position.y);
-            if (pos.x === pX && pos.z === pZ && (pos.y === pY || pos.y === pY - 1)) return;
-
-            const slot = inventory[selectedSlot];
-            if (slot.type && slot.count > 0) {
-                addBlock(pos.x, pos.y, pos.z, slot.type);
-                if (connection) connection.send({ type: 'block-add', x: pos.x, y: pos.y, z: pos.z, blockType: slot.type });
-                slot.count--;
-                if (slot.count <= 0) slot.type = null;
-                updateHotbarUI();
+                // Flatgrass Floor
+                const grid = new THREE.GridHelper(100, 100, 0x000000, 0x000000);
+                grid.material.opacity = 0.2;
+                grid.material.transparent = true;
+                this.scene.add(grid);
             }
         }
-    }
-}
 
-/** * --- EVENTOS DE ENTRADA --- 
- */
-window.addEventListener('keydown', (e) => {
-    if (e.code === 'KeyE') {
-        isInventoryOpen = !isInventoryOpen;
-        document.getElementById('inventory-screen').style.display = isInventoryOpen ? 'flex' : 'none';
-        if (isInventoryOpen) controls.unlock();
-        else controls.lock();
-    }
-    if (isInventoryOpen) return;
+        // --- 3. CONTROLADOR DEL JUGADOR ---
+        class PlayerController {
+            constructor(scene, camera, physics) {
+                this.controls = new PointerLockControls(camera, document.body);
+                this.physics = physics;
+                this.velocity = new THREE.Vector3();
+                this.direction = new THREE.Vector3();
+                this.canJump = false;
 
-    switch(e.code) {
-        case 'KeyW': moveState.forward = 1; break;
-        case 'KeyS': moveState.back = 1; break;
-        case 'KeyA': moveState.left = 1; break;
-        case 'KeyD': moveState.right = 1; break;
-        case 'Space': if (canJump) { velocity.y = 7.5; canJump = false; } break;
-    }
-    if (e.key >= '1' && e.key <= '9') {
-        selectedSlot = parseInt(e.key) - 1;
-        updateHotbarUI();
-    }
-});
+                // Hitbox del jugador (Cilindro/Caja invisible)
+                this.body = new CANNON.Body({
+                    mass: 70,
+                    shape: new CANNON.Sphere(1.5),
+                    position: new CANNON.Vec3(0, 2, 0),
+                    fixedRotation: true
+                });
+                physics.world.addBody(this.body);
 
-window.addEventListener('keyup', (e) => {
-    switch(e.code) {
-        case 'KeyW': moveState.forward = 0; break;
-        case 'KeyS': moveState.back = 0; break;
-        case 'KeyA': moveState.left = 0; break;
-        case 'KeyD': moveState.right = 0; break;
-    }
-});
+                document.addEventListener('click', () => {
+                    if (!this.controls.isLocked && qMenu.style.display !== 'grid') this.controls.lock();
+                });
+            }
 
-renderer.domElement.addEventListener('mousedown', (e) => {
-    if (controls.isLocked) {
-        performAction(e.button === 0);
-    } else if (!isMobile && !isInventoryOpen) {
-        controls.lock();
-    }
-});
+            update(delta, keys) {
+                if (!this.controls.isLocked) return;
 
-// Soporte Móvil
-if (isMobile) {
-    document.getElementById('mobile-controls').style.display = 'block';
-    document.getElementById('mobile-actions').style.display = 'flex';
-    document.getElementById('m-btn-jump').ontouchstart = () => { if (canJump) { velocity.y = 7.5; canJump = false; } };
-    document.getElementById('m-btn-place').ontouchstart = () => performAction(false);
-    
-    // Cámara Touch
-    let lastTouch = null;
-    window.addEventListener('touchstart', e => { lastTouch = e.touches[0]; });
-    window.addEventListener('touchmove', e => {
-        if (!lastTouch || e.target.closest('#mobile-controls')) return;
-        const touch = e.touches[0];
-        const dx = touch.pageX - lastTouch.pageX;
-        const dy = touch.pageY - lastTouch.pageY;
-        camera.rotation.y -= dx * 0.005;
-        camera.rotation.x -= dy * 0.005;
-        lastTouch = touch;
-    });
-}
+                // Sincronizar cámara con cuerpo físico
+                const pos = this.body.position;
+                this.controls.getObject().position.set(pos.x, pos.y + 1, pos.z);
 
-/** * --- BUCLE DE RENDERIZADO --- 
- */
-let lastTime = performance.now();
-function animate() {
-    requestAnimationFrame(animate);
-    const time = performance.now();
-    const delta = (time - lastTime) / 1000;
+                this.direction.z = Number(keys.w) - Number(keys.s);
+                this.direction.x = Number(keys.d) - Number(keys.a);
+                this.direction.normalize();
 
-    updatePhysics(delta);
+                const speed = 150.0;
+                if (keys.w || keys.s) this.body.velocity.z = -this.direction.z * speed * delta * Math.cos(this.controls.getObject().rotation.y);
+                if (keys.a || keys.d) this.body.velocity.x = this.direction.x * speed * delta * Math.cos(this.controls.getObject().rotation.y);
+            }
+        }
 
-    // Sync Multiplayer
-    if (connection && time % 100 < 20) {
-        connection.send({
-            type: 'move',
-            id: peer.id,
-            x: camera.position.x,
-            y: camera.position.y,
-            z: camera.position.z
+        // --- 4. PHYSICS GUN (EL CORAZÓN) ---
+        class PhysicsGun {
+            constructor(scene, camera, physics) {
+                this.scene = scene;
+                this.camera = camera;
+                this.physics = physics;
+                this.raycaster = new THREE.Raycaster();
+                this.pickedObject = null;
+                this.distance = 5;
+                
+                // Visual del láser
+                const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                this.laser = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x00ffff }));
+                this.laser.visible = false;
+                this.scene.add(this.laser);
+            }
+
+            pick() {
+                this.raycaster.setFromCamera(new THREE.Vector2(0,0), this.camera);
+                const intersects = this.raycaster.intersectObjects(this.physics.meshes);
+                
+                if (intersects.length > 0) {
+                    this.pickedObject = intersects[0].object;
+                    const index = this.physics.meshes.indexOf(this.pickedObject);
+                    this.pickedBody = this.physics.bodies[index];
+                    this.pickedBody.mass = 0; // "Congelar" mientras se levanta
+                    this.pickedBody.updateMassProperties();
+                    this.laser.visible = true;
+                }
+            }
+
+            release() {
+                if (this.pickedBody) {
+                    this.pickedBody.mass = 5;
+                    this.pickedBody.updateMassProperties();
+                }
+                this.pickedObject = null;
+                this.pickedBody = null;
+                this.laser.visible = false;
+            }
+
+            update() {
+                if (this.pickedObject && this.pickedBody) {
+                    const targetPos = new THREE.Vector3();
+                    this.camera.getWorldDirection(targetPos);
+                    targetPos.multiplyScalar(this.distance).add(this.camera.position);
+                    
+                    this.pickedBody.position.copy(targetPos);
+                    this.pickedBody.velocity.set(0,0,0);
+
+                    // Actualizar láser
+                    const positions = this.laser.geometry.attributes.position.array;
+                    positions[0] = this.camera.position.x; positions[1] = this.camera.position.y - 0.5; positions[2] = this.camera.position.z;
+                    positions[3] = targetPos.x; positions[4] = targetPos.y; positions[5] = targetPos.z;
+                    this.laser.geometry.attributes.position.needsUpdate = true;
+                }
+            }
+        }
+
+        // --- INICIALIZACIÓN ---
+        const game = new SceneSetup();
+        const physics = new PhysicsEngine();
+        const player = new PlayerController(game.scene, game.camera, physics);
+        const physGun = new PhysicsGun(game.scene, game.camera, physics);
+
+        // Suelo físico
+        const groundBody = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
+        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+        physics.world.addBody(groundBody);
+
+        // Input
+        const keys = { w: false, a: false, s: false, d: false };
+        const qMenu = document.getElementById('q-menu');
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = true;
+            if (e.key.toLowerCase() === 'q') {
+                qMenu.style.display = 'grid';
+                player.controls.unlock();
+            }
         });
-    }
+        window.addEventListener('keyup', (e) => {
+            if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = false;
+            if (e.key.toLowerCase() === 'q') qMenu.style.display = 'none';
+        });
 
-    renderer.render(scene, camera);
-    lastTime = time;
-}
+        window.addEventListener('mousedown', () => physGun.pick());
+        window.addEventListener('mouseup', () => physGun.release());
 
-// Inicio
-initWorld();
-updateHotbarUI();
-camera.position.set(0, 10, 0);
-animate();
+        // Función global para spawn (conectada al UI)
+        window.spawnProp = (type) => {
+            let shape, mesh;
+            const pos = new THREE.Vector3();
+            game.camera.getWorldDirection(pos);
+            pos.multiplyScalar(5).add(game.camera.position);
 
-// Ajuste ventana
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
-</script>
+            if (type === 'box' || type === 'wall') {
+                const size = type === 'box' ? [1,1,1] : [3,3,0.5];
+                shape = new CANNON.Box(new CANNON.Vec3(size[0]/2, size[1]/2, size[2]/2));
+                mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff }));
+            } else {
+                shape = new CANNON.Sphere(0.7);
+                mesh = new THREE.Mesh(new THREE.SphereGeometry(0.7), new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff }));
+            }
+
+            const body = new CANNON.Body({ mass: 5, shape: shape, position: new CANNON.Vec3(pos.x, pos.y, pos.z) });
+            mesh.castShadow = true;
+            
+            physics.world.addBody(body);
+            game.scene.add(mesh);
+            physics.meshes.push(mesh);
+            physics.bodies.push(body);
+        };
+
+        // Loop principal
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            physics.update();
+            player.update(delta, keys);
+            physGun.update();
+            game.renderer.render(game.scene, game.camera);
+        }
+        animate();
+    </script>
 </body>
 </html>
