@@ -2,25 +2,31 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft JS P2P - Final</title>
+    <title>Minecraft JS - Mejorado</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Courier New', monospace; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; border: 2px solid white; transform: translate(-50%, -50%); pointer-events: none; mix-blend-mode: difference; }
-        #hotbar { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; background: rgba(0,0,0,0.5); padding: 5px; border: 2px solid #333; }
-        .slot { width: 40px; height: 40px; border: 3px solid #888; margin: 0 2px; display: flex; justify-content: center; align-items: center; background: #555; color: white; }
-        .slot.selected { border-color: white; background: #777; }
-        #p2p-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: lime; padding: 10px; font-size: 12px; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; border: 2px solid white; transform: translate(-50%, -50%); pointer-events: none; mix-blend-mode: difference; z-index: 10; }
+        #hotbar { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); display: flex; background: rgba(0,0,0,0.7); padding: 5px; border: 3px solid #333; }
+        .slot { width: 50px; height: 50px; border: 3px solid #888; margin: 0 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #555; color: white; font-size: 10px; position: relative; }
+        .slot.selected { border-color: #fff; background: #777; }
+        .count { position: absolute; bottom: 2px; right: 4px; font-size: 12px; color: yellow; }
+        #p2p-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: #0f0; padding: 10px; font-size: 11px; border: 1px solid #444; }
     </style>
 </head>
 <body>
 
 <div id="crosshair"></div>
-<div id="p2p-info">Mi ID: <span id="my-id">...</span><br><input id="peer-id" placeholder="ID Amigo"><button onclick="connectToPeer()">Conectar</button></div>
+<div id="p2p-info">
+    ID: <span id="my-id">Cargando...</span><br>
+    <input id="peer-id" placeholder="ID Amigo" style="width:80px">
+    <button onclick="connectToPeer()">Unirse</button>
+</div>
+
 <div id="hotbar">
-    <div class="slot selected" id="s1">1</div>
-    <div class="slot" id="s2">2</div>
-    <div class="slot" id="s3">3</div>
+    <div class="slot selected" id="slot-1">🌿<div class="count" id="cnt-1">0</div></div>
+    <div class="slot" id="slot-2">🪵<div class="count" id="cnt-2">0</div></div>
+    <div class="slot" id="slot-3">🪨<div class="count" id="cnt-3">0</div></div>
 </div>
 
 <script type="importmap">
@@ -33,12 +39,11 @@ import * as THREE from 'three';
 // --- CONFIG ---
 const CHUNK_SIZE = 16;
 const WORLD = new Map();
-let selectedBlock = 1;
-const playerSize = { w: 0.6, h: 1.8, d: 0.6 };
+let selectedSlot = 1;
+const inventory = { 1: 0, 2: 0, 3: 0 };
 let velocity = new THREE.Vector3();
 let canJump = false;
 
-// --- ESCENA ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -46,11 +51,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: false });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-const light = new THREE.AmbientLight(0xffffff, 0.7);
-scene.add(light);
-
-// Texturas 16x16
-const loader = new THREE.TextureLoader();
+// Texturas Pixel-Art
 function createTex(color) {
     const canvas = document.createElement('canvas');
     canvas.width = 16; canvas.height = 16;
@@ -62,90 +63,94 @@ function createTex(color) {
     return new THREE.MeshLambertMaterial({ map: t });
 }
 const mats = [null, createTex('#4a7c10'), createTex('#8b4513'), createTex('#808080')];
+const boxGeo = new THREE.BoxGeometry(1, 1, 1);
 
-// --- FUNCIONES DE MUNDO ---
+// --- LÓGICA DE MUNDO ---
 function getVoxel(x, y, z) {
     const cx = Math.floor(x / CHUNK_SIZE);
     const cz = Math.floor(z / CHUNK_SIZE);
-    const key = `${cx},${cz}`;
-    const chunk = WORLD.get(key);
+    const chunk = WORLD.get(`${cx},${cz}`);
     if (!chunk) return 0;
     const lx = Math.floor(x) - cx * CHUNK_SIZE;
     const ly = Math.floor(y);
     const lz = Math.floor(z) - cz * CHUNK_SIZE;
-    if (ly < 0 || ly >= 16) return 0;
-    return chunk.data[lx + ly*CHUNK_SIZE + lz*CHUNK_SIZE*16];
+    return chunk.data[lx + ly*CHUNK_SIZE + lz*CHUNK_SIZE*16] || 0;
 }
 
-function setVoxel(x, y, z, v) {
+function updateInventoryUI() {
+    document.getElementById('cnt-1').innerText = inventory[1];
+    document.getElementById('cnt-2').innerText = inventory[2];
+    document.getElementById('cnt-3').innerText = inventory[3];
+}
+
+function setVoxel(x, y, z, type) {
     const cx = Math.floor(x / CHUNK_SIZE);
     const cz = Math.floor(z / CHUNK_SIZE);
     const key = `${cx},${cz}`;
     const chunk = WORLD.get(key);
+    
     if (chunk) {
         const lx = Math.floor(x) - cx * CHUNK_SIZE;
         const ly = Math.floor(y);
         const lz = Math.floor(z) - cz * CHUNK_SIZE;
-        chunk.data[lx + ly*CHUNK_SIZE + lz*CHUNK_SIZE*16] = v;
-        updateChunkMesh(cx, cz);
+        const idx = lx + ly*CHUNK_SIZE + lz*CHUNK_SIZE*16;
+
+        // Si estamos rompiendo (type 0)
+        if (type === 0) {
+            const oldType = chunk.data[idx];
+            if (oldType > 0) {
+                inventory[oldType]++;
+                updateInventoryUI();
+            }
+        }
+
+        chunk.data[idx] = type;
+        
+        // RE-RENDER LOCALIZADO (No borra todo el chunk)
+        const blockName = `b_${Math.floor(x)}_${ly}_${Math.floor(z)}`;
+        const existing = chunk.mesh.getObjectByName(blockName);
+        if (existing) chunk.mesh.remove(existing);
+
+        if (type > 0) {
+            const cube = new THREE.Mesh(boxGeo, mats[type]);
+            cube.position.set(Math.floor(x) + 0.5, ly + 0.5, Math.floor(z) + 0.5);
+            cube.name = blockName;
+            chunk.mesh.add(cube);
+        }
     }
 }
 
 class Chunk {
     constructor(cx, cz) {
-        this.cx = cx; this.cz = cz;
         this.data = new Uint8Array(CHUNK_SIZE * 16 * CHUNK_SIZE);
+        this.mesh = new THREE.Group();
+        scene.add(this.mesh);
+        
         for(let i=0; i<this.data.length; i++) {
             const x = i % CHUNK_SIZE;
             const y = Math.floor(i / CHUNK_SIZE) % 16;
-            if (y < 4) this.data[i] = y === 3 ? 1 : 2;
-        }
-    }
-}
-
-function updateChunkMesh(cx, cz) {
-    const key = `${cx},${cz}`;
-    let chunk = WORLD.get(key);
-    if (!chunk) { chunk = new Chunk(cx, cz); WORLD.set(key, chunk); }
-    if (chunk.mesh) { scene.remove(chunk.mesh); chunk.mesh.geometry.dispose(); }
-
-    const geo = new THREE.BoxGeometry(1, 1, 1);
-    const mesh = new THREE.Group();
-    for(let i=0; i<chunk.data.length; i++) {
-        if(chunk.data[i] > 0) {
-            const x = i % CHUNK_SIZE;
-            const y = Math.floor(i / CHUNK_SIZE) % 16;
             const z = Math.floor(i / (CHUNK_SIZE * 16));
-            const cube = new THREE.Mesh(geo, mats[chunk.data[i]]);
-            cube.position.set(cx*CHUNK_SIZE + x + 0.5, y + 0.5, cz*CHUNK_SIZE + z + 0.5);
-            mesh.add(cube);
+            if (y < 4) {
+                const type = y === 3 ? 1 : 2;
+                this.data[i] = type;
+                const cube = new THREE.Mesh(boxGeo, mats[type]);
+                cube.position.set(cx * CHUNK_SIZE + x + 0.5, y + 0.5, cz * CHUNK_SIZE + z + 0.5);
+                cube.name = `b_${cx * CHUNK_SIZE + x}_${y}_${cz * CHUNK_SIZE + z}`;
+                this.mesh.add(cube);
+            }
         }
     }
-    chunk.mesh = mesh;
-    scene.add(mesh);
 }
 
-// --- FÍSICAS Y MOVIMIENTO ---
-const keys = {};
-document.addEventListener('keydown', e => {
-    keys[e.code] = true;
-    if (e.key >= 1 && e.key <= 3) {
-        selectedBlock = parseInt(e.key);
-        document.querySelectorAll('.slot').forEach(s => s.classList.remove('selected'));
-        document.getElementById('s'+e.key).classList.add('selected');
-    }
-});
-document.addEventListener('keyup', e => keys[e.code] = false);
-
-// Raycasting para romper/colocar
+// --- INTERACCIÓN ---
 window.addEventListener('mousedown', (e) => {
     if (document.pointerLockElement !== renderer.domElement) {
         renderer.domElement.requestPointerLock();
         return;
     }
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-    const intersects = raycaster.intersectObjects(scene.children, true);
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(0,0), camera);
+    const intersects = ray.intersectObjects(scene.children, true);
     
     if (intersects.length > 0) {
         const i = intersects[0];
@@ -153,43 +158,36 @@ window.addEventListener('mousedown', (e) => {
         if (e.button === 0) { // Romper
             pos.add(i.face.normal.clone().multiplyScalar(-0.5));
             setVoxel(pos.x, pos.y, pos.z, 0);
-        } else if (e.button === 2) { // Colocar
+        } else if (e.button === 2 && inventory[selectedSlot] > 0) { // Colocar
             pos.add(i.face.normal.clone().multiplyScalar(0.5));
-            setVoxel(pos.x, pos.y, pos.z, selectedBlock);
+            setVoxel(pos.x, pos.y, pos.z, selectedSlot);
+            inventory[selectedSlot]--;
+            updateInventoryUI();
         }
     }
 });
 
-// --- P2P PEERJS ---
+// --- P2P ---
 const peer = new Peer();
 let conn;
-const otherPlayers = {};
-
 peer.on('open', id => document.getElementById('my-id').innerText = id);
-peer.on('connection', c => {
-    conn = c;
-    setupConn();
-});
-
 window.connectToPeer = () => {
-    const id = document.getElementById('peer-id').value;
-    conn = peer.connect(id);
-    setupConn();
+    conn = peer.connect(document.getElementById('peer-id').value);
 };
 
-function setupConn() {
-    conn.on('data', data => {
-        if (!otherPlayers[data.id]) {
-            const p = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.8, 0.6), new THREE.MeshBasicMaterial({color: 'red'}));
-            scene.add(p);
-            otherPlayers[data.id] = p;
-        }
-        otherPlayers[data.id].position.set(data.x, data.y, data.z);
-    });
-}
-
-// --- BUCLE PRINCIPAL ---
+// --- BUCLE Y FÍSICAS ---
 camera.position.set(8, 10, 8);
+const keys = {};
+document.addEventListener('keydown', e => {
+    keys[e.code] = true;
+    if (e.key >= 1 && e.key <= 3) {
+        selectedSlot = parseInt(e.key);
+        document.querySelectorAll('.slot').forEach(s => s.classList.remove('selected'));
+        document.getElementById('slot-'+e.key).classList.add('selected');
+    }
+});
+document.addEventListener('keyup', e => keys[e.code] = false);
+
 let yaw = 0, pitch = 0;
 document.addEventListener('mousemove', e => {
     if (document.pointerLockElement === renderer.domElement) {
@@ -203,39 +201,33 @@ document.addEventListener('mousemove', e => {
 function animate() {
     requestAnimationFrame(animate);
 
-    // Gravedad y Salto
-    velocity.y -= 0.015; // Fuerza gravedad
-    if (getVoxel(camera.position.x, camera.position.y - 1.6, camera.position.z) > 0) {
-        canJump = true;
+    // Gravedad
+    velocity.y -= 0.01;
+    const footPos = camera.position.clone().add(new THREE.Vector3(0, -1.6, 0));
+    if (getVoxel(footPos.x, footPos.y, footPos.z) > 0) {
         velocity.y = Math.max(0, velocity.y);
+        canJump = true;
     }
-    if (keys['Space'] && canJump) {
-        velocity.y = 0.25;
-        canJump = false;
-    }
-
-    // Movimiento
-    const dir = new THREE.Vector3();
-    if (keys['KeyW']) dir.z -= 1;
-    if (keys['KeyS']) dir.z += 1;
-    if (keys['KeyA']) dir.x -= 1;
-    if (keys['KeyD']) dir.x += 1;
-    dir.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), yaw));
-    camera.position.addScaledVector(dir.normalize(), 0.1);
+    if (keys['Space'] && canJump) { velocity.y = 0.2; canJump = false; }
     camera.position.y += velocity.y;
 
-    // Generar Chunks iniciales
+    // Movimiento WASD
+    const move = new THREE.Vector3();
+    if (keys['KeyW']) move.z -= 1; if (keys['KeyS']) move.z += 1;
+    if (keys['KeyA']) move.x -= 1; if (keys['KeyD']) move.x += 1;
+    move.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), yaw));
+    camera.position.addScaledVector(move.normalize(), 0.1);
+
+    // Carga de Chunks (3x3)
     const cx = Math.floor(camera.position.x / CHUNK_SIZE);
     const cz = Math.floor(camera.position.z / CHUNK_SIZE);
     for(let x=-1; x<=1; x++) for(let z=-1; z<=1; z++) {
-        if (!WORLD.has(`${cx+x},${cz+z}`)) updateChunkMesh(cx+x, cz+z);
+        const k = `${cx+x},${cz+z}`;
+        if (!WORLD.has(k)) WORLD.set(k, new Chunk(cx+x, cz+z));
     }
 
-    // Enviar posición P2P
-    if (conn && conn.open) {
-        conn.send({ id: peer.id, x: camera.position.x, y: camera.position.y, z: camera.position.z });
-    }
-
+    if (conn && conn.open) conn.send({x: camera.position.x, y: camera.position.y, z: camera.position.z});
+    
     renderer.render(scene, camera);
 }
 animate();
