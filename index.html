@@ -2,311 +2,311 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>GMod 2D Sandbox</title>
+    <title>GMod 2D Sandbox Pro</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: #1e1e1e;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        canvas {
-            display: block;
-            background: #2c3e50;
-        }
-        #ui {
+        body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: 'Tahoma', sans-serif; }
+        canvas { display: block; background: #3d4d5d; cursor: crosshair; }
+
+        /* Interfaz estilo Source / GMod */
+        #hud {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
             padding: 15px;
-            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            color: #fff;
             pointer-events: none;
-            border: 1px solid #555;
+            text-shadow: 1px 1px 2px #000;
         }
-        #menu {
+
+        #toolbar {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(30, 30, 30, 0.8);
+            padding: 10px;
+            border: 1px solid #555;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border-radius: 4px;
+        }
+
+        .tool-btn {
+            background: #444;
+            color: #ddd;
+            border: 1px solid #222;
+            padding: 12px;
+            cursor: pointer;
+            font-size: 12px;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
+
+        .tool-btn:hover { background: #555; border-color: #3498db; }
+        .tool-btn.active { background: #3498db; color: white; border-color: #fff; }
+
+        #controls-tip {
             position: absolute;
             bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(40, 40, 40, 0.9);
-            padding: 10px;
-            border-radius: 10px;
-            display: flex;
-            gap: 10px;
-            border: 2px solid #3498db;
-        }
-        .tool-btn {
-            background: #34495e;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            cursor: pointer;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-        .tool-btn:hover {
-            background: #3498db;
-        }
-        .tool-btn.active {
-            background: #e74c3c;
-        }
-        #instructions {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            color: #bdc3c7;
-            text-align: right;
-            font-size: 0.8em;
+            left: 20px;
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
         }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
 
-<div id="ui">
-    <div style="font-size: 1.2em; color: #3498db; margin-bottom: 5px;">GMod HTML 2D</div>
-    <div>Herramienta: <span id="current-tool">Physics Gun</span></div>
-    <div>Entidades: <span id="entity-count">0</span></div>
+<div id="hud">
+    <div style="font-weight: bold; font-size: 18px; margin-bottom: 5px;">Garry's Mod 2D</div>
+    <div>Herramienta: <span id="tool-name" style="color: #3498db;">Physics Gun</span></div>
+    <div style="margin-top: 5px; font-size: 13px;">Objetos: <span id="obj-count">0</span></div>
 </div>
 
-<div id="instructions">
-    [WASD] Moverse | [Espacio] Saltar<br>
-    [Click Izquierdo] Usar Herramienta<br>
-    [Q] Menú de Spawn (Próximamente)<br>
-    [R] Limpiar todo
-</div>
-
-<div id="menu" style="pointer-events: auto;">
+<div id="toolbar">
     <button class="tool-btn active" onclick="setTool('physgun', this)">Physics Gun</button>
-    <button class="tool-btn" onclick="setTool('spawner', this)">Spawn Box</button>
+    <button class="tool-btn" onclick="spawnEntity('prop')">Spawn Caja</button>
+    <button class="tool-btn" onclick="spawnEntity('npc')">Spawn NPC</button>
     <button class="tool-btn" onclick="setTool('remover', this)">Remover</button>
-    <button class="tool-btn" onclick="spawnNPC()">Spawn NPC</button>
+    <button class="tool-btn" style="margin-top: 10px; background: #c0392b;" onclick="clearAll()">Limpiar Mapa</button>
 </div>
 
-<canvas id="gameCanvas"></canvas>
+<div id="controls-tip">
+    WASD: Mover | CLICK IZQ: Usar Tool | CLICK DER (con Physgun): Congelar/Descongelar | R: Reiniciar
+</div>
+
+<canvas id="game"></canvas>
 
 <script>
-    const canvas = document.getElementById('gameCanvas');
+    const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
-    const countDisplay = document.getElementById('entity-count');
-    const toolDisplay = document.getElementById('current-tool');
-
+    
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    // Configuración
-    let gravity = 0.5;
-    let friction = 0.98;
-    let currentTool = 'physgun';
     let entities = [];
-    let keys = {};
-    let mouse = { x: 0, y: 0, down: false, grabbedEntity: null };
-
-    // Jugador (GMod Style)
-    const player = {
-        x: 100,
-        y: 100,
-        width: 30,
-        height: 60,
-        velX: 0,
-        velY: 0,
-        speed: 5,
-        jumpForce: 12,
-        grounded: false,
-        color: '#3498db'
-    };
+    let gravity = 0.4;
+    let friction = 0.9;
+    let currentTool = 'physgun';
+    const keys = {};
+    const mouse = { x: 0, y: 0, left: false, right: false, target: null };
 
     class Entity {
-        constructor(x, y, width, height, type = 'prop', color = '#95a5a6') {
-            this.x = x;
-            this.y = y;
-            this.width = width;
-            this.height = height;
-            this.velX = 0;
-            this.velY = 0;
+        constructor(x, y, w, h, type) {
+            this.x = x; this.y = y;
+            this.w = w; this.h = h;
+            this.vx = 0; this.vy = 0;
             this.type = type;
-            this.color = color;
-            this.isStatic = false;
-            this.grabbed = false;
+            this.isFrozen = false;
+            this.isGrabbed = false;
+            this.color = type === 'npc' ? '#e74c3c' : '#95a5a6';
+            this.grounded = false;
         }
 
         update() {
-            if (this.isStatic || this.grabbed) return;
+            if (this.isFrozen || this.isGrabbed) return;
 
-            this.velY += gravity;
-            this.x += this.velX;
-            this.y += this.velY;
+            this.vy += gravity;
+            this.vy *= 0.99; // Aire
+            this.vx *= friction;
 
-            // Colisión con el suelo
-            if (this.y + this.height > canvas.height - 20) {
-                this.y = canvas.height - 20 - this.height;
-                this.velY *= -0.4; // Rebote
-                this.velX *= friction;
+            // Integración de movimiento
+            this.x += this.vx;
+            this.y += this.vy;
+
+            // Colisión Suelo
+            if (this.y + this.h > canvas.height - 30) {
+                this.y = canvas.height - 30 - this.h;
+                this.vy = 0;
+                this.vx *= friction;
+                this.grounded = true;
             }
 
-            // Límites laterales
-            if (this.x < 0 || this.x + this.width > canvas.width) {
-                this.velX *= -1;
-            }
+            // Colisión Paredes
+            if (this.x < 0) { this.x = 0; this.vx *= -0.5; }
+            if (this.x + this.w > canvas.width) { this.x = canvas.width - this.w; this.vx *= -0.5; }
         }
 
         draw() {
-            ctx.fillStyle = this.grabbed ? '#00ff00' : this.color;
-            ctx.fillRect(this.x, this.y, this.width, this.height);
+            ctx.fillStyle = this.isFrozen ? '#2980b9' : (this.isGrabbed ? '#2ecc71' : this.color);
+            ctx.fillRect(this.x, this.y, this.w, this.h);
             
-            // Efecto de borde para parecerse a props de Source
-            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-            ctx.strokeRect(this.x, this.y, this.width, this.height);
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.x, this.y, this.w, this.h);
 
             if (this.type === 'npc') {
-                // Dibujar ojos simples para los NPCs
                 ctx.fillStyle = 'white';
-                ctx.fillRect(this.x + 5, this.y + 10, 5, 5);
-                ctx.fillRect(this.x + this.width - 10, this.y + 10, 5, 5);
+                ctx.fillRect(this.x + 5, this.y + 10, 6, 6);
+                ctx.fillRect(this.x + this.w - 11, this.y + 10, 6, 6);
             }
         }
     }
 
-    // Funciones de Herramientas
+    const player = {
+        x: 100, y: 100, w: 30, h: 55, vx: 0, vy: 0,
+        speed: 5, jump: 10, grounded: false
+    };
+
+    function checkCollision(a, b) {
+        return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    }
+
+    function resolveCollisions() {
+        const all = [...entities, player];
+
+        for (let i = 0; i < all.length; i++) {
+            for (let j = i + 1; j < all.length; j++) {
+                let e1 = all[i];
+                let e2 = all[j];
+
+                if (checkCollision(e1, e2)) {
+                    // Empuje básico (Simple AABB Resolve)
+                    let midX1 = e1.x + e1.w / 2;
+                    let midX2 = e2.x + e2.w / 2;
+                    let midY1 = e1.y + e1.h / 2;
+                    let midY2 = e2.y + e2.h / 2;
+
+                    let dx = midX1 - midX2;
+                    let dy = midY1 - midY2;
+
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        if (dx > 0) e1.x = e2.x + e2.w; else e1.x = e2.x - e1.w;
+                        e1.vx *= 0.5;
+                    } else {
+                        if (dy > 0) e1.y = e2.y + e2.h; else {
+                            e1.y = e2.y - e1.h;
+                            e1.grounded = true;
+                            if(e1 === player) player.vy = 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    function spawnEntity(type) {
+        const size = type === 'npc' ? {w:30, h:60} : {w:40, h:40};
+        entities.push(new Entity(mouse.x || 100, 50, size.w, size.h, type));
+    }
+
     function setTool(tool, btn) {
         currentTool = tool;
-        toolDisplay.innerText = tool.charAt(0).toUpperCase() + tool.slice(1);
+        document.getElementById('tool-name').innerText = btn.innerText;
         document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
     }
 
-    function spawnBox(x, y) {
-        const size = Math.random() * 30 + 20;
-        const colors = ['#95a5a6', '#7f8c8d', '#d35400', '#27ae60'];
-        entities.push(new Entity(x - size/2, y - size/2, size, size, 'prop', colors[Math.floor(Math.random() * colors.length)]));
-    }
+    function clearAll() { entities = []; }
 
-    function spawnNPC() {
-        const npc = new Entity(Math.random() * canvas.width, 50, 30, 60, 'npc', '#e74c3c');
-        entities.push(npc);
-    }
+    // Loop de Control
+    window.onkeydown = e => keys[e.code] = true;
+    window.onkeyup = e => keys[e.code] = false;
 
-    // Input Events
-    window.addEventListener('keydown', e => {
-        keys[e.code] = true;
-        if(e.code === 'KeyR') entities = [];
-    });
-    window.addEventListener('keyup', e => keys[e.code] = false);
+    canvas.onmousedown = e => {
+        if (e.button === 0) mouse.left = true;
+        if (e.button === 2) mouse.right = true;
 
-    canvas.addEventListener('mousedown', e => {
-        mouse.down = true;
-        const rect = canvas.getBoundingClientRect();
-        mouse.x = e.clientX - rect.left;
-        mouse.y = e.clientY - rect.top;
+        if (currentTool === 'remover' && mouse.left) {
+            entities = entities.filter(ent => !checkCollision({x:mouse.x, y:mouse.y, w:1, h:1}, ent));
+        }
 
-        if (currentTool === 'spawner') {
-            spawnBox(mouse.x, mouse.y);
-        } else if (currentTool === 'remover') {
-            entities = entities.filter(ent => 
-                !(mouse.x > ent.x && mouse.x < ent.x + ent.width && 
-                  mouse.y > ent.y && mouse.y < ent.y + ent.height)
-            );
-        } else if (currentTool === 'physgun') {
+        if (currentTool === 'physgun') {
             entities.forEach(ent => {
-                if (mouse.x > ent.x && mouse.x < ent.x + ent.width && 
-                    mouse.y > ent.y && mouse.y < ent.y + ent.height) {
-                    mouse.grabbedEntity = ent;
-                    ent.grabbed = true;
+                if (mouse.x > ent.x && mouse.x < ent.x + ent.w && mouse.y > ent.y && mouse.y < ent.y + ent.h) {
+                    if (mouse.left) {
+                        mouse.target = ent;
+                        ent.isGrabbed = true;
+                        ent.isFrozen = false;
+                    }
+                    if (mouse.right && !mouse.left) {
+                        ent.isFrozen = !ent.isFrozen;
+                    }
                 }
             });
         }
-    });
+    };
 
-    window.addEventListener('mouseup', () => {
-        mouse.down = false;
-        if (mouse.grabbedEntity) {
-            mouse.grabbedEntity.grabbed = false;
-            mouse.grabbedEntity = null;
+    window.onmouseup = e => {
+        if (e.button === 0) {
+            mouse.left = false;
+            if (mouse.target) {
+                mouse.target.isGrabbed = false;
+                mouse.target = null;
+            }
         }
-    });
+        if (e.button === 2) mouse.right = false;
+    };
 
-    canvas.addEventListener('mousemove', e => {
-        const rect = canvas.getBoundingClientRect();
-        mouse.x = e.clientX - rect.left;
-        mouse.y = e.clientY - rect.top;
-
-        if (mouse.grabbedEntity) {
-            mouse.grabbedEntity.x = mouse.x - mouse.grabbedEntity.width / 2;
-            mouse.grabbedEntity.y = mouse.y - mouse.grabbedEntity.height / 2;
-            mouse.grabbedEntity.velX = 0;
-            mouse.grabbedEntity.velY = 0;
+    window.onmousemove = e => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+        if (mouse.target && mouse.left) {
+            mouse.target.x = mouse.x - mouse.target.w / 2;
+            mouse.target.y = mouse.y - mouse.target.h / 2;
+            mouse.target.vx = 0; mouse.target.vy = 0;
         }
-    });
+    };
 
-    function update() {
+    function gameLoop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
         // Movimiento Jugador
-        if (keys['KeyA']) player.velX = -player.speed;
-        else if (keys['KeyD']) player.velX = player.speed;
-        else player.velX *= 0.8;
+        if (keys['KeyA']) player.vx = -player.speed;
+        else if (keys['KeyD']) player.vx = player.speed;
+        else player.vx *= friction;
 
-        if (keys['Space'] && player.grounded) {
-            player.velY = -player.jumpForce;
-            player.grounded = false;
-        }
+        player.vy += gravity;
+        player.x += player.vx;
+        player.y += player.vy;
 
-        player.velY += gravity;
-        player.x += player.velX;
-        player.y += player.velY;
-
-        // Suelo para Jugador
-        if (player.y + player.height > canvas.height - 20) {
-            player.y = canvas.height - 20 - player.height;
-            player.velY = 0;
+        if (player.y + player.h > canvas.height - 30) {
+            player.y = canvas.height - 30 - player.h;
+            player.vy = 0;
             player.grounded = true;
         }
 
-        // Actualizar Entidades
-        entities.forEach(ent => ent.update());
-        countDisplay.innerText = entities.length;
-    }
-
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Dibujar Suelo
-        ctx.fillStyle = '#34495e';
-        ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
-
-        // Dibujar Props/NPCs
-        entities.forEach(ent => ent.draw());
-
-        // Dibujar Rayo de Physgun si está agarrando algo
-        if (mouse.grabbedEntity) {
-            ctx.beginPath();
-            ctx.moveTo(player.x + player.width/2, player.y + 20);
-            ctx.lineTo(mouse.x, mouse.y);
-            ctx.strokeStyle = '#00ffff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            // Glow effect
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#00ffff';
-            ctx.stroke();
-            ctx.shadowBlur = 0;
+        if (keys['Space'] && player.grounded) {
+            player.vy = -player.jump;
+            player.grounded = false;
         }
 
-        // Dibujar Jugador
-        ctx.fillStyle = player.color;
-        ctx.fillRect(player.x, player.y, player.width, player.height);
-        ctx.strokeStyle = 'white';
-        ctx.strokeRect(player.x, player.y, player.width, player.height);
+        // Colisiones y Updates
+        entities.forEach(ent => ent.update());
+        resolveCollisions();
+
+        // Dibujo
+        // Suelo
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
+
+        entities.forEach(ent => ent.draw());
+
+        // Rayo Physgun
+        if (mouse.target) {
+            ctx.beginPath();
+            ctx.moveTo(player.x + player.w/2, player.y + 15);
+            ctx.lineTo(mouse.x, mouse.y);
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Dibujar Player
+        ctx.fillStyle = '#3498db';
+        ctx.fillRect(player.x, player.y, player.w, player.h);
+        ctx.strokeStyle = '#fff';
+        ctx.strokeRect(player.x, player.y, player.w, player.h);
+
+        document.getElementById('obj-count').innerText = entities.length;
+        requestAnimationFrame(gameLoop);
     }
 
-    function loop() {
-        update();
-        draw();
-        requestAnimationFrame(loop);
-    }
-
-    loop();
+    gameLoop();
 </script>
-
 </body>
 </html>
