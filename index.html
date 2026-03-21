@@ -3,64 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Korblox: Slime Prototype</title>
+    <title>Korblox: Slime Rancher Prototipo Extendido</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; overflow: hidden; font-family: 'Courier New', Courier, monospace; background-color: #000; }
         canvas { display: block; }
         
-        /* Interfaz de Usuario */
-        #ui {
+        /* --- INTERFAZ DE USUARIO --- */
+        #ui-container {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 15px;
-            border-radius: 10px;
+            top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
-            user-select: none;
+            color: #fff;
+            text-shadow: 2px 2px #000;
         }
+
+        .stats-panel {
+            position: absolute;
+            top: 20px; left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border: 3px solid #ff69b4;
+            border-radius: 10px;
+            pointer-events: auto;
+        }
+
+        .currency { color: #ffd700; font-size: 24px; font-weight: bold; }
+        .inventory { color: #00ff7f; font-size: 18px; }
 
         #crosshair {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 10px;
-            height: 10px;
-            border: 2px solid white;
+            top: 50%; left: 50%;
+            width: 20px; height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.8);
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            pointer-events: none;
         }
+
+        /* --- MENÚ DE CONSTRUCCIÓN --- */
+        #build-menu {
+            position: absolute;
+            bottom: 10%; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(40, 44, 52, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            border: 4px solid #1e90ff;
+            display: none;
+            pointer-events: auto;
+            text-align: center;
+        }
+
+        .btn-build {
+            background: #1e90ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+
+        .btn-build:hover { background: #00bfff; }
 
         #overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            cursor: pointer;
-            z-index: 10;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 100; cursor: pointer;
         }
     </style>
 </head>
 <body>
 
     <div id="overlay">
-        <h1>Haz clic para empezar a recolectar</h1>
+        <h1 style="color: #ff69b4; font-size: 48px;">KORBLOX: SLIME RANCHER</h1>
+        <p style="color: white; font-size: 20px;">Haz clic para entrar al Rancho</p>
     </div>
 
-    <div id="ui">
-        <div style="font-size: 24px;">Slimes en Inventario: <span id="counter">0</span></div>
-        <div style="font-size: 12px; margin-top: 5px;">[WASD] Mover | [Click Izq] Succión | [Click Der] Disparar</div>
+    <div id="ui-container">
+        <div class="stats-panel">
+            <div class="currency">Newbucks: $<span id="money">0</span></div>
+            <div class="inventory">Vacpack: <span id="inv-slimes">0</span> Slimes</div>
+            <div class="inventory">Comida: <span id="inv-food">0</span> Zanahorias</div>
+            <div class="inventory">Plorts: <span id="inv-plorts">0</span></div>
+        </div>
+        <div id="crosshair"></div>
+        
+        <div id="build-menu">
+            <h3 id="plot-title">Parcela Vacía</h3>
+            <button class="btn-build" onclick="buildStructure('corral')">Construir Corral ($100)</button>
+            <button class="btn-build" onclick="buildStructure('farm')">Construir Granja ($50)</button>
+            <button class="btn-build" style="background:#ff4500" onclick="closeMenu()">Cerrar</button>
+        </div>
     </div>
-
-    <div id="crosshair"></div>
 
     <script type="importmap">
         {
@@ -75,178 +114,333 @@
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
-        // --- Configuración Básica ---
+        // --- CONSTANTES Y ESTADO ---
+        const PLOT_PRICE_CORRAL = 100;
+        const PLOT_PRICE_FARM = 50;
+        const PLORT_VALUE = 25;
+
+        let gameState = {
+            money: 200, // Dinero inicial para empezar
+            invSlimes: 0,
+            invFood: 0,
+            invPlorts: 0,
+            activePlot: null
+        };
+
+        // --- ESCENA Y RENDER ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // Cielo azul
-        scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+        scene.background = new THREE.Color(0x60c5f1);
+        scene.fog = new THREE.Fog(0x60c5f1, 20, 100);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.y = 1.6; // Altura de los ojos
-
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
 
-        // --- Iluminación ---
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
-        scene.add(hemiLight);
+        // --- ILUMINACIÓN ---
+        const ambientLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+        scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(5, 10, 2);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        sunLight.position.set(50, 50, 20);
+        sunLight.castShadow = true;
+        sunLight.shadow.camera.left = -50;
+        sunLight.shadow.camera.right = 50;
+        sunLight.shadow.camera.top = 50;
+        sunLight.shadow.camera.bottom = -50;
+        scene.add(sunLight);
 
-        // --- Suelo y Límites ---
-        const floorGeo = new THREE.PlaneGeometry(100, 100);
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x7cfc00 });
+        // --- MAPA MEJORADO ---
+        // Suelo principal
+        const floorGeo = new THREE.PlaneGeometry(200, 200);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x4caf50 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // --- Lógica de Juego ---
-        const slimes = [];
-        let inventoryCount = 0;
-        const inventoryEl = document.getElementById('counter');
+        // Paredes del Mundo (Cañón)
+        function createWall(x, z, width, depth, height) {
+            const wallGeo = new THREE.BoxGeometry(width, height, depth);
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+            const wall = new THREE.Mesh(wallGeo, wallMat);
+            wall.position.set(x, height / 2, z);
+            wall.castShadow = true;
+            wall.receiveShadow = true;
+            scene.add(wall);
+        }
+        createWall(0, 50, 100, 5, 10);   // Norte
+        createWall(0, -50, 100, 5, 10);  // Sur
+        createWall(50, 0, 5, 100, 10);   // Este
+        createWall(-50, 0, 5, 100, 10);  // Oeste
+
+        // --- SISTEMA DE PARCELAS ---
+        const plots = [];
+        const plotGeometry = new THREE.BoxGeometry(8, 0.2, 8);
+        const plotMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+
+        const plotPositions = [
+            {x: -15, z: -15}, {x: 0, z: -15}, {x: 15, z: -15},
+            {x: -15, z: 15}, {x: 15, z: 15},
+            {x: -15, z: 0}, {x: 15, z: 0}, {x: 0, z: 15}
+        ];
+
+        plotPositions.forEach((pos, index) => {
+            const plotMesh = new THREE.Mesh(plotGeometry, plotMaterial);
+            plotMesh.position.set(pos.x, 0.1, pos.z);
+            plotMesh.receiveShadow = true;
+            scene.add(plotMesh);
+
+            plots.push({
+                id: index,
+                mesh: plotMesh,
+                type: 'empty', // 'empty', 'corral', 'farm'
+                structure: null,
+                objects: [] // slimes en corral o zanahorias en granja
+            });
+        });
+
+        // --- CLASES DE OBJETOS ---
         
-        // Controles
-        const controls = new PointerLockControls(camera, document.body);
-        const overlay = document.getElementById('overlay');
+        class Carrot {
+            constructor(position) {
+                const group = new THREE.Group();
+                const body = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.1, 0.02, 0.5),
+                    new THREE.MeshStandardMaterial({ color: 0xff8c00 })
+                );
+                const leaves = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.15, 8, 8),
+                    new THREE.MeshStandardMaterial({ color: 0x228b22 })
+                );
+                leaves.position.y = 0.25;
+                group.add(body, leaves);
+                group.position.copy(position);
+                group.position.y = 0.25;
+                this.mesh = group;
+                this.type = "food";
+                scene.add(this.mesh);
+            }
+        }
 
-        overlay.addEventListener('click', () => controls.lock());
-        controls.addEventListener('lock', () => overlay.style.display = 'none');
-        controls.addEventListener('unlock', () => overlay.style.display = 'flex');
+        class Plort {
+            constructor(position, color) {
+                this.mesh = new THREE.Mesh(
+                    new THREE.IcosahedronGeometry(0.2, 0),
+                    new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.5 })
+                );
+                this.mesh.position.copy(position);
+                this.mesh.position.y = 0.5;
+                this.type = "plort";
+                scene.add(this.mesh);
+            }
+        }
 
-        // Movimiento
-        const moveKeys = { forward: false, backward: false, left: false, right: false };
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'KeyW') moveKeys.forward = true;
-            if (e.code === 'KeyS') moveKeys.backward = true;
-            if (e.code === 'KeyA') moveKeys.left = true;
-            if (e.code === 'KeyD') moveKeys.right = true;
-        });
-        document.addEventListener('keyup', (e) => {
-            if (e.code === 'KeyW') moveKeys.forward = false;
-            if (e.code === 'KeyS') moveKeys.backward = false;
-            if (e.code === 'KeyA') moveKeys.left = false;
-            if (e.code === 'KeyD') moveKeys.right = false;
-        });
-
-        // Mouse Actions
-        let isSucking = false;
-        document.addEventListener('mousedown', (e) => {
-            if (e.button === 0) isSucking = true;
-            if (e.button === 2) shootSlime();
-        });
-        document.addEventListener('mouseup', (e) => {
-            if (e.button === 0) isSucking = false;
-        });
-        document.addEventListener('contextmenu', e => e.preventDefault());
-
-        // --- Clase Slime ---
         class Slime {
             constructor(position, color = 0xff69b4) {
                 this.mesh = new THREE.Group();
-                
-                // Cuerpo
                 const body = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.4, 16, 16),
-                    new THREE.MeshStandardMaterial({ color: color })
+                    new THREE.SphereGeometry(0.5, 16, 16),
+                    new THREE.MeshStandardMaterial({ color: color, transparent: true, opacity: 0.9 })
                 );
                 body.castShadow = true;
-                this.mesh.add(body);
-
-                // Ojos
-                const eyeGeo = new THREE.SphereGeometry(0.05, 8, 8);
+                
+                const eyeGeo = new THREE.SphereGeometry(0.06, 8, 8);
                 const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-                const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-                eyeL.position.set(0.15, 0.1, 0.35);
-                const eyeR = eyeL.clone();
-                eyeR.position.x = -0.15;
-                this.mesh.add(eyeL, eyeR);
-
+                const e1 = new THREE.Mesh(eyeGeo, eyeMat); e1.position.set(0.2, 0.1, 0.4);
+                const e2 = new THREE.Mesh(eyeGeo, eyeMat); e2.position.set(-0.2, 0.1, 0.4);
+                
+                this.mesh.add(body, e1, e2);
                 this.mesh.position.copy(position);
+                this.mesh.position.y = 0.5;
                 scene.add(this.mesh);
 
-                // Física y Estado
-                this.velocity = new THREE.Vector3(0, 0, 0);
-                this.isGrounded = true;
-                this.nextJump = Date.now() + Math.random() * 3000;
+                this.velocity = new THREE.Vector3();
+                this.nextJump = Date.now() + Math.random() * 2000;
+                this.color = color;
+                this.isHungry = true;
+                this.inCorral = null;
             }
 
             update(delta) {
-                // Gravedad simple
-                if (this.mesh.position.y > 0.4) {
-                    this.velocity.y -= 9.8 * delta;
-                    this.isGrounded = false;
+                // Gravedad
+                if (this.mesh.position.y > 0.5) {
+                    this.velocity.y -= 15 * delta;
                 } else {
-                    this.mesh.position.y = 0.4;
+                    this.mesh.position.y = 0.5;
                     this.velocity.y = 0;
-                    this.velocity.x *= 0.9; // Fricción
-                    this.velocity.z *= 0.9;
-                    this.isGrounded = true;
+                    this.velocity.x *= 0.8;
+                    this.velocity.z *= 0.8;
                 }
 
-                // Salto aleatorio (IA Wander)
-                if (this.isGrounded && Date.now() > this.nextJump) {
-                    this.velocity.y = 4;
-                    this.velocity.x = (Math.random() - 0.5) * 5;
-                    this.velocity.z = (Math.random() - 0.5) * 5;
+                // Salto IA
+                if (this.mesh.position.y <= 0.5 && Date.now() > this.nextJump) {
+                    this.velocity.y = 5 + Math.random() * 2;
+                    this.velocity.x = (Math.random() - 0.5) * 8;
+                    this.velocity.z = (Math.random() - 0.5) * 8;
                     this.nextJump = Date.now() + 2000 + Math.random() * 3000;
                 }
 
-                // Aplicar movimiento
-                this.mesh.position.add(this.velocity.clone().multiplyScalar(delta));
-
-                // Mirar hacia donde se mueven
-                if (this.velocity.length() > 0.1) {
-                    const lookAtTarget = this.mesh.position.clone().add(this.velocity);
-                    lookAtTarget.y = this.mesh.position.y;
-                    this.mesh.lookAt(lookAtTarget);
+                // Límites de Corral (Paredes invisibles si está dentro)
+                if (this.inCorral) {
+                    const plotPos = this.inCorral.mesh.position;
+                    const limit = 3.5;
+                    if (Math.abs(this.mesh.position.x - plotPos.x) > limit) {
+                        this.velocity.x *= -1.5;
+                        this.mesh.position.x = plotPos.x + Math.sign(this.mesh.position.x - plotPos.x) * limit;
+                    }
+                    if (Math.abs(this.mesh.position.z - plotPos.z) > limit) {
+                        this.velocity.z *= -1.5;
+                        this.mesh.position.z = plotPos.z + Math.sign(this.mesh.position.z - plotPos.z) * limit;
+                    }
                 }
+
+                this.mesh.position.add(this.velocity.clone().multiplyScalar(delta));
             }
         }
 
-        // --- Generación Inicial ---
-        const colors = [0xff69b4, 0x00ff7f, 0x1e90ff, 0xffd700];
-        for (let i = 0; i < 15; i++) {
-            const pos = new THREE.Vector3((Math.random() - 0.5) * 40, 0.4, (Math.random() - 0.5) * 40);
-            slimes.push(new Slime(pos, colors[Math.floor(Math.random() * colors.length)]));
+        // --- VARIABLES DE JUEGO ---
+        const slimes = [];
+        const worldObjects = []; // Comida y Plorts
+        const controls = new PointerLockControls(camera, document.body);
+        const moveKeys = { w: false, s: false, a: false, d: false };
+        let isSucking = false;
+
+        // --- CONTROLES Y EVENTOS ---
+        document.getElementById('overlay').addEventListener('click', () => controls.lock());
+        controls.addEventListener('lock', () => document.getElementById('overlay').style.display = 'none');
+        controls.addEventListener('unlock', () => document.getElementById('overlay').style.display = 'flex');
+
+        window.addEventListener('keydown', (e) => { if(moveKeys.hasOwnProperty(e.key.toLowerCase())) moveKeys[e.key.toLowerCase()] = true; });
+        window.addEventListener('keyup', (e) => { if(moveKeys.hasOwnProperty(e.key.toLowerCase())) moveKeys[e.key.toLowerCase()] = false; });
+        
+        window.addEventListener('mousedown', (e) => {
+            if (!controls.isLocked) return;
+            if (e.button === 0) isSucking = true;
+            if (e.button === 2) useVacpack();
+        });
+        window.addEventListener('mouseup', () => isSucking = false);
+
+        // --- FUNCIONES DE MECÁNICA ---
+
+        function updateUI() {
+            document.getElementById('money').innerText = gameState.money;
+            document.getElementById('inv-slimes').innerText = gameState.invSlimes;
+            document.getElementById('inv-food').innerText = gameState.invFood;
+            document.getElementById('inv-plorts').innerText = gameState.invPlorts;
         }
 
-        function shootSlime() {
-            if (inventoryCount <= 0) return;
+        window.buildStructure = function(type) {
+            if (!gameState.activePlot) return;
+            const plot = gameState.activePlot;
             
-            inventoryCount--;
-            inventoryEl.innerText = inventoryCount;
-
-            const spawnPos = camera.position.clone().add(new THREE.Vector3(0, -0.2, 0));
-            const newSlime = new Slime(spawnPos, colors[Math.floor(Math.random() * colors.length)]);
+            if (type === 'corral' && gameState.money >= PLOT_PRICE_CORRAL) {
+                gameState.money -= PLOT_PRICE_CORRAL;
+                plot.type = 'corral';
+                // Crear malla visual de corral
+                const cageGeo = new THREE.BoxGeometry(8, 4, 8);
+                const cageMat = new THREE.MeshStandardMaterial({ color: 0x1e90ff, wireframe: true, transparent: true, opacity: 0.3 });
+                const cage = new THREE.Mesh(cageGeo, cageMat);
+                cage.position.set(plot.mesh.position.x, 2, plot.mesh.position.z);
+                scene.add(cage);
+                plot.structure = cage;
+            } 
+            else if (type === 'farm' && gameState.money >= PLOT_PRICE_FARM) {
+                gameState.money -= PLOT_PRICE_FARM;
+                plot.type = 'farm';
+                const dirtGeo = new THREE.PlaneGeometry(7, 7);
+                const dirtMat = new THREE.MeshStandardMaterial({ color: 0x3d2b1f });
+                const dirt = new THREE.Mesh(dirtGeo, dirtMat);
+                dirt.rotation.x = -Math.PI / 2;
+                dirt.position.set(plot.mesh.position.x, 0.15, plot.mesh.position.z);
+                scene.add(dirt);
+                plot.structure = dirt;
+                // Ciclo de cultivo
+                setInterval(() => growFood(plot), 10000);
+            }
             
-            // Impulso inicial
-            const direction = new THREE.Vector3();
-            camera.getWorldDirection(direction);
-            newSlime.velocity.copy(direction.multiplyScalar(15));
-            newSlime.velocity.y += 2; // Un poco hacia arriba
+            updateUI();
+            closeMenu();
+        };
 
-            slimes.push(newSlime);
+        function growFood(plot) {
+            if (plot.type !== 'farm') return;
+            for(let i=0; i<3; i++) {
+                const offset = new THREE.Vector3((Math.random()-0.5)*5, 0, (Math.random()-0.5)*5);
+                const carrot = new Carrot(plot.mesh.position.clone().add(offset));
+                worldObjects.push(carrot);
+            }
         }
 
-        // --- Bucle de Animación ---
+        function useVacpack() {
+            // Prioridad: Plorts (Venta automática) > Comida > Slimes
+            if (gameState.invPlorts > 0) {
+                gameState.money += PLORT_VALUE;
+                gameState.invPlorts--;
+            } else if (gameState.invFood > 0) {
+                shootObject("carrot");
+                gameState.invFood--;
+            } else if (gameState.invSlimes > 0) {
+                shootObject("slime");
+                gameState.invSlimes--;
+            }
+            updateUI();
+        }
+
+        function shootObject(type) {
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            const pos = camera.position.clone().add(dir.clone().multiplyScalar(2));
+
+            if (type === "slime") {
+                const s = new Slime(pos);
+                s.velocity.copy(dir.multiplyScalar(20));
+                slimes.push(s);
+            } else {
+                const c = new Carrot(pos);
+                // Física simple para comida lanzada
+                worldObjects.push(c);
+            }
+        }
+
+        window.closeMenu = function() {
+            document.getElementById('build-menu').style.display = 'none';
+            controls.lock();
+        };
+
+        // --- BUCLE PRINCIPAL ---
         const clock = new THREE.Clock();
+        camera.position.set(0, 2, 10);
+
+        // Slimes iniciales
+        for(let i=0; i<10; i++) {
+            slimes.push(new Slime(new THREE.Vector3((Math.random()-0.5)*30, 1, (Math.random()-0.5)*30)));
+        }
 
         function animate() {
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
 
             if (controls.isLocked) {
-                // Movimiento del jugador
-                const speed = 10 * delta;
-                if (moveKeys.forward) controls.moveForward(speed);
-                if (moveKeys.backward) controls.moveForward(-speed);
-                if (moveKeys.left) controls.moveRight(-speed);
-                if (moveKeys.right) controls.moveRight(speed);
+                const speed = 15 * delta;
+                if (moveKeys.w) controls.moveForward(speed);
+                if (moveKeys.s) controls.moveForward(-speed);
+                if (moveKeys.a) controls.moveRight(-speed);
+                if (moveKeys.d) controls.moveRight(speed);
+
+                // Check Parcelas Cercanas
+                let nearPlot = null;
+                plots.forEach(p => {
+                    if (camera.position.distanceTo(p.mesh.position) < 5) nearPlot = p;
+                });
+
+                if (nearPlot && nearPlot.type === 'empty') {
+                    gameState.activePlot = nearPlot;
+                    document.getElementById('build-menu').style.display = 'block';
+                    controls.unlock();
+                }
             }
 
             // Actualizar Slimes
@@ -254,21 +448,53 @@
                 const s = slimes[i];
                 s.update(delta);
 
-                // Lógica de succión
+                // ¿Entrar en un corral?
+                plots.forEach(p => {
+                    if (p.type === 'corral' && s.mesh.position.distanceTo(p.mesh.position) < 4) {
+                        s.inCorral = p;
+                    }
+                });
+
+                // Succión
                 if (isSucking) {
                     const dist = s.mesh.position.distanceTo(camera.position);
-                    if (dist < 8) {
-                        // Atraer hacia la cámara
-                        const target = camera.position.clone();
-                        target.y -= 0.5; // Apuntar un poco más abajo del centro
-                        s.mesh.position.lerp(target, 0.1);
-                        
-                        // Capturar
-                        if (dist < 1.2) {
+                    if (dist < 10) {
+                        s.mesh.position.lerp(camera.position, 0.1);
+                        if (dist < 1.5) {
                             scene.remove(s.mesh);
                             slimes.splice(i, 1);
-                            inventoryCount++;
-                            inventoryEl.innerText = inventoryCount;
+                            gameState.invSlimes++;
+                            updateUI();
+                            continue;
+                        }
+                    }
+                }
+
+                // Alimentación e IA de Plorts
+                worldObjects.forEach((obj, objIdx) => {
+                    if (obj.type === "food" && s.mesh.position.distanceTo(obj.mesh.position) < 1.5) {
+                        scene.remove(obj.mesh);
+                        worldObjects.splice(objIdx, 1);
+                        // Generar Plort
+                        const p = new Plort(s.mesh.position, s.color);
+                        worldObjects.push(p);
+                    }
+                });
+            }
+
+            // Actualizar Objetos (Comida y Plorts)
+            for (let i = worldObjects.length - 1; i >= 0; i--) {
+                const obj = worldObjects[i];
+                if (isSucking) {
+                    const dist = obj.mesh.position.distanceTo(camera.position);
+                    if (dist < 10) {
+                        obj.mesh.position.lerp(camera.position, 0.1);
+                        if (dist < 1.5) {
+                            if (obj.type === "food") gameState.invFood++;
+                            else if (obj.type === "plort") gameState.invPlorts++;
+                            scene.remove(obj.mesh);
+                            worldObjects.splice(i, 1);
+                            updateUI();
                         }
                     }
                 }
@@ -277,13 +503,14 @@
             renderer.render(scene, camera);
         }
 
+        animate();
+
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        animate();
     </script>
 </body>
 </html>
