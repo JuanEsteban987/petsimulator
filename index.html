@@ -2,67 +2,75 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>JS-Craft: Survival Engine</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JS-Craft: Multiplayer P2P & Mobile</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; touch-action: none; }
         canvas { display: block; }
-        #ui { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; background: rgba(0,0,0,0.7); padding: 10px; border: 4px solid #333; pointer-events: none; }
-        .slot { width: 50px; height: 50px; border: 3px solid #555; background: #8b8b8b; display: flex; justify-content: center; align-items: center; position: relative; color: white; font-weight: bold; }
-        .slot.active { border-color: #fff; box-shadow: 0 0 15px #fff; }
-        .count { position: absolute; bottom: 2px; right: 5px; font-size: 14px; text-shadow: 2px 2px #000; }
-        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 20px; opacity: 0.8; pointer-events: none; }
-        #msg { position: absolute; top: 20px; width: 100%; text-align: center; color: white; pointer-events: none; text-shadow: 2px 2px #000; }
+
+        /* UI HUD */
+        #hud { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; background: rgba(0,0,0,0.7); padding: 10px; border: 4px solid #333; pointer-events: none; z-index: 10; }
+        .slot { width: 45px; height: 45px; border: 3px solid #555; background: #8b8b8b; display: flex; justify-content: center; align-items: center; color: white; position: relative; }
+        .slot.active { border-color: #fff; box-shadow: 0 0 10px #fff; }
+        .count { position: absolute; bottom: 2px; right: 5px; font-size: 12px; }
+        
+        /* MULTIPLAYER UI */
+        #multiplayer-ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); color: #0f0; padding: 10px; border: 2px solid #333; font-size: 12px; z-index: 20; }
+        input { background: #222; border: 1px solid #555; color: white; padding: 5px; width: 120px; }
+        button { cursor: pointer; background: #444; color: white; border: 1px solid #777; padding: 5px; }
+
+        /* MOBILE CONTROLS */
+        #mobile-controls { position: absolute; bottom: 20px; left: 20px; width: 150px; height: 150px; display: none; z-index: 30; }
+        #joystick { width: 100px; height: 100px; background: rgba(255,255,255,0.2); border-radius: 50%; position: relative; }
+        #stick { width: 40px; height: 40px; background: white; border-radius: 50%; position: absolute; top: 30px; left: 30px; }
+        #action-buttons { position: absolute; bottom: 20px; right: 20px; display: none; flex-direction: column; gap: 10px; z-index: 30; }
+        .btn-mobile { width: 60px; height: 60px; background: rgba(255,255,255,0.3); border-radius: 50%; color: white; font-weight: bold; display: flex; justify-content: center; align-items: center; user-select: none; }
+
+        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 20px; pointer-events: none; }
     </style>
 </head>
 <body>
 
-<div id="msg">CLIC PARA JUGAR | 'E' INVENTARIO | RUEDA: CAMBIAR BLOQUE</div>
+<div id="multiplayer-ui">
+    Mi ID: <span id="my-id">...</span><br>
+    <input type="text" id="peer-id-input" placeholder="ID del amigo">
+    <button id="connect-btn">Conectar</button>
+</div>
+
 <div id="crosshair">+</div>
-<div id="ui">
-    </div>
+
+<div id="hud"></div>
+
+<div id="mobile-controls">
+    <div id="joystick"><div id="stick"></div></div>
+</div>
+
+<div id="action-buttons">
+    <div class="btn-mobile" id="btn-jump">JUMP</div>
+    <div class="btn-mobile" id="btn-place">ADD</div>
+</div>
 
 <script type="importmap">
-    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    { "imports": { 
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "peerjs": "https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"
+    } }
 </script>
 
 <script type="module">
 import * as THREE from 'three';
 import { PointerLockControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
+import Peer from 'peerjs';
 
-// --- CONFIGURACIÓN ---
-const CHUNK_SIZE = 40;
-const worldData = new Map();
-const inventory = Array(9).fill(null).map(() => ({ type: null, count: 0 }));
+// --- CONFIG & ESTADO ---
+const world = new Map();
+const players = new Map(); // Otros jugadores en P2P
+let myPeer, conn;
+const inventory = Array(9).fill(null).map((_, i) => ({ type: i === 0 ? 'grass' : null, count: i === 0 ? 64 : 0 }));
 let selectedSlot = 0;
+const isMobile = /Android|iPhone/i.test(navigator.userAgent);
 
-// --- GENERADOR DE TEXTURAS 8x8 ---
-function createPixelTexture(colorBase, noiseLevel = 40) {
-    const size = 8;
-    const data = new Uint8Array(size * size * 4);
-    for (let i = 0; i < size * size * 4; i += 4) {
-        const noise = (Math.random() - 0.5) * noiseLevel;
-        data[i] = Math.max(0, Math.min(255, colorBase.r + noise));
-        data[i+1] = Math.max(0, Math.min(255, colorBase.g + noise));
-        data[i+2] = Math.max(0, Math.min(255, colorBase.b + noise));
-        data[i+3] = 255;
-    }
-    const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-    tex.magFilter = THREE.NearestFilter;
-    tex.needsUpdate = true;
-    return tex;
-}
-
-const materials = {
-    grass: new THREE.MeshLambertMaterial({ map: createPixelTexture({r:100, g:160, b:60}) }),
-    dirt: new THREE.MeshLambertMaterial({ map: createPixelTexture({r:120, g:80, b:50}) }),
-    wood: new THREE.MeshLambertMaterial({ map: createPixelTexture({r:90, g:60, b:40}) }),
-    leaves: new THREE.MeshLambertMaterial({ map: createPixelTexture({r:50, g:120, b:40}), transparent: true, opacity: 0.9 }),
-    stone: new THREE.MeshLambertMaterial({ map: createPixelTexture({r:120, g:120, b:120}) }),
-    chest: new THREE.MeshLambertMaterial({ map: createPixelTexture({r:180, g:130, b:60}, 80) }),
-    crafting: new THREE.MeshLambertMaterial({ map: createPixelTexture({r:150, g:100, b:70}, 100) })
-};
-
-// --- ESCENA Y MOTOR ---
+// --- MOTOR GRÁFICO ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -72,172 +80,172 @@ document.body.appendChild(renderer.domElement);
 
 const controls = new PointerLockControls(camera, document.body);
 scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-const sun = new THREE.DirectionalLight(0xffffff, 0.6);
-sun.position.set(10, 20, 10);
-scene.add(sun);
 
-// --- LÓGICA DE MUNDO ---
+// Texturas Pixeladas
+function getMat(color) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 8; canvas.height = 8;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = color; ctx.fillRect(0,0,8,8);
+    for(let i=0; i<10; i++) { ctx.fillStyle = `rgba(0,0,0,${Math.random()*0.2})`; ctx.fillRect(Math.random()*8, Math.random()*8, 1, 1); }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    return new THREE.MeshLambertMaterial({ map: tex });
+}
+
+const mats = { grass: getMat('#5d994d'), dirt: getMat('#795548'), stone: getMat('#888'), wood: getMat('#5d4037') };
 const boxGeo = new THREE.BoxGeometry(1, 1, 1);
 
-function setBlock(x, y, z, type) {
-    const key = `${x},${y},${z}`;
-    if (worldData.has(key)) return;
-    const mesh = new THREE.Mesh(boxGeo, materials[type]);
-    mesh.position.set(x, y, z);
+function setBlock(x, y, z, type, broadcast = true) {
+    const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+    if (world.has(key)) return;
+    const mesh = new THREE.Mesh(boxGeo, mats[type]);
+    mesh.position.set(Math.round(x), Math.round(y), Math.round(z));
     mesh.name = type;
     scene.add(mesh);
-    worldData.set(key, mesh);
+    world.set(key, mesh);
+    if (broadcast && conn) conn.send({ action: 'place', x, y, z, type });
 }
 
-// Generar Terreno con Cuevas y Árboles
-for(let x = -CHUNK_SIZE/2; x < CHUNK_SIZE/2; x++) {
-    for(let z = -CHUNK_SIZE/2; z < CHUNK_SIZE/2; z++) {
-        const ground = Math.floor(Math.sin(x/6)*2 + Math.cos(z/6)*2);
-        
-        for(let y = -8; y <= ground; y++) {
-            // CUEVAS: Si el "ruido" es bajo, no ponemos bloque
-            const caveNoise = Math.sin(x/2) * Math.cos(y/2) * Math.sin(z/2);
-            if (y < ground - 1 && caveNoise > 0.7) continue; 
-
-            let type = 'stone';
-            if (y === ground) type = 'grass';
-            else if (y > ground - 3) type = 'dirt';
-            setBlock(x, y, z, type);
-        }
-
-        // ÁRBOLES Y ESTRUCTURAS (Raro)
-        if (Math.random() > 0.98 && x % 5 === 0) {
-            const h = ground + 1;
-            for(let ty=0; ty<4; ty++) setBlock(x, h+ty, z, 'wood'); // Tronco
-            for(let lx=-1; lx<=1; lx++) 
-                for(let lz=-1; lz<=1; lz++) 
-                    setBlock(x+lx, h+4, z+lz, 'leaves'); // Copa
-            
-            if (Math.random() > 0.5) setBlock(x+1, h, z, 'chest'); // Cofre random
-            else setBlock(x-1, h, z, 'crafting'); // Mesa random
-        }
+// Generar Terreno inicial
+for(let x=-10; x<10; x++) {
+    for(let z=-10; z<10; z++) {
+        setBlock(x, 0, z, 'grass', false);
+        setBlock(x, -1, z, 'dirt', false);
     }
 }
 
-// --- FÍSICA Y COLISIONES ---
-let move = { f:0, b:0, l:0, r:0 };
-let velocity = new THREE.Vector3();
-let canJump = false;
-
-function isBlockAt(x, y, z) {
-    return worldData.has(`${Math.round(x)},${Math.round(y)},${Math.round(z)}`);
+// --- COLISIONES SÓLIDAS ---
+function isSolid(x, y, z) {
+    return world.has(`${Math.round(x)},${Math.round(y)},${Math.round(z)}`);
 }
 
-function updatePhysics(delta) {
-    if (!controls.isLocked) return;
-
-    velocity.y -= 9.8 * 1.5 * delta; // Gravedad
-    
-    // Colisión Vertical (Pies)
-    const nextY = camera.position.y + velocity.y * delta;
-    if (isBlockAt(camera.position.x, nextY - 1.6, camera.position.z)) {
-        velocity.y = 0;
-        canJump = true;
-    } else {
-        camera.position.y = nextY;
-    }
-
-    // Movimiento Horizontal
-    const direction = new THREE.Vector3();
-    direction.z = move.f - move.b;
-    direction.x = move.r - move.l;
-    direction.normalize();
-
-    if (move.f || move.b || move.l || move.r) {
-        const speed = 5 * delta;
-        controls.moveRight(direction.x * speed);
-        if (isBlockAt(camera.position.x, camera.position.y - 1, camera.position.z)) {
-            controls.moveRight(-direction.x * speed);
-        }
-        controls.moveForward(direction.z * speed);
-        if (isBlockAt(camera.position.x, camera.position.y - 1, camera.position.z)) {
-            controls.moveForward(-direction.z * speed);
-        }
-    }
+function checkCollisions(pos, vel, delta) {
+    const nextPos = pos.clone().add(vel.clone().multiplyScalar(delta));
+    // Colisión en X
+    if (isSolid(nextPos.x + (vel.x > 0 ? 0.3 : -0.3), pos.y - 1.5, pos.z)) vel.x = 0;
+    // Colisión en Z
+    if (isSolid(pos.x, pos.y - 1.5, nextPos.z + (vel.z > 0 ? 0.3 : -0.3))) vel.z = 0;
+    // Colisión en Y (Suelo/Techo)
+    if (isSolid(pos.x, nextPos.y - 1.6, pos.z)) { vel.y = 0; canJump = true; } 
+    else { vel.y -= 15 * delta; } // Gravedad
 }
 
-// --- INVENTARIO Y UI ---
-const ui = document.getElementById('ui');
-const blockIcons = { grass: '🌿', dirt: '🟫', wood: '🪵', stone: '🧱', chest: '📦', crafting: '🛠️', leaves: '🍃' };
+// --- MULTIPLAYER P2P (PeerJS) ---
+myPeer = new Peer();
+myPeer.on('open', id => document.getElementById('my-id').innerText = id);
+myPeer.on('connection', c => setupConn(c));
 
-function updateUI() {
-    ui.innerHTML = '';
-    inventory.forEach((slot, i) => {
-        const div = document.createElement('div');
-        div.className = `slot ${i === selectedSlot ? 'active' : ''}`;
-        div.innerHTML = slot.type ? blockIcons[slot.type] : '';
-        if (slot.count > 1) div.innerHTML += `<span class="count">${slot.count}</span>`;
-        ui.appendChild(div);
+document.getElementById('connect-btn').onclick = () => {
+    const id = document.getElementById('peer-id-input').value;
+    setupConn(myPeer.connect(id));
+};
+
+function setupConn(c) {
+    conn = c;
+    conn.on('data', data => {
+        if (data.action === 'move') updateRemotePlayer(data);
+        if (data.action === 'place') setBlock(data.x, data.y, data.z, data.type, false);
+        if (data.action === 'break') {
+            const key = `${data.x},${data.y},${data.z}`;
+            if(world.has(key)) { scene.remove(world.get(key)); world.delete(key); }
+        }
     });
 }
 
-function addToInventory(type) {
-    const existing = inventory.find(s => s.type === type);
-    if (existing) existing.count++;
-    else {
-        const empty = inventory.find(s => s.type === null);
-        if (empty) { empty.type = type; empty.count = 1; }
+function updateRemotePlayer(data) {
+    if (!players.has(data.id)) {
+        const p = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.8, 0.6), getMat('#f00'));
+        scene.add(p);
+        players.set(data.id, p);
     }
-    updateUI();
+    players.get(data.id).position.set(data.x, data.y - 0.9, data.z);
+}
+
+// --- INPUTS & MOBILE ---
+let keys = {}, canJump = false, velocity = new THREE.Vector3();
+window.onkeydown = (e) => keys[e.code] = true;
+window.onkeyup = (e) => keys[e.code] = false;
+
+if (isMobile) {
+    document.getElementById('mobile-controls').style.display = 'block';
+    document.getElementById('action-buttons').style.display = 'flex';
+    // Lógica básica de Touch para rotación omitida por brevedad, usa touchmove
 }
 
 // --- INTERACCIÓN ---
-document.addEventListener('mousedown', (e) => {
-    if (!controls.isLocked) return;
+function performAction(type) {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(0,0), camera);
     const intersects = ray.intersectObjects(scene.children);
-
     if (intersects.length > 0) {
         const obj = intersects[0].object;
-        if (e.button === 0) { // Romper
-            addToInventory(obj.name);
+        if (type === 'break') {
+            const p = obj.position;
+            if (conn) conn.send({ action: 'break', x: p.x, y: p.y, z: p.z });
             scene.remove(obj);
-            worldData.delete(`${obj.position.x},${obj.position.y},${obj.position.z}`);
-        } else if (inventory[selectedSlot].type) { // Poner
+            world.delete(`${p.x},${p.y},${p.z}`);
+        } else {
             const pos = obj.position.clone().add(intersects[0].face.normal);
+            // VALIDACIÓN: No poner bloque sobre el jugador
+            const pX = Math.round(camera.position.x), pZ = Math.round(camera.position.z);
+            if (pos.x === pX && pos.z === pZ && (pos.y === Math.round(camera.position.y) || pos.y === Math.round(camera.position.y-1))) return;
             setBlock(pos.x, pos.y, pos.z, inventory[selectedSlot].type);
-            inventory[selectedSlot].count--;
-            if (inventory[selectedSlot].count <= 0) inventory[selectedSlot].type = null;
-            updateUI();
         }
     }
+}
+
+document.addEventListener('mousedown', (e) => {
+    if (!controls.isLocked && !isMobile) return;
+    performAction(e.button === 0 ? 'break' : 'place');
 });
 
-// --- EVENTOS ---
-window.onkeydown = (e) => {
-    if (e.code === 'KeyW') move.f = 1; if (e.code === 'KeyS') move.b = 1;
-    if (e.code === 'KeyA') move.l = 1; if (e.code === 'KeyD') move.r = 1;
-    if (e.code === 'Space' && canJump) { velocity.y = 5; canJump = false; }
-    if (e.key >= 1 && e.key <= 9) { selectedSlot = e.key - 1; updateUI(); }
-};
-window.onkeyup = (e) => {
-    if (e.code === 'KeyW') move.f = 0; if (e.code === 'KeyS') move.b = 0;
-    if (e.code === 'KeyA') move.l = 0; if (e.code === 'KeyD') move.r = 0;
-};
-window.onwheel = (e) => {
-    selectedSlot = (selectedSlot + (e.deltaY > 0 ? 1 : -1) + 9) % 9;
-    updateUI();
-};
-document.body.onclick = () => controls.lock();
-
-// --- LOOP ---
+// --- LOOP PRINCIPAL ---
 let lastTime = performance.now();
 function animate() {
     requestAnimationFrame(animate);
     const time = performance.now();
-    updatePhysics((time - lastTime) / 1000);
+    const delta = Math.min((time - lastTime) / 1000, 0.1);
+
+    if (controls.isLocked || isMobile) {
+        const moveVel = new THREE.Vector3();
+        if (keys['KeyW']) moveVel.z += 5;
+        if (keys['KeyS']) moveVel.z -= 5;
+        if (keys['KeyA']) moveVel.x -= 5;
+        if (keys['KeyD']) moveVel.x += 5;
+
+        checkCollisions(camera.position, velocity, delta);
+        
+        controls.moveRight(moveVel.x * delta);
+        controls.moveForward(moveVel.z * delta);
+        camera.position.y += velocity.y * delta;
+
+        if (keys['Space'] && canJump) { velocity.y = 6; canJump = false; }
+
+        if (conn && time % 100 < 20) { // Sync cada 100ms aprox
+            conn.send({ action: 'move', id: myPeer.id, x: camera.position.x, y: camera.position.y, z: camera.position.z });
+        }
+    }
+    
     renderer.render(scene, camera);
     lastTime = time;
 }
-updateUI();
-camera.position.set(0, 10, 0);
+
+// UI Inventory
+const hud = document.getElementById('hud');
+function drawInv() {
+    hud.innerHTML = inventory.map((s, i) => `
+        <div class="slot ${i === selectedSlot ? 'active' : ''}">
+            ${s.type ? (s.type === 'grass' ? '🌿' : '🟫') : ''}
+            <span class="count">${s.count || ''}</span>
+        </div>`).join('');
+}
+
+drawInv();
+camera.position.set(0, 5, 0);
+document.body.onclick = () => { if(!isMobile) controls.lock(); };
 animate();
+
 </script>
 </body>
 </html>
