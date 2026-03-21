@@ -2,343 +2,192 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>3D P2P RPG - Tercera Persona</title>
+    <title>RPG 3D - Estilo WoW</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         canvas { display: block; }
-        
-        /* Interfaz de Usuario (UI) */
-        #ui {
+
+        /* UI de Pantalla */
+        #gui {
             position: absolute; top: 10px; left: 10px;
-            color: white; background: rgba(0,0,0,0.7);
-            padding: 15px; border-radius: 8px;
-            max-width: 300px; pointer-events: auto;
+            color: white; background: rgba(0,0,0,0.6);
+            padding: 15px; border-radius: 5px; pointer-events: none;
         }
-        .net-controls { margin-top: 10px; border-top: 1px solid #555; padding-top: 10px; }
-        input { width: 100%; padding: 5px; margin-bottom: 5px; background: #333; color: white; border: 1px solid #555; }
-        button { width: 100%; padding: 5px; background: #28a745; color: white; border: none; cursor: pointer; }
-        button:hover { background: #218838; }
-        #status { font-style: italic; color: #aaa; margin-top: 5px;}
-        
-        /* Punto de mira */
+
+        /* Inventario */
+        #inventory {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px; background: rgba(40, 40, 40, 0.9);
+            border: 3px solid #8b5a2b; border-radius: 10px;
+            display: none; padding: 20px; color: white;
+            box-shadow: 0 0 20px black;
+        }
+        .inv-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .slot { 
+            width: 80px; height: 80px; background: #222; 
+            border: 1px solid #555; display: flex; 
+            align-items: center; justify-content: center; font-size: 12px;
+            cursor: pointer;
+        }
+        .slot:hover { background: #444; border-color: gold; }
+
         #crosshair {
             position: absolute; top: 50%; left: 50%;
-            width: 10px; height: 10px; background: rgba(255,255,255,0.5);
+            width: 4px; height: 4px; background: white;
             border-radius: 50%; transform: translate(-50%, -50%);
-            pointer-events: none; /* No interfiere con el click */
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
 </head>
 <body>
 
     <div id="crosshair"></div>
+    
+    <div id="gui">
+        <b>Acciones:</b> WASD para mover | Click Derecho: Girar Cámara<br>
+        <b>E:</b> Abrir Mochila | <b>ID P2P:</b> <span id="my-id">Generando...</span>
+    </div>
 
-    <div id="ui">
-        <b>Jugador (Cubo Verde)</b><br>
-        HP: 100 | Arma: Arco<br>
-        Controles: WASD + Ratón (Girar). Click: Disparar.
-        
-        <div class="net-controls">
-            <div>Mi ID: <span id="my-id">...cargando...</span></div>
-            <input type="text" id="peer-id-input" placeholder="Pegar ID del amigo aquí">
-            <button id="connect-btn">Conectar a Amigo</button>
-            <div id="status">P2P Desconectado</div>
+    <div id="inventory">
+        <h3 style="text-align:center; margin-top:0;">Mochila</h3>
+        <div class="inv-grid">
+            <div class="slot" onclick="selectItem('Espada')">⚔️ Espada</div>
+            <div class="slot" onclick="selectItem('Arco')">🏹 Arco</div>
+            <div class="slot" onclick="selectItem('Poción Roja')">🧪 P. Vida</div>
+            <div class="slot" onclick="selectItem('Poción Azul')">🧪 P. Maná</div>
+            <div class="slot">Vacio</div>
+            <div class="slot">Vacio</div>
         </div>
+        <p id="inv-msg" style="font-size: 12px; color: gold; text-align: center;"></p>
     </div>
 
     <script>
-        // ==========================================
-        // CONFIGURACIÓN GLOBAL Y VARIABLES
-        // ==========================================
-        let myPeerId = null;
-        let connection = null; // Solo soportamos 1 conexión para este prototipo
-        const remotePlayers = {}; // Diccionario para guardar modelos de otros jugadores
-        const projectiles = []; // Array para las flechas
-
-        const playerSettings = { speed: 0.15, turnSpeed: 0.002 };
-        const keys = { w: false, a: false, s: false, d: false };
-        
-        // Estado del ratón para la cámara
-        let mouseX = 0;
-        let mouseY = 0;
-        const targetCameraRotation = new THREE.Euler(0, 0, 0);
-
-        // ==========================================
-        // 1. INICIALIZACIÓN DE THREE.JS (GRÁFICOS)
-        // ==========================================
+        // --- CONFIGURACIÓN ESCENA ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // Cielo azul
-
+        scene.background = new THREE.Color(0xa0d8ef);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Luces
-        scene.add(new THREE.AmbientLight(0x404040, 2)); // Luz ambiental
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-        directionalLight.position.set(1, 1, 1).normalize();
-        scene.add(directionalLight);
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(10, 20, 10);
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0x404040, 1.5));
 
-        // Suelo (Mundo)
-        const floorGeo = new THREE.PlaneGeometry(200, 200);
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x228b22 }); // Verde bosque
+        // --- TERRENO ---
+        const floorGeo = new THREE.PlaneGeometry(500, 500, 20, 20);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x3d6e3d, wireframe: false });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
 
-        // Enemigo Dummy (Cubo Rojo Estático)
-        const enemyGeo = new THREE.BoxGeometry(2, 2, 2);
-        const enemyMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-        const enemy = new THREE.Mesh(enemyGeo, enemyMat);
-        enemy.position.set(0, 1, -10);
-        enemy.userData = { type: 'enemy', hp: 50 }; // Datos personalizados
-        scene.add(enemy);
+        // --- CASTILLO (Simple) ---
+        function createCastle() {
+            const castleGroup = new THREE.Group();
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x808080 });
+            
+            // Murallas
+            const box = new THREE.Mesh(new THREE.BoxGeometry(20, 8, 20), wallMat);
+            box.position.y = 4;
+            castleGroup.add(box);
 
-        // ==========================================
-        // 2. EL JUGADOR Y LA CÁMARA (3ª PERSONA)
-        // ==========================================
-        // Contenedor del jugador (para rotación y movimiento)
-        const playerGroup = new THREE.Group();
-        playerGroup.position.y = 1; // Altura sobre el suelo
-        scene.add(playerGroup);
-
-        // Modelo del jugador (Cubo Verde)
-        const playerModelGeo = new THREE.BoxGeometry(1, 2, 1);
-        const playerModelMat = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-        const playerModel = new THREE.Mesh(playerModelGeo, playerModelMat);
-        playerGroup.add(playerModel);
-
-        // Brazo/Arma (indicador de dirección de apuntado vertical)
-        const weaponGeo = new THREE.BoxGeometry(0.2, 0.2, 1);
-        const weaponMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
-        const weapon = new THREE.Mesh(weaponGeo, weaponMat);
-        weapon.position.set(0.6, 0.5, -0.5); // A la derecha y adelante
-        playerGroup.add(weapon); // Está unido al grupo del jugador, rota horizontalmente con él
-
-        // Configuración de la Cámara en 3ª Persona
-        const cameraOffset = new THREE.Vector3(0, 3, 5); // Distancia atrás y arriba
-        const cameraTarget = new THREE.Vector3(); // Punto donde mira la cámara
-
-        // Pointer Lock (Bloquear ratón para girar cámara)
-        renderer.domElement.addEventListener('click', () => {
-            renderer.domElement.requestPointerLock();
-        });
-
-        // ==========================================
-        // 3. LÓGICA RED P2P (PEERJS)
-        // ==========================================
-        const peer = new Peer(); // Crea un ID único aleatorio
-
-        const statusEl = document.getElementById('status');
-
-        peer.on('open', (id) => {
-            myPeerId = id;
-            document.getElementById('my-id').innerText = id;
-            statusEl.innerText = "Esperando conexión...";
-        });
-
-        // Caso A: Alguien se conecta a mí (Servidor)
-        peer.on('connection', (conn) => {
-            setupConnection(conn);
-        });
-
-        // Caso B: Yo me conecto a alguien (Cliente)
-        document.getElementById('connect-btn').addEventListener('click', () => {
-            const remoteId = document.getElementById('peer-id-input').value;
-            if (remoteId) {
-                const conn = peer.connect(remoteId);
-                setupConnection(conn);
-            }
-        });
-
-        function setupConnection(conn) {
-            if (connection) {
-                console.log("Ya hay una conexión activa.");
-                return;
-            }
-            connection = conn;
-            statusEl.innerText = "¡Conectado P2P!";
-            statusEl.style.color = "#28a745";
-
-            // Crear modelo para el jugador remoto (Cubo Azul)
-            const remotePlayerGeo = new THREE.BoxGeometry(1, 2, 1);
-            const remotePlayerMat = new THREE.MeshStandardMaterial({ color: 0x0000ff });
-            const remotePlayerMesh = new THREE.Mesh(remotePlayerGeo, remotePlayerMat);
-            remotePlayerMesh.position.y = 1;
-            scene.add(remotePlayerMesh);
-            remotePlayers[conn.peer] = remotePlayerMesh;
-
-            // Recibir datos del otro jugador
-            conn.on('data', (data) => {
-                if (data.type === 'move') {
-                    // Actualizar posición y rotación horizontal
-                    remotePlayerMesh.position.set(data.x, data.y, data.z);
-                    remotePlayerMesh.rotation.y = data.ry;
-                }
+            // Torres
+            const towerGeo = new THREE.CylinderGeometry(2, 2, 12, 8);
+            const corners = [[10,10], [-10,10], [10,-10], [-10,-10]];
+            corners.forEach(p => {
+                const tower = new THREE.Mesh(towerGeo, wallMat);
+                tower.position.set(p[0], 6, p[1]);
+                castleGroup.add(tower);
             });
 
-            conn.on('close', () => {
-                statusEl.innerText = "Conexión cerrada.";
-                statusEl.style.color = "red";
-                scene.remove(remotePlayers[conn.peer]);
-                delete remotePlayers[conn.peer];
-                connection = null;
-            });
+            castleGroup.position.set(0, 0, -50);
+            scene.add(castleGroup);
         }
+        createCastle();
 
-        // ==========================================
-        // 4. CONTROLES Y SISTEMA DE COMBATE
-        // ==========================================
-        window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
-        window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+        // --- JUGADOR ---
+        const player = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0x2222ff}));
+        body.position.y = 1;
+        player.add(body);
+        scene.add(player);
 
-        // Rotación de cámara con ratón
+        // --- LÓGICA DE CÁMARA Y CONTROLES ---
+        let isRightClick = false;
+        let camAzimuth = 0; // Rotación horizontal
+        let camElevation = 0.5; // Rotación vertical
+        let camDistance = 8;
+
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'KeyE') toggleInventory();
+        });
+        document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        // Bloquear menú contextual para usar click derecho
+        window.addEventListener('contextmenu', e => e.preventDefault());
+
+        window.addEventListener('mousedown', (e) => { if(e.button === 2) isRightClick = true; });
+        window.addEventListener('mouseup', (e) => { if(e.button === 2) isRightClick = false; });
+        
         window.addEventListener('mousemove', (e) => {
-            if (document.pointerLockElement === renderer.domElement) {
-                // Girar el grupo del jugador (horizontalmente)
-                playerGroup.rotation.y -= e.movementX * playerSettings.turnSpeed;
-
-                // Girar el arma/brazo (verticalmente)
-                weapon.rotation.x -= e.movementY * playerSettings.turnSpeed;
-                // Limitar apuntado vertical
-                weapon.rotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, weapon.rotation.x));
+            if (isRightClick) {
+                camAzimuth -= e.movementX * 0.005;
+                camElevation += e.movementY * 0.005;
+                camElevation = Math.max(0.1, Math.min(Math.PI/2 - 0.1, camElevation));
             }
         });
 
-        // Disparar (Click)
-        window.addEventListener('click', () => {
-            if (document.pointerLockElement === renderer.domElement) {
-                fireProjectile();
-            }
-        });
-
-        function fireProjectile() {
-            // Geometría de la flecha
-            const arrowGeo = new THREE.CylinderGeometry(0.05, 0.05, 1, 4);
-            const arrowMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
-            const arrow = new THREE.Mesh(arrowGeo, arrowMat);
-
-            // Posición inicial (en el arma)
-            const weaponWorldPos = new THREE.Vector3();
-            weapon.getWorldPosition(weaponWorldPos);
-            arrow.position.copy(weaponWorldPos);
-
-            // Dirección (hacia donde apunta el arma)
-            const weaponWorldQuat = new THREE.Quaternion();
-            weapon.getWorldQuaternion(weaponWorldQuat);
-            arrow.quaternion.copy(weaponWorldQuat);
-            // Corregir orientación por defecto del cilindro
-            arrow.rotateX(Math.PI / 2);
-
-            // Obtener vector de dirección para el movimiento
-            const direction = new THREE.Vector3(0, 0, -1);
-            direction.applyQuaternion(weaponWorldQuat);
-
-            arrow.userData = { 
-                velocity: direction.multiplyScalar(0.5), // Velocidad
-                life: 100 // Ticks de vida
-            };
-
-            scene.add(arrow);
-            projectiles.push(arrow);
+        // --- INVENTARIO ---
+        const invPanel = document.getElementById('inventory');
+        function toggleInventory() {
+            const isVisible = invPanel.style.display === 'block';
+            invPanel.style.display = isVisible ? 'none' : 'block';
         }
 
-        // ==========================================
-        // 5. LOOP DE ANIMACIÓN Y LÓGICA DE JUEGO
-        // ==========================================
-        const clock = new THREE.Clock();
+        function selectItem(item) {
+            document.getElementById('inv-msg').innerText = "Has equipado: " + item;
+            if(item === 'Arco') body.material.color.set(0xffaa00);
+            if(item === 'Espada') body.material.color.set(0xff0000);
+        }
 
+        // --- LOOP DE ANIMACIÓN ---
         function animate() {
             requestAnimationFrame(animate);
-            const delta = clock.getDelta(); // Tiempo entre frames
 
-            // A. Movimiento del Jugador Local
-            const moveVec = new THREE.Vector3(0, 0, 0);
-            if (keys.w) moveVec.z -= 1;
-            if (keys.s) moveVec.z += 1;
-            if (keys.a) moveVec.x -= 1;
-            if (keys.d) moveVec.x += 1;
+            // Movimiento basado en la cámara
+            const speed = 0.2;
+            if (keys['KeyW']) {
+                player.position.x -= Math.sin(camAzimuth) * speed;
+                player.position.z -= Math.cos(camAzimuth) * speed;
+                player.rotation.y = camAzimuth; // El jugador mira hacia donde corre
+            }
+            if (keys['KeyS']) {
+                player.position.x += Math.sin(camAzimuth) * speed;
+                player.position.z += Math.cos(camAzimuth) * speed;
+            }
+
+            // Actualizar posición de cámara (Orbital)
+            camera.position.x = player.position.x + camDistance * Math.sin(camAzimuth) * Math.cos(camElevation);
+            camera.position.z = player.position.z + camDistance * Math.cos(camAzimuth) * Math.cos(camElevation);
+            camera.position.y = player.position.y + camDistance * Math.sin(camElevation);
             
-            if (moveVec.length() > 0) {
-                moveVec.normalize();
-                // Mover relativo a la rotación actual del jugador
-                moveVec.applyEuler(new THREE.Euler(0, playerGroup.rotation.y, 0));
-                playerGroup.position.add(moveVec.multiplyScalar(playerSettings.speed));
-            }
-
-            // B. Actualizar Cámara 3ª Persona
-            // Calcular posición ideal de la cámara relativa al jugador
-            const idealOffset = cameraOffset.clone();
-            idealOffset.applyEuler(new THREE.Euler(0, playerGroup.rotation.y, 0)); // Rotar offset horizontalmente
-            const idealCameraPos = playerGroup.position.clone().add(idealOffset);
-
-            // Suavizar movimiento de cámara (opcional, aquí es directo)
-            camera.position.copy(idealCameraPos);
-            
-            // Punto de mira (un poco por encima del jugador para ver por encima del hombro)
-            cameraTarget.copy(playerGroup.position);
-            cameraTarget.y += 1.5;
-            camera.lookAt(cameraTarget);
-
-            // C. Lógica de Proyectiles (Movimiento y Colisión)
-            for (let i = projectiles.length - 1; i >= 0; i--) {
-                const p = projectiles[i];
-                p.position.add(p.userData.velocity);
-                p.userData.life--;
-
-                // Colisión básica con el enemigo dummy
-                const distEnemigo = p.position.distanceTo(enemy.position);
-                if (distEnemigo < 1.5) { // Radio de colisión
-                    scene.remove(p);
-                    projectiles.splice(i, 1);
-                    console.log("¡Enemigo impactado!");
-                    // Efecto visual rápido
-                    enemy.material.color.set(0xffffff);
-                    setTimeout(() => enemy.material.color.set(0xff0000), 100);
-                    continue;
-                }
-
-                // Colisión con el suelo
-                if (p.position.y <= 0) {
-                    scene.remove(p);
-                    projectiles.splice(i, 1);
-                    continue;
-                }
-
-                // Muerte por tiempo
-                if (p.userData.life <= 0) {
-                    scene.remove(p);
-                    projectiles.splice(i, 1);
-                }
-            }
-
-            // D. Enviar datos de red (Si estamos conectados)
-            if (connection && connection.open) {
-                connection.send({
-                    type: 'move',
-                    x: playerGroup.position.x,
-                    y: playerGroup.position.y,
-                    z: playerGroup.position.z,
-                    ry: playerGroup.rotation.y // Solo enviamos rotación horizontal del cuerpo
-                });
-            }
+            camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
 
             renderer.render(scene, camera);
         }
 
-        // Manejar redimensionado de ventana
-        window.addEventListener('resize', onWindowResize, false);
-        function onWindowResize() {
+        animate();
+
+        // Ajuste de ventana
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        animate(); // Iniciar loop
-
+        });
     </script>
 </body>
 </html>
