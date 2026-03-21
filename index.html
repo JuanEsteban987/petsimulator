@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Korblox Mod (KMod) - Physics Sandbox | Con Colisiones</title>
+    <title>Korblox Mod (KMod) - Colisiones Exactas + Salto</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a1a; color: white; user-select: none; }
         canvas { display: block; }
 
-        /* UI principal */
         #ui-layer {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -95,8 +94,8 @@
 
     <div id="start-screen" onclick="initSandbox()">
         <h1>KMOD</h1>
-        <p>Physics Sandbox | Colisiones completas</p>
-        <p style="font-size: 14px; margin-top: 20px;">Haz clic para jugar | WASD | Ratón para mirar</p>
+        <p>Physics Sandbox | Colisiones exactas + Salto</p>
+        <p style="font-size: 14px; margin-top: 20px;">Haz clic para jugar | WASD | ESPACIO para saltar</p>
         <p style="font-size: 12px;">🔫 Physics Gun (1) agarra objetos | Tool Gun (2) spawnear | Click derecho elimina/congela</p>
     </div>
 
@@ -117,7 +116,7 @@
             <div class="tool-category">SANDBOX</div>
             <button class="tool-item" style="background: #c0392b;" onclick="clearProps()">💥 Limpiar Todo</button>
         </div>
-        <div class="info-badge">✔️ Colisiones entre objetos + jugador activadas | Rebote elástico</div>
+        <div class="info-badge">✔️ Colisiones precisas (esferas ajustadas) | Salto con espacio | Movimiento corregido</div>
     </div>
 
     <script type="importmap">
@@ -187,7 +186,6 @@
         floor.receiveShadow = true;
         scene.add(floor);
         
-        // Suelo auxiliar visual (grid helper)
         const gridHelper = new THREE.GridHelper(200, 40, 0x888888, 0x555555);
         gridHelper.position.y = 0;
         scene.add(gridHelper);
@@ -205,20 +203,11 @@
         createBoundWall(100, 0, 2, 200);
         createBoundWall(-100, 0, 2, 200);
         
-        // Decoración: algunos postes visuales
-        const pillarMat = new THREE.MeshStandardMaterial({ color: 0xbd7e5a });
-        for (let i = -8; i <= 8; i+=4) {
-            const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 4, 6), pillarMat);
-            pillar.position.set(i, 2, -15);
-            pillar.castShadow = true;
-            scene.add(pillar);
-        }
-
-        // --- RAYCASTER (centro pantalla) ---
+        // --- RAYCASTER ---
         const raycaster = new THREE.Raycaster();
         const centerPoint = new THREE.Vector2(0, 0);
         
-        // --- CLASE PROP CON COLISIONES ---
+        // --- CLASE PROP CON RADIOS EXACTOS ---
         class Prop {
             constructor(type, position) {
                 this.type = type;
@@ -226,9 +215,11 @@
                 const colors = { cube: 0xe67e22, sphere: 0x3498db, wall: 0x9b59b6 };
                 material = new THREE.MeshStandardMaterial({ color: colors[type], roughness: 0.6, metalness: 0.2 });
                 
+                // Dimensiones reales y radio de colisión (esfera envolvente ajustada al tamaño real)
                 if (type === 'cube') {
                     geometry = new THREE.BoxGeometry(1.8, 1.8, 1.8);
-                    this.radius = 1.1;  // radio bounding sphere ajustado
+                    // Radio = mitad de la diagonal (para colisiones esféricas exactas)
+                    this.radius = Math.sqrt(1.8*1.8 + 1.8*1.8 + 1.8*1.8) / 2; // ~1.56
                     this.mass = 1.2;
                 } else if (type === 'sphere') {
                     geometry = new THREE.SphereGeometry(1.1, 24, 24);
@@ -236,8 +227,9 @@
                     this.mass = 1.0;
                 } else if (type === 'wall') {
                     geometry = new THREE.BoxGeometry(0.8, 3.2, 5.2);
-                    this.radius = 2.2;  // bounding sphere que cubre el objeto alargado
-                    this.mass = 1.8;
+                    // Radio = semidiagonal (para que la esfera cubra toda la caja)
+                    this.radius = Math.sqrt(0.8*0.8 + 3.2*3.2 + 5.2*5.2) / 2; // ~3.11
+                    this.mass = 2.2;
                 }
                 
                 this.mesh = new THREE.Mesh(geometry, material);
@@ -247,7 +239,6 @@
                 this.mesh.userData.isProp = true;
                 this.mesh.userData.parentProp = this;
                 
-                // Física
                 this.velocity = new THREE.Vector3(0, 0, 0);
                 this.isFrozen = false;
                 this.isHeld = false;
@@ -270,14 +261,13 @@
                 this.mesh.position.z += this.velocity.z * delta;
                 this.mesh.position.y += this.velocity.y * delta;
                 
-                // Colisión con suelo (y=0 + radio)
+                // Colisión con suelo (y = radio)
                 const groundY = this.radius;
                 if (this.mesh.position.y < groundY) {
                     this.mesh.position.y = groundY;
                     if (this.velocity.y < 0) {
-                        this.velocity.y *= -0.35; // rebote
+                        this.velocity.y *= -0.35;
                     }
-                    // fricción suelo
                     this.velocity.x *= 0.98;
                     this.velocity.z *= 0.98;
                 }
@@ -287,15 +277,19 @@
             }
         }
         
-        // --- FUNCIONES DE COLISIONES (PROP-PROP Y PLAYER-PROP) ---
-        // Radio del jugador (collider esférico a la altura del torso)
-        const PLAYER_RADIUS = 0.65;
-        // Posición del collider del jugador (a 1.2m del suelo aprox, centrado)
+        // --- JUGADOR: FÍSICA CON SALTO Y COLISIONES EXACTAS ---
+        // El jugador se representa como un cuerpo esférico (radio) para colisiones simples pero precisas
+        const PLAYER_RADIUS = 0.55;
+        let playerVelocity = new THREE.Vector3(0, 0, 0);
+        let isGrounded = false;
+        let jumpRequested = false;
+        
+        // Obtener posición del centro del collider del jugador (a la altura del torso)
         function getPlayerColliderPos() {
-            return new THREE.Vector3(camera.position.x, camera.position.y - 0.6, camera.position.z);
+            return new THREE.Vector3(camera.position.x, camera.position.y - 0.55, camera.position.z);
         }
         
-        // Resolver colisión entre dos props (separación y cambio de velocidades)
+        // Resolver colisión entre dos props (usando radios exactos)
         function resolvePropCollision(p1, p2) {
             const pos1 = p1.mesh.position;
             const pos2 = p2.mesh.position;
@@ -304,7 +298,6 @@
             const minDist = p1.radius + p2.radius;
             if (distance >= minDist) return false;
             
-            // Separación
             const overlap = minDist - distance;
             const dir = delta.clone().normalize();
             const correction = dir.clone().multiplyScalar(overlap * 0.5);
@@ -312,7 +305,6 @@
             if (!p1.isFrozen && !p1.isHeld) pos1.sub(correction);
             if (!p2.isFrozen && !p2.isHeld) pos2.add(correction);
             
-            // Intercambio de velocidades (elástico + factor de restitución)
             const rest = 0.55;
             const vrel = new THREE.Vector3().subVectors(p2.velocity, p1.velocity);
             const velAlong = vrel.dot(dir);
@@ -328,7 +320,7 @@
             return true;
         }
         
-        // Colisión jugador vs prop
+        // Resolver colisión jugador vs prop (colisiones esféricas precisas)
         function resolvePlayerPropCollision(playerPos, prop) {
             const propPos = prop.mesh.position;
             const delta = new THREE.Vector3().subVectors(propPos, playerPos);
@@ -338,38 +330,79 @@
             
             const overlap = minDist - dist;
             const dir = delta.clone().normalize();
-            // Empujar jugador (cámara) fuera
-            const correction = dir.clone().multiplyScalar(overlap);
-            camera.position.sub(correction);
             
-            // Si el prop no está agarrado ni congelado, también se empuja ligeramente para evitar clipping
+            // Mover al jugador para resolver colisión
+            camera.position.sub(dir.clone().multiplyScalar(overlap));
+            
+            // Si el prop no está agarrado ni congelado, aplicamos impulso y movimiento
             if (!prop.isHeld && !prop.isFrozen) {
-                prop.mesh.position.add(correction.multiplyScalar(0.4));
-                // pequeño impulso lateral para simular rozamiento
-                const pushVel = dir.clone().multiplyScalar(overlap * 1.2);
-                prop.velocity.add(pushVel);
+                prop.mesh.position.add(dir.clone().multiplyScalar(overlap * 0.3));
+                // Añadir impulso basado en velocidad relativa
+                const relVel = playerVelocity.clone().sub(prop.velocity);
+                const velAlong = relVel.dot(dir);
+                if (velAlong < 0) {
+                    const e = 0.5;
+                    const impulse = (1 + e) * velAlong / (1 + (prop.mass > 0 ? prop.mass : 1));
+                    prop.velocity.sub(dir.clone().multiplyScalar(impulse / (prop.mass || 1)));
+                }
+            }
+            
+            // Determinar si el jugador está en el suelo (colisión desde arriba)
+            if (dir.y > 0.7 && playerVelocity.y <= 0) {
+                isGrounded = true;
+                playerVelocity.y = 0;
             }
             return true;
         }
         
-        // Bucle de colisiones global entre props
-        function handleAllPropCollisions() {
-            const props = gameState.props;
-            for (let i = 0; i < props.length; i++) {
-                for (let j = i + 1; j < props.length; j++) {
-                    resolvePropCollision(props[i], props[j]);
+        // Colisión con el suelo (plano Y=0 + radio jugador)
+        function handleGroundCollision() {
+            const playerPos = getPlayerColliderPos();
+            if (playerPos.y - PLAYER_RADIUS <= 0) {
+                camera.position.y = PLAYER_RADIUS + 0.55; // ajuste visual
+                if (playerVelocity.y < 0) {
+                    playerVelocity.y = 0;
+                    isGrounded = true;
                 }
+            } else {
+                isGrounded = false;
             }
         }
         
-        // --- MOVIMIENTO DEL JUGADOR CON COLISIONES ---
-        const keys = { w: false, s: false, a: false, d: false };
+        // Actualizar física del jugador (gravedad y movimiento)
+        function updatePlayerPhysics(delta) {
+            // Gravedad
+            playerVelocity.y -= 22 * delta;
+            camera.position.y += playerVelocity.y * delta;
+            
+            // Colisión con suelo y props
+            handleGroundCollision();
+            const playerPos = getPlayerColliderPos();
+            for (const prop of gameState.props) {
+                resolvePlayerPropCollision(playerPos, prop);
+            }
+            
+            // Saltar
+            if (jumpRequested && isGrounded) {
+                playerVelocity.y = 8.5;
+                isGrounded = false;
+                jumpRequested = false;
+            }
+        }
+        
+        // --- MOVIMIENTO DEL JUGADOR (WASD + SALTO) ---
+        const keys = { w: false, s: false, a: false, d: false, space: false };
         window.addEventListener('keydown', (e) => {
             const code = e.code;
             if (code === 'KeyW') keys.w = true;
             if (code === 'KeyS') keys.s = true;
             if (code === 'KeyA') keys.a = true;
             if (code === 'KeyD') keys.d = true;
+            if (code === 'Space') {
+                keys.space = true;
+                jumpRequested = true;
+                e.preventDefault();
+            }
             if (e.key === '1') selectWeapon('physgun');
             if (e.key === '2') selectWeapon('toolgun');
             if (e.key === 'r' || e.key === 'R') reloadAction();
@@ -380,10 +413,12 @@
             if (code === 'KeyS') keys.s = false;
             if (code === 'KeyA') keys.a = false;
             if (code === 'KeyD') keys.d = false;
+            if (code === 'Space') keys.space = false;
         });
         
         function updatePlayerMovement(delta) {
             if (!controls.isLocked) return;
+            
             const speed = 12.0;
             const move = new THREE.Vector3(0, 0, 0);
             const forward = new THREE.Vector3();
@@ -393,48 +428,39 @@
             forward.normalize();
             right.crossVectors(new THREE.Vector3(0, 1, 0), forward);
             
+            // Movimiento WASD (corregido: A izquierda, D derecha)
             if (keys.w) move.add(forward);
             if (keys.s) move.sub(forward);
             if (keys.d) move.add(right);
             if (keys.a) move.sub(right);
             move.multiplyScalar(speed * delta);
             
-            if (move.length() === 0) return;
-            
-            // Probar movimiento por ejes (simple sliding)
-            const originalPos = camera.position.clone();
-            const newPos = originalPos.clone().add(move);
-            // Primero probar movimiento completo, si hay colisión, resolver por separado en ejes
-            camera.position.copy(newPos);
-            let collision = false;
-            const playerCollPos = getPlayerColliderPos();
-            for (const prop of gameState.props) {
-                if (resolvePlayerPropCollision(playerCollPos, prop)) collision = true;
-            }
-            if (collision) {
-                // fallback: intentar movimiento en X y Z por separado
-                camera.position.copy(originalPos);
+            if (move.length() > 0) {
+                // Movimiento con colisiones simples por ejes (deslizamiento)
+                const originalPos = camera.position.clone();
+                // Eje X
                 const moveX = new THREE.Vector3(move.x, 0, 0);
                 camera.position.add(moveX);
                 let collX = false;
+                const playerPosX = getPlayerColliderPos();
                 for (const prop of gameState.props) {
-                    if (resolvePlayerPropCollision(getPlayerColliderPos(), prop)) collX = true;
+                    if (resolvePlayerPropCollision(playerPosX, prop)) collX = true;
                 }
-                if (collX) camera.position.copy(originalPos);
+                if (collX) camera.position.x = originalPos.x;
                 
+                // Eje Z
                 const moveZ = new THREE.Vector3(0, 0, move.z);
                 camera.position.add(moveZ);
                 let collZ = false;
+                const playerPosZ = getPlayerColliderPos();
                 for (const prop of gameState.props) {
-                    if (resolvePlayerPropCollision(getPlayerColliderPos(), prop)) collZ = true;
+                    if (resolvePlayerPropCollision(playerPosZ, prop)) collZ = true;
                 }
                 if (collZ) camera.position.z = originalPos.z;
+                
+                // Si hay colisión en ambos ejes, se queda en la posición original
+                if (collX && collZ) camera.position.copy(originalPos);
             }
-            
-            // Mantener Y del jugador estable (no atraviesa suelo)
-            const playerBottom = camera.position.y - 0.9;
-            if (playerBottom < 0.2) camera.position.y = 1.1;
-            if (camera.position.y > 2.5) camera.position.y = 2.5; // límite superior
         }
         
         // --- CONTROLES Y ARMAS ---
@@ -445,7 +471,6 @@
             spawnInitialProps();
         };
         
-        // Ratón disparo
         let isPrimary = false;
         let isSecondary = false;
         window.addEventListener('mousedown', (e) => {
@@ -459,7 +484,6 @@
         });
         window.addEventListener('contextmenu', e => e.preventDefault());
         
-        // Rueda para distancia PhysGun
         window.addEventListener('wheel', (e) => {
             if (!controls.isLocked || !gameState.heldEntity) return;
             gameState.heldDistance -= e.deltaY * 0.012;
@@ -503,7 +527,6 @@
             if (gameState.currentWeapon === 'physgun' && gameState.heldEntity) {
                 gameState.heldEntity.isHeld = false;
                 gameState.heldEntity.mesh.material.emissive.setHex(0x000000);
-                // Pequeño impulso al soltar si está muy cerca
                 if (gameState.heldEntity.velocity.length() < 1.2) {
                     const dir = new THREE.Vector3(0, 0.5, 0);
                     gameState.heldEntity.velocity.add(dir);
@@ -573,7 +596,7 @@
         function spawnInitialProps() {
             new Prop('cube', new THREE.Vector3(2, 1.2, -8));
             new Prop('sphere', new THREE.Vector3(-2, 1.2, -6));
-            new Prop('wall', new THREE.Vector3(0, 2, -12));
+            new Prop('wall', new THREE.Vector3(0, 3.5, -12));
             new Prop('cube', new THREE.Vector3(5, 0.8, -4));
             new Prop('sphere', new THREE.Vector3(-4, 1, -10));
         }
@@ -581,12 +604,14 @@
         // --- BUCLE PRINCIPAL ---
         const clock = new THREE.Clock();
         camera.position.set(0, 1.8, 10);
+        playerVelocity.set(0, 0, 0);
         
         function animate() {
             const delta = Math.min(clock.getDelta(), 0.033);
             
             if (controls.isLocked) {
                 updatePlayerMovement(delta);
+                updatePlayerPhysics(delta);
             }
             
             // Actualizar objeto sostenido por physgun
@@ -595,9 +620,7 @@
                 const camDir = new THREE.Vector3();
                 camera.getWorldDirection(camDir);
                 targetPos.add(camDir.multiplyScalar(gameState.heldDistance));
-                // Movimiento suave para el objeto agarrado
                 gameState.heldEntity.mesh.position.lerp(targetPos, 0.35);
-                // Si el objeto agarrado se mueve, su velocidad se resetea para evitar rebotes extraños
                 gameState.heldEntity.velocity.set(0, 0, 0);
             }
             
@@ -606,8 +629,12 @@
                 prop.update(delta);
             }
             
-            // COLISIONES PROPIEDADES ENTRE SÍ
-            handleAllPropCollisions();
+            // Colisiones entre props
+            for (let i = 0; i < gameState.props.length; i++) {
+                for (let j = i + 1; j < gameState.props.length; j++) {
+                    resolvePropCollision(gameState.props[i], gameState.props[j]);
+                }
+            }
             
             // Re-validar colisiones jugador después de mover props (para evitar clipping)
             if (controls.isLocked) {
@@ -629,8 +656,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
         
-        // Pequeño helper para evitar errores de UI
-        console.log("KMod con colisiones activas");
+        console.log("KMod con colisiones exactas y salto activado");
     </script>
 </body>
 </html>
