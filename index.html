@@ -2,340 +2,93 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>TABS RPG Ultra - Advanced Painter</title>
+    <title>Mini Pet Simulator</title>
     <style>
-        :root { 
-            --primary: #007bff; --accent: #6f42c1; --bg: #090909; 
-            --panel: #151515; --border: #333; --danger: #ff4444; --success: #28a745;
+        body { background: #2c3e50; color: white; font-family: 'Arial', sans-serif; text-align: center; }
+        #game-container { margin-top: 50px; }
+        #coins-display { font-size: 2em; color: #f1c40f; text-shadow: 2px 2px #000; }
+        
+        .pet-area { height: 200px; border: 2px dashed #7f8c8d; margin: 20px auto; width: 80%; position: relative; border-radius: 15px; }
+        .pet { font-size: 40px; position: absolute; transition: all 0.5s ease; cursor: pointer; }
+        
+        button { 
+            padding: 15px 30px; font-size: 1.2em; cursor: pointer; border-radius: 10px; border: none;
+            background: #27ae60; color: white; transition: 0.3s;
         }
-
-        body { margin: 0; background: var(--bg); color: white; font-family: 'Inter', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        button:hover { background: #2ecc71; transform: scale(1.05); }
+        button:disabled { background: #95a5a6; cursor: not-allowed; }
         
-        #leftPanel { width: 320px; background: var(--panel); padding: 15px; border-right: 1px solid var(--border); overflow-y: auto; z-index: 10; }
-        .section-title { font-size: 10px; text-transform: uppercase; color: var(--primary); margin: 15px 0 8px 0; border-bottom: 1px solid var(--border); letter-spacing: 1px; font-weight: bold; padding-bottom: 3px; }
-        
-        .buttonGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-        .unitBtn, .tileBtn { background: #222; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; height: 65px; display: flex; align-items: center; justify-content: center; transition: 0.2s; padding: 5px; overflow: hidden; position: relative; }
-        .unitBtn img, .tileBtn img { image-rendering: pixelated; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
-        .selected { border-color: var(--success) !important; background: rgba(40, 167, 69, 0.2) !important; }
-        
-        #gameContainer { flex: 1; position: relative; background: #000; }
-        canvas#game { display: block; width: 100%; height: 100%; }
-
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 1000; }
-        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #181818; padding: 25px; border: 1px solid var(--border); border-radius: 12px; width: 950px; cursor: default; }
-        .editor-layout { display: grid; grid-template-columns: 420px 1fr; gap: 25px; }
-
-        canvas.pixel-canvas { 
-            image-rendering: pixelated; background-color: #1a1a1a;
-            border: 2px solid #000; display: block; margin: 0 auto; cursor: crosshair; 
-        }
-
-        .tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
-        .tool-btn { background: #333; border: 1px solid #444; color: white; padding: 10px; cursor: pointer; border-radius: 4px; font-size: 14px; display: flex; align-items: center; justify-content: center; height: 40px;}
-        .tool-btn.active { background: var(--primary); border-color: white; }
-
-        .stats-box { background: #222; padding: 15px; border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        input, select { background: #000; border: 1px solid #444; color: #0f0; padding: 8px; border-radius: 4px; width: 100%; box-sizing: border-box; }
-        .btn-main { color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
-        
-        #contextMenu { display: none; position: absolute; background: #202020; border: 1px solid var(--border); z-index: 2000; min-width: 180px; border-radius: 8px; padding: 5px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .context-item { padding: 10px 15px; cursor: pointer; font-size: 13px; border-radius: 4px; color: #ccc; }
-        .context-item:hover { background: var(--primary); color: white; }
-
-        .res-selector { display: flex; gap: 10px; margin-bottom: 10px; }
-        .res-btn { flex: 1; padding: 5px; background: #333; border: 1px solid #444; color: white; cursor: pointer; border-radius: 4px; font-size: 10px; }
-        .res-btn.active { background: var(--accent); border-color: white; }
+        .stats { margin-bottom: 20px; }
     </style>
 </head>
 <body>
 
-<div id="leftPanel">
-    <div class="section-title">Tropas y Estructuras</div>
-    <div id="unitButtons" class="buttonGrid"></div>
-    <div class="section-title">Terrenos</div>
-    <div id="tileLibrary" class="buttonGrid" style="grid-template-columns: repeat(5,1fr)"></div>
-    <button class="btn-main" style="background:var(--accent); font-size:11px" onclick="openTileEditor()">🎨 NUEVO TILESET</button>
-    
-    <div class="section-title">Simulación</div>
-    <div class="buttonGrid">
-        <button class="unitBtn" onclick="toggleTeam()" id="teamBtn">🔵<br><small>Bando</small></button>
-        <button class="unitBtn" onclick="startBattle()" style="color:var(--success)">▶<br><small>Play</small></button>
-        <button class="unitBtn" onclick="clearUnits()" style="color:var(--danger)">🗑<br><small>Reset</small></button>
-        <button class="unitBtn" onclick="openCreator()" style="color:var(--primary)">➕<br><small>Nuevo</small></button>
-    </div>
-</div>
-
-<div id="gameContainer"><canvas id="game"></canvas></div>
-
-<div id="contextMenu">
-    <div class="context-item" onclick="editCurrent()">✏️ Editar</div>
-    <div class="context-item" onclick="deleteCurrent()" style="color:var(--danger)">🗑️ Eliminar</div>
-</div>
-
-<div id="creatorPanel" class="modal">
-    <div class="modal-content">
-        <div class="editor-layout">
-            <div>
-                <div class="res-selector">
-                    <button class="res-btn active" onclick="setRes(16, this)">16x16</button>
-                    <button class="res-btn" onclick="setRes(32, this)">32x32</button>
-                </div>
-                <canvas id="uCanvas" class="pixel-canvas" width="384" height="384"></canvas>
-                <div class="tools" id="uTools">
-                    <button class="tool-btn active" onclick="setTool('pen', this)">✏️ Pincel</button>
-                    <button class="tool-btn" onclick="setTool('line', this)">📏 Línea</button>
-                    <button class="tool-btn" onclick="setTool('rect', this)">⬜ Caja</button>
-                    <button class="tool-btn" onclick="setTool('circle', this)">⭕ Círculo</button>
-                    <button class="tool-btn" onclick="setTool('eraser', this)">🧽 Goma</button>
-                    <button class="tool-btn" onclick="setTool('fill', this)">🎨 Cubo</button>
-                    <button class="tool-btn" onclick="setTool('picker', this)">🧪 Gotero</button>
-                    <button class="tool-btn" onclick="toggleMirror(this)">🌓 Espejo</button>
-                </div>
-                <input type="color" id="uColor" value="#3498db" style="width:100%; height:30px; margin-top:10px; border:none;">
-            </div>
-            <div>
-                <h2 style="margin:0; color:var(--primary)">Configurar Entidad</h2>
-                <div class="stats-box">
-                    <div style="grid-column: span 2;"><label>Nombre</label><input id="uName" value="Soldado"></div>
-                    <div><label>Tipo</label>
-                        <select id="uType" onchange="autoAdjustRange()">
-                            <option value="melee">Infantería</option>
-                            <option value="range">Arquero</option>
-                            <option value="turret">Torre</option>
-                            <option value="structure">Estructura</option>
-                        </select>
-                    </div>
-                    <div><label>Skill</label>
-                        <select id="uSkill">
-                            <option value="none">Ninguna</option>
-                            <option value="spin">🌪️ Remolino</option>
-                            <option value="poison">🧪 Veneno</option>
-                        </select>
-                    </div>
-                    <div><label>❤️ Vida</label><input id="uHp" type="number" value="100"></div>
-                    <div><label>⚔️ Daño</label><input id="uAtk" type="number" value="15"></div>
-                    <div><label>🏃 Vel</label><input id="uSpd" type="number" value="1.5" step="0.1"></div>
-                </div>
-                <button class="btn-main" id="saveNewBtn" onclick="saveUnit()" style="background:var(--success)">GUARDAR ENTIDAD</button>
-                <button onclick="closeModals()" style="width:100%; background:none; border:none; color:#555; cursor:pointer; margin-top:10px">Cerrar</button>
-            </div>
+    <div id="game-container">
+        <h1>🐾 PET SIMULATOR HTML 🐾</h1>
+        <div class="stats">
+            <div id="coins-display">💰 Monedas: 0</div>
+            <p id="pet-count">Mascotas: 1 (Cada una genera 1 moneda/seg)</p>
         </div>
+
+        <div class="pet-area" id="pet-area">
+            <span class="pet" id="pet1">🐶</span>
+        </div>
+
+        <button onclick="clickCoin()">¡Cosechar Monedas!</button>
+        <button id="buy-egg" onclick="buyEgg()">🥚 Comprar Huevo (50 Monedas)</button>
     </div>
-</div>
 
-<div id="tileModal" class="modal">
-    <div class="modal-content">
-        <canvas id="tCanvas" class="pixel-canvas" width="256" height="256"></canvas>
-        <button class="btn-main" style="background:var(--accent)" onclick="saveTile()">AÑADIR AL MAPA</button>
-        <button onclick="closeModals()" style="width:100%; background:none; border:none; color:#555; cursor:pointer;">Cancelar</button>
-    </div>
-</div>
+    <script>
+        let coins = 0;
+        let pets = ["🐶"];
+        const petIcons = ["🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐸", "🦁", "🦄"];
+        const petArea = document.getElementById('pet-area');
 
-<script>
-const canvas = document.getElementById("game"), ctx = canvas.getContext("2d");
-const gridSize = 40;
-let currentRes = 16, pSize = 384/16; 
-let baseUnits = [], baseTiles = [], unitsOnMap = [], mapData = {}, tileImgs = [];
-let particles = [], selectedUnit = null, selectedTileIdx = 0, currentTeam = "blue", battleStarted = false;
-let currentTool = 'pen', isMirror = false, drawing = false, editIndex = -1, mouseX = 0, mouseY = 0;
-let startX = 0, startY = 0, previewCanvas = null;
-
-// --- GESTIÓN DE RATÓN Y MENÚ ---
-window.addEventListener('mousedown', (e) => {
-    const m = document.getElementById("contextMenu");
-    if (m.style.display === "block" && !m.contains(e.target)) m.style.display = "none";
-});
-
-// --- CLASE UNIDAD ---
-class Unit {
-    constructor(x, y, team, data) {
-        Object.assign(this, data);
-        this.x = x; this.y = y; this.team = team; this.curHp = this.hp;
-        this.cool = 0; this.img = new Image(); this.img.src = this.sprite;
-        this.dir = (team === "blue" ? 1 : -1); this.flash = 0;
-        this.physSize = this.res === 32 ? 80 : 40; 
-        this.rng = (this.type === 'melee' ? 45 : this.type === 'range' ? 220 : 350);
-    }
-    damage(amt) { this.curHp -= amt; this.flash = 5; }
-    update() {
-        if(!battleStarted) return;
-        let enemies = unitsOnMap.filter(u => u.team !== this.team);
-        if(!enemies.length) return;
-        let target = enemies.reduce((p, c) => Math.hypot(c.x-this.x, c.y-this.y) < Math.hypot(p.x-this.x, p.y-this.y) ? c : p);
-        let d = Math.hypot(target.x-this.x, target.y-this.y);
-        this.dir = target.x > this.x ? 1 : -1;
-        if(this.type !== 'structure' && this.type !== 'turret' && d > this.rng) {
-            this.x += (target.x-this.x)/d * this.spd; this.y += (target.y-this.y)/d * this.spd;
+        // Función para ganar monedas al hacer clic
+        function clickCoin() {
+            coins += 1 + (pets.length * 2); // Bonus por tener mascotas
+            updateUI();
         }
-        if(d <= this.rng && this.cool <= 0 && this.type !== 'structure') {
-            target.damage(this.atk); this.cool = 60;
-        }
-        if(this.cool > 0) this.cool--; if(this.flash > 0) this.flash--;
-    }
-    draw(ghost = false) {
-        ctx.save(); ctx.translate(this.x, this.y);
-        if(ghost) ctx.globalAlpha = 0.4;
-        if(this.dir === -1) ctx.scale(-1, 1);
-        if(this.flash > 0) ctx.filter = "brightness(5)";
-        ctx.drawImage(this.img, -this.physSize/2, -this.physSize/2, this.physSize, this.physSize);
-        ctx.restore();
-        ctx.globalAlpha = 1;
-    }
-}
 
-// --- HERRAMIENTAS DE DIBUJO ---
-function setTool(t, b) {
-    currentTool = t;
-    document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-    b.classList.add('active');
-}
-
-function toggleMirror(b) { isMirror = !isMirror; b.classList.toggle('active'); }
-
-function getPixelCoords(c, e) {
-    const r = c.getBoundingClientRect();
-    return {
-        x: Math.floor(((e.clientX - r.left) * (c.width/r.width)) / pSize) * pSize,
-        y: Math.floor(((e.clientY - r.top) * (c.height/r.height)) / pSize) * pSize
-    };
-}
-
-const uCanvas = document.getElementById("uCanvas"), uCtx = uCanvas.getContext("2d");
-let tempCanvas = document.createElement('canvas'); // Para previsualizar formas
-tempCanvas.width = 384; tempCanvas.height = 384;
-const tCtx = tempCanvas.getContext('2d');
-
-uCanvas.onmousedown = (e) => {
-    drawing = true;
-    const coords = getPixelCoords(uCanvas, e);
-    startX = coords.x; startY = coords.y;
-    
-    if(currentTool === 'picker') {
-        const data = uCtx.getImageData(startX, startY, 1, 1).data;
-        if(data[3] > 0) {
-            const hex = "#" + ((1 << 24) + (data[0] << 16) + (data[1] << 8) + data[2]).toString(16).slice(1);
-            document.getElementById("uColor").value = hex;
-        }
-        drawing = false;
-    } else if(currentTool === 'fill') {
-        uCtx.fillStyle = document.getElementById("uColor").value;
-        uCtx.fillRect(0,0,384,384);
-        drawing = false;
-    }
-};
-
-uCanvas.onmousemove = (e) => {
-    if(!drawing) return;
-    const coords = getPixelCoords(uCanvas, e);
-    const color = document.getElementById("uColor").value;
-    
-    if(currentTool === 'pen') {
-        uCtx.fillStyle = color;
-        uCtx.fillRect(coords.x, coords.y, pSize, pSize);
-        if(isMirror) uCtx.fillRect(384 - coords.x - pSize, coords.y, pSize, pSize);
-    } else if(currentTool === 'eraser') {
-        uCtx.clearRect(coords.x, coords.y, pSize, pSize);
-        if(isMirror) uCtx.clearRect(384 - coords.x - pSize, coords.y, pSize, pSize);
-    }
-};
-
-uCanvas.onmouseup = (e) => {
-    if(!drawing) return;
-    const coords = getPixelCoords(uCanvas, e);
-    const color = document.getElementById("uColor").value;
-    uCtx.fillStyle = color;
-
-    if(currentTool === 'rect') {
-        const w = coords.x - startX + pSize;
-        const h = coords.y - startY + pSize;
-        uCtx.fillRect(startX, startY, w, h);
-        if(isMirror) uCtx.fillRect(384 - startX - w, startY, w, h);
-    } else if(currentTool === 'line') {
-        // Simple pixel line
-        let dist = Math.hypot(coords.x - startX, coords.y - startY);
-        for(let i=0; i<dist; i+=pSize/2) {
-            let lx = startX + (coords.x - startX) * (i/dist);
-            let ly = startY + (coords.y - startY) * (i/dist);
-            uCtx.fillRect(Math.floor(lx/pSize)*pSize, Math.floor(ly/pSize)*pSize, pSize, pSize);
-        }
-    } else if(currentTool === 'circle') {
-        const r = Math.hypot(coords.x - startX, coords.y - startY);
-        for(let x=0; x<384; x+=pSize) {
-            for(let y=0; y<384; y+=pSize) {
-                if(Math.hypot(x-startX, y-startY) <= r) uCtx.fillRect(x,y,pSize,pSize);
+        // Comprar nuevas mascotas
+        function buyEgg() {
+            if (coins >= 50) {
+                coins -= 50;
+                const randomPet = petIcons[Math.floor(Math.random() * petIcons.length)];
+                pets.push(randomPet);
+                
+                // Crear el elemento visual de la mascota
+                const newPet = document.createElement('span');
+                newPet.className = 'pet';
+                newPet.innerHTML = randomPet;
+                newPet.style.left = Math.random() * 80 + "%";
+                newPet.style.top = Math.random() * 60 + "%";
+                petArea.appendChild(newPet);
+                
+                updateUI();
             }
         }
-    }
-    drawing = false;
-};
 
-// --- RESTO DE LÓGICA ---
-function saveUnit() {
-    baseUnits.push({
-        name: document.getElementById("uName").value, type: document.getElementById("uType").value,
-        sprite: uCanvas.toDataURL(), hp: +document.getElementById("uHp").value,
-        atk: +document.getElementById("uAtk").value, spd: +document.getElementById("uSpd").value,
-        res: currentRes
-    });
-    updateUI(); closeModals();
-}
+        // Actualizar la interfaz
+        function updateUI() {
+            document.getElementById('coins-display').innerText = `💰 Monedas: ${coins}`;
+            document.getElementById('pet-count').innerText = `Mascotas: ${pets.length} (Bonus activo)`;
+            document.getElementById('buy-egg').disabled = coins < 50;
+        }
 
-function updateUI() {
-    const ub = document.getElementById("unitButtons"); ub.innerHTML = "";
-    baseUnits.forEach((u, i) => {
-        const b = document.createElement("div"); b.className = "unitBtn" + (selectedUnit === u ? " selected" : "");
-        b.innerHTML = `<img src="${u.sprite}">`; 
-        b.onclick = () => { selectedUnit = u; updateUI(); };
-        b.oncontextmenu = (e) => {
-            e.preventDefault();
-            editIndex = i;
-            const m = document.getElementById("contextMenu");
-            m.style.display="block"; m.style.left=e.pageX+"px"; m.style.top=e.pageY+"px";
-        };
-        ub.appendChild(b);
-    });
-}
+        // Generación automática de monedas (Ingreso pasivo)
+        setInterval(() => {
+            coins += pets.length;
+            updateUI();
+            
+            // Mover mascotas aleatoriamente para que se vea "vivo"
+            const allPets = document.querySelectorAll('.pet');
+            allPets.forEach(p => {
+                p.style.left = Math.random() * 80 + "%";
+                p.style.top = Math.random() * 60 + "%";
+            });
+        }, 3000);
 
-function loop() {
-    ctx.fillStyle = "#111"; ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
-    for(let x=0; x<canvas.width; x+=gridSize) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
-    for(let y=0; y<canvas.height; y+=gridSize) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
-    
-    for(let k in mapData) { const [x,y] = k.split(",").map(Number); if(tileImgs[mapData[k]]) ctx.drawImage(tileImgs[mapData[k]], x, y, 40, 40); }
-
-    if(!battleStarted && selectedUnit) {
-        const gx = Math.floor(mouseX / gridSize) * gridSize;
-        const gy = Math.floor(mouseY / gridSize) * gridSize;
-        new Unit(gx+20, gy+20, currentTeam, selectedUnit).draw(true);
-    }
-
-    unitsOnMap.forEach(u => { u.update(); u.draw(); });
-    requestAnimationFrame(loop);
-}
-
-canvas.onmousemove = (e) => {
-    const r = canvas.getBoundingClientRect();
-    mouseX = e.clientX - r.left; mouseY = e.clientY - r.top;
-};
-
-canvas.onclick = (e) => {
-    if(battleStarted || !selectedUnit) return;
-    const x = Math.floor(mouseX / gridSize) * gridSize;
-    const y = Math.floor(mouseY / gridSize) * gridSize;
-    unitsOnMap.push(new Unit(x+20, y+20, currentTeam, selectedUnit));
-};
-
-function setRes(res, b) { currentRes = res; pSize = 384/res; document.querySelectorAll('.res-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); uCtx.clearRect(0,0,384,384); }
-function openCreator() { uCtx.clearRect(0,0,384,384); document.getElementById("creatorPanel").style.display="block"; }
-function closeModals() { document.querySelectorAll('.modal').forEach(m => m.style.display="none"); }
-function toggleTeam() { currentTeam = currentTeam === "blue" ? "red" : "blue"; document.getElementById("teamBtn").innerHTML = (currentTeam === "blue" ? "🔵" : "🔴") + "<br><small>Bando</small>"; }
-function startBattle() { battleStarted = true; }
-function clearUnits() { unitsOnMap = []; mapData = {}; battleStarted = false; }
-function deleteCurrent() { baseUnits.splice(editIndex, 1); updateUI(); document.getElementById("contextMenu").style.display="none"; }
-
-window.onload = () => { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; loop(); };
-</script>
+    </script>
 </body>
 </html>
