@@ -2,22 +2,25 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Mini-Minecraft JS P2P</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JS Minecraft Voxel Engine</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid white; transform: translate(-50%, -50%); pointer-events: none; }
-        #inventory { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; background: rgba(0,0,0,0.5); padding: 5px; }
-        .slot { width: 40px; height: 40px; border: 2px solid #888; background: #333; }
-        .slot.active { border-color: white; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Courier New', Courier, monospace; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; border: 2px solid white; transform: translate(-50%, -50%); pointer-events: none; mix-blend-mode: difference; }
+        #ui { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; background: rgba(0,0,0,0.6); padding: 8px; border: 4px solid #333; }
+        .slot { width: 40px; height: 40px; border: 4px solid #888; background: #555; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .slot.active { border-color: #fff; background: #777; }
+        #instructions { position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 10px; pointer-events: none; }
     </style>
 </head>
 <body>
 
+<div id="instructions">Click para jugar | WASD para mover | SPACE: saltar</div>
 <div id="crosshair"></div>
-<div id="inventory">
-    <div class="slot active" data-id="1"></div>
-    <div class="slot" data-id="2"></div>
-    <div class="slot" data-id="3"></div>
+<div id="ui">
+    <div class="slot active">1</div>
+    <div class="slot">2</div>
+    <div class="slot">3</div>
 </div>
 
 <script type="importmap">
@@ -29,86 +32,165 @@ import * as THREE from 'three';
 
 // --- CONFIGURACIÓN ---
 const CHUNK_SIZE = 16;
-const RENDER_DISTANCE = 1; // 1 de radio = 3x3 chunks
-const TEXTURE_SIZE = 16;
+const RENDER_DIST = 1; // 1 de radio = 3x3 chunks
+const CHUNK_HEIGHT = 16;
+const WORLD = new Map();
 
-// --- MOTOR GRÁFICO ---
+// --- ESCENA ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.Fog(0x87CEEB, 20, 60);
+
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-scene.add(light);
+const light = new THREE.AmbientLight(0xffffff, 0.8);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+dirLight.position.set(5, 10, 7);
+scene.add(light, dirLight);
 
-// --- LÓGICA DE MUNDO (Simplificada) ---
-const chunks = new Map();
+// --- GENERACIÓN DE TEXTURA 16x16 ---
+function createBlockTexture(color) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 16; canvas.height = 16;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 16, 16);
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+    ctx.strokeRect(0, 0, 16, 16);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    return tex;
+}
+const blockMat = new THREE.MeshLambertMaterial({ map: createBlockTexture('#4a7c10') });
 
-function getChunkKey(x, z) { return `${x},${z}`; }
+// --- LÓGICA DE VOXELS (FACE CULLING) ---
+const FACE_CONFIG = [
+    { dir: [ 0,  0,  1], corners: [ [1,1,1], [0,1,1], [1,0,1], [0,0,1] ] }, // Front
+    { dir: [ 0,  0, -1], corners: [ [0,1,0], [1,1,0], [0,0,0], [1,0,0] ] }, // Back
+    { dir: [ 0,  1,  0], corners: [ [0,1,1], [1,1,1], [0,1,0], [1,1,0] ] }, // Top
+    { dir: [ 0, -1,  0], corners: [ [0,0,0], [1,0,0], [0,0,1], [1,0,1] ] }, // Bottom
+    { dir: [ 1,  0,  0], corners: [ [1,1,0], [1,1,1], [1,0,0], [1,0,1] ] }, // Right
+    { dir: [-1,  0,  0], corners: [ [0,1,1], [0,1,0], [0,0,1], [0,0,0] ] }, // Left
+];
 
-function generateChunk(cx, cz) {
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshLambertMaterial({ color: Math.random() * 0xffffff });
-    const group = new THREE.Group();
+class Chunk {
+    constructor(cx, cz) {
+        this.cx = cx; this.cz = cz;
+        this.data = new Uint8Array(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE);
+        this.mesh = null;
+        this.generateData();
+    }
 
-    for (let x = 0; x < CHUNK_SIZE; x++) {
-        for (let z = 0; z < CHUNK_SIZE; z++) {
-            const h = Math.floor(Math.random() * 3); // Altura simple
-            for (let y = 0; y <= h; y++) {
-                const mesh = new THREE.Mesh(geometry, material);
-                mesh.position.set(cx * CHUNK_SIZE + x, y, cz * CHUNK_SIZE + z);
-                group.add(mesh);
+    generateData() {
+        for(let x=0; x<CHUNK_SIZE; x++) {
+            for(let z=0; z<CHUNK_SIZE; z++) {
+                const h = Math.floor(Math.sin((this.cx * CHUNK_SIZE + x) * 0.1) * 3 + 5);
+                for(let y=0; y<h; y++) {
+                    this.data[x + y*CHUNK_SIZE + z*CHUNK_SIZE*CHUNK_HEIGHT] = 1;
+                }
             }
         }
     }
-    return group;
+
+    getVoxel(x, y, z) {
+        if (y < 0 || y >= CHUNK_HEIGHT) return 0;
+        if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE) return 0; // Simplificado para este ejemplo
+        return this.data[x + y*CHUNK_SIZE + z*CHUNK_SIZE*CHUNK_HEIGHT];
+    }
+
+    buildMesh() {
+        const positions = [];
+        const normals = [];
+        const uvs = [];
+
+        for (let y = 0; y < CHUNK_HEIGHT; y++) {
+            for (let z = 0; z < CHUNK_SIZE; z++) {
+                for (let x = 0; x < CHUNK_SIZE; x++) {
+                    if (this.getVoxel(x, y, z)) {
+                        for (const {dir, corners} of FACE_CONFIG) {
+                            // FACE CULLING: Si el vecino está vacío, dibujamos la cara
+                            if (!this.getVoxel(x + dir[0], y + dir[1], z + dir[2])) {
+                                const ndx = positions.length / 3;
+                                corners.forEach(c => {
+                                    positions.push(x + c[0] + this.cx * CHUNK_SIZE, y + c[1], z + c[2] + this.cz * CHUNK_SIZE);
+                                    normals.push(...dir);
+                                });
+                                uvs.push(0,1, 1,1, 0,0, 1,0);
+                                // Indices manuales para 2 triángulos
+                                this.indices = this.indices || [];
+                                this.indices.push(ndx, ndx+1, ndx+2, ndx+2, ndx+1, ndx+3);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+        geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geo.setIndex(this.indices);
+        
+        this.mesh = new THREE.Mesh(geo, blockMat);
+        scene.add(this.mesh);
+    }
 }
 
-// --- BUCLE PRINCIPAL ---
+// --- CONTROLES FPS ---
+let yaw = 0, pitch = 0;
+const keys = {};
+document.addEventListener('keydown', e => keys[e.code] = true);
+document.addEventListener('keyup', e => keys[e.code] = false);
+
+renderer.domElement.addEventListener('click', () => renderer.domElement.requestPointerLock());
+document.addEventListener('mousemove', (e) => {
+    if (document.pointerLockElement === renderer.domElement) {
+        yaw -= e.movementX * 0.002;
+        pitch -= e.movementY * 0.002;
+        pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+        camera.rotation.set(pitch, yaw, 0, 'YXZ');
+    }
+});
+
+// --- BUCLE DE CARGA DE CHUNKS ---
 function updateChunks() {
     const pCX = Math.floor(camera.position.x / CHUNK_SIZE);
     const pCZ = Math.floor(camera.position.z / CHUNK_SIZE);
 
-    for (let x = pCX - RENDER_DISTANCE; x <= pCX + RENDER_DISTANCE; x++) {
-        for (let z = pCZ - RENDER_DISTANCE; z <= pCZ + RENDER_DISTANCE; z++) {
-            const key = getChunkKey(x, z);
-            if (!chunks.has(key)) {
-                const chunk = generateChunk(x, z);
-                chunks.set(key, chunk);
-                scene.add(chunk);
+    for (let x = pCX - RENDER_DIST; x <= pCX + RENDER_DIST; x++) {
+        for (let z = pCZ - RENDER_DIST; z <= pCZ + RENDER_DIST; z++) {
+            const key = `${x},${z}`;
+            if (!WORLD.has(key)) {
+                const chunk = new Chunk(x, z);
+                chunk.buildMesh();
+                WORLD.set(key, chunk);
             }
         }
     }
 }
 
-// --- CONTROLES BÁSICOS ---
-let moveForward = false, moveLeft = false, moveBackward = false, moveRight = false;
-document.addEventListener('keydown', (e) => {
-    if (e.code === 'KeyW') moveForward = true;
-    if (e.code === 'KeyS') moveBackward = true;
-    // Bloqueo de mouse para girar cámara
-    if (e.code === 'Space') renderer.domElement.requestPointerLock();
-});
-document.addEventListener('keyup', (e) => {
-    if (e.code === 'KeyW') moveForward = false;
-    if (e.code === 'KeyS') moveBackward = false;
-});
-
-camera.position.y = 5;
-camera.position.z = 5;
+camera.position.set(8, 10, 8);
 
 function animate() {
     requestAnimationFrame(animate);
-    if (moveForward) camera.translateZ(-0.1);
-    if (moveBackward) camera.translateZ(0.1);
     
+    const speed = 0.15;
+    if (keys['KeyW']) camera.translateZ(-speed);
+    if (keys['KeyS']) camera.translateZ(speed);
+    if (keys['KeyA']) camera.translateX(-speed);
+    if (keys['KeyD']) camera.translateX(speed);
+    if (keys['Space']) camera.position.y += 0.1;
+    if (keys['ShiftLeft']) camera.position.y -= 0.1;
+
     updateChunks();
     renderer.render(scene, camera);
 }
 
-// Ajuste de ventana
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -116,8 +198,6 @@ window.addEventListener('resize', () => {
 });
 
 animate();
-
-console.log("Sistema P2P inicializado: Usa PeerJS para conectar con IDs de otros jugadores.");
 </script>
 </body>
 </html>
