@@ -1,20 +1,306 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Mini Gmod Web</title>
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-  </head>
-  <body>
-    <a-scene>
-      <a-plane position="0 0 0" rotation="-90 0 0" width="50" height="50" color="#7BC8A4"></a-plane>
-      
-      <a-box position="-1 0.5 -3" rotation="0 45 0" color="#4CC3D9" shadow></a-box>
-      
-      <a-sphere position="0 1.25 -5" radius="1.25" color="#EF2D5E" shadow></a-sphere>
-      
-      <a-sky color="#ECECEC"></a-sky>
-      
-      <a-entity camera look-controls wasd-controls position="0 1.6 0"></a-entity>
-    </a-scene>
-  </body>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Juego de Plataformas 2D</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Evita barras de desplazamiento */
+            background-color: #a0d8ef; /* Color del cielo */
+            font-family: sans-serif;
+        }
+
+        #gameCanvas {
+            display: block;
+            /* El fondo se dibuja en el script, pero podrías usar un background-image aquí */
+        }
+
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none; /* Atraviesa los clics */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">Puntuación: <span id="score">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        // --- Configuración Inicial ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        // Ajustar canvas al tamaño de la ventana
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // --- Variables del Juego ---
+        let score = 0;
+        let keys = {}; // Registra qué teclas están pulsadas
+
+        // Configuración de físicas
+        const gravity = 0.8;
+        const friction = 0.9; // Rozamiento horizontal
+
+        // --- Clases de Objetos ---
+
+        // 1. El Jugador
+        class Player {
+            constructor(x, y, width, height, color) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.color = color;
+
+                this.speed = 5;
+                this.velX = 0;
+                this.velY = 0;
+                this.jumpStrength = 15;
+                this.onGround = false;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                // Opcional: Ojos para saber hacia dónde mira
+                ctx.fillStyle = "white";
+                ctx.fillRect(this.x + 5, this.y + 5, 10, 10);
+                ctx.fillRect(this.x + this.width - 15, this.y + 5, 10, 10);
+            }
+
+            update() {
+                // Control de movimiento horizontal
+                if (keys['ArrowRight'] || keys['d']) {
+                    if (this.velX < this.speed) this.velX++;
+                }
+                if (keys['ArrowLeft'] || keys['a']) {
+                    if (this.velX > -this.speed) this.velX--;
+                }
+
+                // Salto
+                if ((keys['ArrowUp'] || keys['w'] || keys[' ']) && this.onGround) {
+                    this.velY = -this.jumpStrength;
+                    this.onGround = false;
+                }
+
+                // Aplicar Físicas
+                this.velY += gravity; // Gravedad constante
+                this.velX *= friction; // Rozamiento
+
+                // Predecir nueva posición
+                let nextX = this.x + this.velX;
+                let nextY = this.y + this.velY;
+
+                this.onGround = false; // Asumimos que está en el aire hasta chocar
+
+                // --- Detección de Colisiones con Plataformas ---
+                for (let plat of platforms) {
+                    // Colisión Vertical (Suelo y Techo)
+                    if (nextX < plat.x + plat.width &&
+                        nextX + this.width > plat.x &&
+                        this.y < plat.y + plat.height &&
+                        this.y + this.height > plat.y) {
+                        
+                        // Choca con el suelo de la plataforma
+                        if (this.velY > 0 && this.y + this.height <= plat.y + 10) {
+                            this.velY = 0;
+                            nextY = plat.y - this.height; // Colocar justo encima
+                            this.onGround = true;
+                        }
+                        // Choca con el techo de la plataforma
+                        else if (this.velY < 0 && this.y >= plat.y + plat.height - 10) {
+                            this.velY = 0;
+                            nextY = plat.y + plat.height; // Colocar justo debajo
+                        }
+                    }
+
+                    // Colisión Horizontal (Paredes) - Se calcula DESPUÉS de la vertical para mejor precisión
+                    if (nextX < plat.x + plat.width &&
+                        nextX + this.width > plat.x &&
+                        nextY < plat.y + plat.height &&
+                        nextY + this.height > plat.y) {
+                        
+                        // Choca por la izquierda
+                        if (this.velX > 0 && this.x + this.width <= plat.x + 10) {
+                            this.velX = 0;
+                            nextX = plat.x - this.width;
+                        }
+                        // Choca por la derecha
+                        else if (this.velX < 0 && this.x >= plat.x + plat.width - 10) {
+                            this.velX = 0;
+                            nextX = plat.x + plat.width;
+                        }
+                    }
+                }
+
+                // Actualizar posición final
+                this.x = nextX;
+                this.y = nextY;
+
+                // --- Límites de la pantalla (Suelo/Paredes del mundo) ---
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+                
+                // Si cae por debajo de la pantalla (Muerte)
+                if (this.y > canvas.height) {
+                    this.reset();
+                }
+            }
+
+            reset() {
+                this.x = 100;
+                this.y = canvas.height - 150;
+                this.velX = 0;
+                this.velY = 0;
+            }
+        }
+
+        // 2. Las Plataformas
+        class Platform {
+            constructor(x, y, width, height, color = '#555') {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.color = color;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Borde decorativo
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+            }
+        }
+
+        // 3. El Objetivo (Moneda/Meta)
+        class Goal {
+            constructor(x, y, size) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.color = '#ffd700'; // Dorado
+                this.angle = 0; // Para animación
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x + this.size/2, this.y + this.size/2);
+                ctx.rotate(this.angle);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+                
+                // Brillo
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-this.size/2, -this.size/2, this.size, this.size);
+                ctx.restore();
+
+                this.angle += 0.05; // Girar
+            }
+
+            checkCollision(player) {
+                if (player.x < this.x + this.size &&
+                    player.x + player.width > this.x &&
+                    player.y < this.y + this.size &&
+                    player.y + player.height > this.y) {
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        // --- Inicialización de Objetos ---
+        const player = new Player(100, canvas.height - 150, 40, 40, '#ff4444');
+        const goal = new Goal(canvas.width - 100, 150, 30);
+
+        const platforms = [];
+        // Suelo principal
+        platforms.push(new Platform(0, canvas.height - 40, canvas.width, 40, '#2e8b57')); // Hierba
+        
+        // Plataformas flotantes (puedes añadir las que quieras)
+        platforms.push(new Platform(200, canvas.height - 150, 200, 20));
+        platforms.push(new Platform(500, canvas.height - 250, 200, 20));
+        platforms.push(new Platform(150, canvas.height - 380, 150, 20));
+        platforms.push(new Platform(450, 200, 100, 20));
+        platforms.push(new Platform(canvas.width - 200, 250, 200, 20));
+
+        // Obstáculo vertical
+        platforms.push(new Platform(750, canvas.height - 120, 30, 80));
+
+
+        // --- Bucle Principal del Juego (Game Loop) ---
+        function gameLoop() {
+            // 1. Limpiar el canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Dibujar fondo (gradiente simple)
+            let grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grd.addColorStop(0, "#87CEEB");
+            grd.addColorStop(1, "#a0d8ef");
+            ctx.fillStyle = grd;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 2. Actualizar y Dibujar objetos
+            
+            // Dibujar plataformas
+            platforms.forEach(plat => plat.draw());
+
+            // Dibujar objetivo
+            goal.draw();
+
+            // Actualizar y dibujar jugador
+            player.update();
+            player.draw();
+
+            // 3. Lógica de victoria/puntuación
+            if (goal.checkCollision(player)) {
+                score += 100;
+                scoreElement.innerText = score;
+                // Mover el objetivo a una posición aleatoria para seguir jugando
+                goal.x = Math.random() * (canvas.width - 100) + 50;
+                goal.y = Math.random() * (canvas.height - 300) + 100;
+            }
+
+            // 4. Llamar al siguiente frame
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Manejo de Controles (Teclado) ---
+        window.addEventListener('keydown', function(e) {
+            keys[e.key] = true;
+        });
+
+        window.addEventListener('keyup', function(e) {
+            keys[e.key] = false;
+        });
+
+        // Ajustar canvas si se cambia el tamaño de la ventana
+        window.addEventListener('resize', function() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // Opcional: reposicionar suelo principal
+            platforms[0].width = canvas.width;
+            platforms[0].y = canvas.height - 40;
+        });
+
+        // --- Iniciar el Juego ---
+        gameLoop();
+
+    </script>
+</body>
 </html>
