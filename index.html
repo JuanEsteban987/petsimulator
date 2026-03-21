@@ -2,241 +2,216 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JS-Craft Pro MVP</title>
+    <title>JS-Craft Ultra: Voxel Engine</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
         canvas { display: block; }
-
-        /* UI HUD */
-        #ui-hud {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
-        }
-        #crosshair {
+        
+        /* HUD & CROSSHAIR */
+        #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #crosshair { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: white; font-size: 24px; font-weight: bold;
+            width: 20px; height: 20px; border: 2px solid white; border-radius: 50%; opacity: 0.5;
         }
+
+        /* INVENTARIO ESTILO MINECRAFT */
+        #inventory {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #c6c6c6; border: 4px solid #373737; padding: 15px;
+            display: none; flex-direction: column; gap: 15px; pointer-events: all;
+        }
+        .inv-row { display: flex; gap: 5px; }
+        .slot { 
+            width: 40px; height: 40px; background: #8b8b8b; border: 3px solid #373737; 
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+        }
+        .slot:hover { background: #bebebe; }
+        .crafting-grid { display: grid; grid-template-columns: repeat(2, 45px); gap: 5px; }
+        .result-slot { margin-left: 20px; border-color: #ffffff; }
+
         #hotbar {
-            align-self: center; margin-bottom: 20px; display: flex;
-            background: rgba(0,0,0,0.6); padding: 5px; border: 3px solid #333;
+            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+            display: flex; background: rgba(0,0,0,0.5); padding: 5px; gap: 5px;
         }
-        .slot {
-            width: 50px; height: 50px; border: 2px solid #555; margin: 2px;
-            background-size: cover; image-rendering: pixelated;
-        }
-        .slot.active { border-color: white; box-shadow: inset 0 0 10px #fff; }
-
-        /* MENU INVENTARIO */
-        #inventory-menu {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: #c6c6c6; border: 4px solid #333; display: none; padding: 20px;
-            grid-template-columns: repeat(9, 50px); gap: 5px; z-index: 100;
-        }
-        #instructions {
-            position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.85);
-            color: white; display: flex; flex-direction: column; justify-content: center;
-            align-items: center; text-align: center; cursor: pointer; z-index: 1000;
-        }
+        .slot.selected { border-color: white; box-shadow: 0 0 10px white; }
     </style>
 </head>
 <body>
 
-    <div id="instructions">
-        <h1>JS-CRAFT EXPERT</h1>
-        <p>CLIC PARA EMPEZAR</p>
-        <p>(W,A,S,D: Mover | Espacio: Saltar | E: Inventario | Clic: Romper/Poner)</p>
+<div id="hud">
+    <div id="crosshair"></div>
+    <div id="hotbar">
+        <div class="slot selected" data-type="grass">🌿</div>
+        <div class="slot" data-type="dirt">🟫</div>
+        <div class="slot" data-type="wood">🪵</div>
     </div>
+</div>
 
-    <div id="ui-hud">
-        <div id="crosshair">+</div>
-        <div id="hotbar">
-            <div class="slot active" data-id="1"></div>
-            <div class="slot" data-id="2"></div>
-            <div class="slot" data-id="3"></div>
+<div id="inventory">
+    <div style="display: flex; align-items: center; margin-bottom: 20px;">
+        <div class="crafting-grid">
+            <div class="slot" draggable="true"></div><div class="slot"></div>
+            <div class="slot"></div><div class="slot"></div>
         </div>
+        <div style="font-size: 24px; margin: 0 15px;">➜</div>
+        <div class="slot result-slot"></div>
     </div>
+    <div class="inv-row"> <div class="slot">🌿</div><div class="slot">🌿</div><div class="slot">🟫</div>
+        <div class="slot">🪵</div><div class="slot"></div><div class="slot"></div>
+    </div>
+</div>
 
-    <div id="inventory-menu">
-        </div>
+<script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
 
-    <script type="importmap">
-        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
-    </script>
+<script type="module">
+import * as THREE from 'three';
+import { PointerLockControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { PointerLockControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
+// --- CONFIG ---
+const world = { size: 64, height: 10, data: new Map() };
+const player = { height: 1.8, radius: 0.4, speed: 0.12, velocity: new THREE.Vector3() };
 
-        // --- CONFIGURACIÓN Y ESTADO ---
-        const worldSize = 32; // Tamaño del "chunk" inicial
-        const blocks = new Map();
-        let inventoryOpen = false;
+// --- THREE.JS SETUP ---
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.Fog(0x87CEEB, 20, 50);
 
-        // --- ESCENA ---
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x7fbfff);
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: false });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
-        // --- ILUMINACIÓN ---
-        const light = new THREE.HemisphereLight(0xeeeeff, 0x777788, 1.5);
-        scene.add(light);
+const controls = new PointerLockControls(camera, document.body);
+const light = new THREE.AmbientLight(0xffffff, 1.0);
+scene.add(light);
 
-        // --- MOTOR FÍSICO Y CONTROLES ---
-        const controls = new PointerLockControls(camera, document.body);
-        const instructions = document.getElementById('instructions');
-        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, canJump = false;
-        let velocity = new THREE.Vector3();
+// --- GENERACIÓN CON FACE CULLING ---
+const geo = new THREE.BoxGeometry(1, 1, 1);
+const materials = {
+    grass: new THREE.MeshLambertMaterial({ color: 0x5d994d }),
+    dirt: new THREE.MeshLambertMaterial({ color: 0x795548 }),
+    wood: new THREE.MeshLambertMaterial({ color: 0x4d3222 })
+};
 
-        instructions.addEventListener('click', () => controls.lock());
-        controls.addEventListener('lock', () => instructions.style.display = 'none');
-        controls.addEventListener('unlock', () => { if(!inventoryOpen) instructions.style.display = 'flex'; });
+function getVoxel(x, y, z) { return world.data.get(`${Math.round(x)},${Math.round(y)},${Math.round(z)}`); }
 
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'KeyE') toggleInventory();
-            if (inventoryOpen) return;
-            switch(e.code) {
-                case 'KeyW': moveForward = true; break;
-                case 'KeyS': moveBackward = true; break;
-                case 'KeyA': moveLeft = true; break;
-                case 'KeyD': moveRight = true; break;
-                case 'Space': if(canJump) velocity.y += 5; canJump = false; break;
-            }
-        });
+function addBlock(x, y, z, type, render = true) {
+    const key = `${x},${y},${z}`;
+    if (world.data.has(key)) return;
+    
+    const mesh = new THREE.Mesh(geo, materials[type]);
+    mesh.position.set(x, y, z);
+    mesh.name = type;
+    if (render) scene.add(mesh);
+    world.data.set(key, mesh);
+}
 
-        document.addEventListener('keyup', (e) => {
-            switch(e.code) {
-                case 'KeyW': moveForward = false; break;
-                case 'KeyS': moveBackward = false; break;
-                case 'KeyA': moveLeft = false; break;
-                case 'KeyD': moveRight = false; break;
-            }
-        });
+// Generar terreno amplio
+for(let x = -world.size/2; x < world.size/2; x++) {
+    for(let z = -world.size/2; z < world.size/2; z++) {
+        const h = Math.floor(Math.sin(x/8) * 2 + Math.cos(z/8) * 2);
+        for(let y = -2; y <= h; y++) {
+            // "Face Culling" básico: Solo añade al scene si es la capa superior o está en el borde
+            addBlock(x, y, z, y === h ? 'grass' : 'dirt', y === h);
+        }
+    }
+}
 
-        // --- GENERACIÓN DE MUNDO (Optimizado) ---
-        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-        const grassMat = new THREE.MeshLambertMaterial({ color: 0x4caf50 });
-        const dirtMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+// --- COLISIONES REALES ---
+function checkCollision(pos) {
+    // Revisar pies y cabeza
+    const checkPoints = [
+        new THREE.Vector3(pos.x, pos.y - 1.5, pos.z),
+        new THREE.Vector3(pos.x, pos.y, pos.z)
+    ];
+    for(let p of checkPoints) {
+        if (getVoxel(p.x, p.y, p.z)) return true;
+    }
+    return false;
+}
 
-        function addBlock(x, y, z, type = 'grass') {
-            const mesh = new THREE.Mesh(boxGeo, type === 'grass' ? grassMat : dirtMat);
-            mesh.position.set(x, y, z);
-            scene.add(mesh);
-            blocks.set(`${x},${y},${z}`, mesh);
+// --- INPUTS ---
+let keys = {};
+document.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    if (e.code === 'KeyE') {
+        if (controls.isLocked) {
+            controls.unlock();
+            document.getElementById('inventory').style.display = 'flex';
+        } else {
+            controls.lock();
+            document.getElementById('inventory').style.display = 'none';
+        }
+    }
+});
+document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+// --- INTERACCIÓN ---
+const raycaster = new THREE.Raycaster();
+document.addEventListener('mousedown', (e) => {
+    if (!controls.isLocked) return;
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const intersects = raycaster.intersectObjects(scene.children);
+    
+    if (intersects.length > 0) {
+        const target = intersects[0];
+        if (e.button === 0) { // Romper
+            scene.remove(target.object);
+            world.data.delete(`${target.object.position.x},${target.object.position.y},${target.object.position.z}`);
+        } else { // Poner
+            const pos = target.object.position.clone().add(target.face.normal);
+            addBlock(pos.x, pos.y, pos.z, 'wood', true);
+        }
+    }
+});
+
+// --- LOOP ---
+camera.position.y = 5;
+let canJump = false;
+
+function animate() {
+    requestAnimationFrame(animate);
+    if (controls.isLocked) {
+        const oldPos = camera.position.clone();
+        
+        // Gravedad
+        player.velocity.y -= 0.015;
+        camera.position.y += player.velocity.y;
+
+        // Colisión Suelo
+        if (checkCollision(camera.position)) {
+            camera.position.y = oldPos.y;
+            player.velocity.y = 0;
+            canJump = true;
         }
 
-        // Generar terreno con pseudo-ruido
-        for(let x = -worldSize/2; x < worldSize/2; x++) {
-            for(let z = -worldSize/2; z < worldSize/2; z++) {
-                const h = Math.floor(Math.sin(x * 0.1) * 2 + Math.cos(z * 0.1) * 2);
-                addBlock(x, h, z, 'grass');
-                addBlock(x, h-1, z, 'dirt');
-            }
+        // Movimiento
+        const dir = new THREE.Vector3();
+        if (keys['KeyW']) dir.z += 1;
+        if (keys['KeyS']) dir.z -= 1;
+        if (keys['KeyA']) dir.x -= 1;
+        if (keys['KeyD']) dir.x += 1;
+        dir.normalize();
+
+        controls.moveRight(dir.x * player.speed);
+        if (checkCollision(camera.position)) camera.position.x = oldPos.x;
+
+        controls.moveForward(dir.z * player.speed);
+        if (checkCollision(camera.position)) camera.position.z = oldPos.z;
+
+        if (keys['Space'] && canJump) {
+            player.velocity.y = 0.25;
+            canJump = false;
         }
+    }
+    renderer.render(scene, camera);
+}
+animate();
 
-        // --- INTERACCIÓN ---
-        const raycaster = new THREE.Raycaster();
-        document.addEventListener('mousedown', (e) => {
-            if (!controls.isLocked || inventoryOpen) return;
-            
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-            const intersects = raycaster.intersectObjects(scene.children);
-
-            if (intersects.length > 0) {
-                const intersect = intersects[0];
-                if (e.button === 0) { // Romper
-                    scene.remove(intersect.object);
-                    const p = intersect.object.position;
-                    blocks.delete(`${p.x},${p.y},${p.z}`);
-                } else if (e.button === 2) { // Poner
-                    const pos = intersect.object.position.clone().add(intersect.face.normal);
-                    addBlock(pos.x, pos.y, pos.z, 'dirt');
-                }
-            }
-        });
-
-        // --- SISTEMA DE INVENTARIO ---
-        function toggleInventory() {
-            inventoryOpen = !inventoryOpen;
-            const menu = document.getElementById('inventory-menu');
-            if (inventoryOpen) {
-                menu.style.display = 'grid';
-                controls.unlock();
-                renderInventory();
-            } else {
-                menu.style.display = 'none';
-                controls.lock();
-            }
-        }
-
-        function renderInventory() {
-            const menu = document.getElementById('inventory-menu');
-            menu.innerHTML = '';
-            for(let i=0; i<27; i++) {
-                const slot = document.createElement('div');
-                slot.className = 'slot';
-                slot.style.background = '#888';
-                menu.appendChild(slot);
-            }
-        }
-
-        // --- Mobs (Simple IA Zombie) ---
-        const zombieGeo = new THREE.BoxGeometry(0.6, 1.8, 0.6);
-        const zombieMat = new THREE.MeshLambertMaterial({ color: 0x2e4d2e });
-        const zombie = new THREE.Mesh(zombieGeo, zombieMat);
-        zombie.position.set(5, 5, 5);
-        scene.add(zombie);
-
-        function updateMobs(delta) {
-            zombie.position.x += Math.sin(Date.now() * 0.001) * delta * 2;
-            zombie.position.z += Math.cos(Date.now() * 0.001) * delta * 2;
-        }
-
-        // --- LOOP PRINCIPAL ---
-        let prevTime = performance.now();
-        function animate() {
-            requestAnimationFrame(animate);
-            const time = performance.now();
-            const delta = (time - prevTime) / 1000;
-
-            if (controls.isLocked) {
-                velocity.x -= velocity.x * 10.0 * delta;
-                velocity.z -= velocity.z * 10.0 * delta;
-                velocity.y -= 9.8 * 2.5 * delta;
-
-                const dir = new THREE.Vector3();
-                dir.z = Number(moveForward) - Number(moveBackward);
-                dir.x = Number(moveRight) - Number(moveLeft);
-                dir.normalize();
-
-                if (moveForward || moveBackward) velocity.z -= dir.z * 100.0 * delta;
-                if (moveLeft || moveRight) velocity.x -= dir.x * 100.0 * delta;
-
-                controls.moveRight(-velocity.x * delta);
-                controls.moveForward(-velocity.z * delta);
-                controls.getObject().position.y += (velocity.y * delta);
-
-                if (controls.getObject().position.y < 2.5) {
-                    velocity.y = 0;
-                    controls.getObject().position.y = 2.5;
-                    canJump = true;
-                }
-                updateMobs(delta);
-            }
-            renderer.render(scene, camera);
-            prevTime = time;
-        }
-        animate();
-
-        // Ajuste de ventana
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
+// UI de inicio
+document.body.onclick = () => { if(document.getElementById('inventory').style.display !== 'flex') controls.lock(); };
+</script>
 </body>
 </html>
