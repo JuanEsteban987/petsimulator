@@ -3,168 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Korblox: Slime Rancher Ultimate</title>
+    <title>Korblox Mod (KMod) - Physics Sandbox</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif; background-color: #050505; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a1a; color: white; user-select: none; }
         canvas { display: block; }
-        
+
         /* --- UI PRINCIPAL --- */
         #ui-layer {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
-            user-select: none;
         }
 
-        .money-display {
-            position: absolute;
-            top: 20px; right: 20px;
-            background: rgba(0, 0, 0, 0.6);
-            color: #ffd700;
-            padding: 10px 25px;
-            border-radius: 50px;
-            font-size: 28px;
-            border: 3px solid #ffd700;
-            pointer-events: auto;
-        }
-
-        /* --- SISTEMA DE INVENTARIO (4 SLOTS) --- */
-        #hotbar {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 15px;
-            pointer-events: auto;
-        }
-
-        .slot {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 4px solid #555;
-            border-radius: 15px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            position: relative;
-            transition: all 0.2s;
-        }
-
-        .slot.active {
-            border-color: #00fbff;
-            background: rgba(0, 251, 255, 0.2);
-            transform: scale(1.1);
-            box-shadow: 0 0 15px #00fbff;
-        }
-
-        .slot-count {
-            position: absolute;
-            bottom: 5px;
-            right: 8px;
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-        .slot-icon { font-size: 24px; }
-        .slot-label { font-size: 10px; text-transform: uppercase; margin-top: 5px; }
-
-        /* --- MENÚ DE CONSTRUCCIÓN --- */
-        #build-menu {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            background: linear-gradient(135deg, #1e90ff, #00bfff);
-            padding: 30px;
-            border-radius: 20px;
-            border: 6px solid white;
-            display: none;
-            pointer-events: auto;
-            text-align: center;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
-            z-index: 200;
-        }
-
-        .btn-build {
-            background: white;
-            color: #1e90ff;
-            border: none;
-            padding: 15px 30px;
-            margin: 10px;
-            cursor: pointer;
-            font-size: 18px;
-            font-weight: bold;
-            border-radius: 10px;
-            transition: 0.2s;
-        }
-        .btn-build:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-
+        /* Crosshair estilo Source */
         #crosshair {
             position: absolute;
             top: 50%; left: 50%;
-            width: 30px; height: 30px;
-            border: 3px solid rgba(255, 255, 255, 0.5);
+            width: 8px; height: 8px;
+            background-color: transparent;
+            border: 2px solid rgba(255, 255, 255, 0.8);
             border-radius: 50%;
             transform: translate(-50%, -50%);
         }
 
-        /* OVERLAY INICIAL SOLAMENTE */
+        /* Panel de Herramientas (Derecha) */
+        #tool-panel {
+            position: absolute;
+            top: 20px; right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #555;
+            padding: 15px;
+            border-radius: 8px;
+            width: 200px;
+            pointer-events: auto;
+        }
+
+        .tool-category { font-weight: bold; color: #aaa; margin-top: 10px; font-size: 12px; text-transform: uppercase; }
+        .tool-item {
+            background: #333;
+            border: 1px solid #444;
+            color: white;
+            padding: 8px;
+            margin-top: 5px;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .tool-item:hover { background: #444; }
+        .tool-item.active { background: #2980b9; border-color: #3498db; }
+
+        /* Indicador de Arma (Abajo Derecha) */
+        #weapon-display {
+            position: absolute;
+            bottom: 20px; right: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #f1c40f;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        /* Pantalla de Inicio */
         #start-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
+            background: radial-gradient(circle, #2c3e50 0%, #000 100%);
             display: flex; flex-direction: column;
             justify-content: center; align-items: center;
             z-index: 1000; cursor: pointer;
-            color: white;
+            text-align: center;
         }
+        #start-screen h1 { font-size: 64px; margin: 0; color: #3498db; }
+        #start-screen p { font-size: 18px; color: #bdc3c7; }
     </style>
 </head>
 <body>
 
-    <div id="start-screen" onclick="initGame()">
-        <h1 style="font-size: 60px; color: #ff69b4; margin-bottom: 10px;">KORBLOX</h1>
-        <h2 style="font-size: 24px;">SLIME RANCHER PROTOTYPE</h2>
-        <p>Haz clic para comenzar</p>
+    <div id="start-screen" onclick="initSandbox()">
+        <h1>KMOD</h1>
+        <p>Korblox Physics Sandbox</p>
+        <p style="font-size: 14px; margin-top: 20px;">Haz clic para jugar</p>
     </div>
 
     <div id="ui-layer">
-        <div class="money-display">$<span id="money-val">250</span></div>
-        
         <div id="crosshair"></div>
+        
+        <div id="weapon-display">PHYSICS GUN</div>
 
-        <div id="hotbar">
-            <div class="slot active" id="slot-0">
-                <span class="slot-icon">🌀</span>
-                <span class="slot-label">Vacio</span>
-                <span class="slot-count" id="cnt-0">0</span>
-            </div>
-            <div class="slot" id="slot-1">
-                <span class="slot-icon">🌀</span>
-                <span class="slot-label">Vacio</span>
-                <span class="slot-count" id="cnt-1">0</span>
-            </div>
-            <div class="slot" id="slot-2">
-                <span class="slot-icon">🌀</span>
-                <span class="slot-label">Vacio</span>
-                <span class="slot-count" id="cnt-2">0</span>
-            </div>
-            <div class="slot" id="slot-3">
-                <span class="slot-icon">🌀</span>
-                <span class="slot-label">Vacio</span>
-                <span class="slot-count" id="cnt-3">0</span>
-            </div>
-        </div>
+        <div id="tool-panel">
+            <div style="font-size: 18px; font-weight: bold; color: #3498db; margin-bottom: 10px;"> Herramientas</div>
+            
+            <div class="tool-category">Armas (Teclas 1-2)</div>
+            <button class="tool-item active" id="btn-physgun" onclick="selectWeapon('physgun')">1. Physics Gun</button>
+            <button class="tool-item" id="btn-toolgun" onclick="selectWeapon('toolgun')">2. Tool Gun</button>
 
-        <div id="build-menu">
-            <h2 style="color: white; margin-bottom: 20px;">¿Qué quieres construir?</h2>
-            <button class="btn-build" onclick="handleBuild('corral')">CORRAL ($100)</button>
-            <button class="btn-build" onclick="handleBuild('farm')">GRANJA ($50)</button>
-            <br>
-            <button class="btn-build" style="background:#ff4757; color:white; font-size: 14px;" onclick="closeBuildMenu()">CANCELAR</button>
+            <div class="tool-category">Spawn Props (ToolGun)</div>
+            <button class="tool-item" onclick="selectProp('cube')">Cubo</button>
+            <button class="tool-item" onclick="selectProp('sphere')">Esfera</button>
+            <button class="tool-item" onclick="selectProp('wall')">Muro</button>
+
+            <div class="tool-category">Sandbox</div>
+            <button class="tool-item" style="background: #c0392b;" onclick="clearProps()">Limpiar Todo</button>
         </div>
     </div>
 
@@ -181,10 +121,19 @@
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
-        // --- CONFIGURACIÓN DE ESCENA ---
+        // --- ESTADO DEL JUEGO ---
+        const gameState = {
+            currentWeapon: 'physgun', // 'physgun', 'toolgun'
+            currentPropType: 'cube',
+            heldEntity: null,         // Objeto que sostiene la physgun
+            heldDistance: 0,
+            props: []
+        };
+
+        // --- CONFIGURACIÓN DE TRES.JS ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x74b9ff);
-        scene.fog = new THREE.Fog(0x74b9ff, 30, 120);
+        scene.background = new THREE.Color(0x7f8c8d); // Gris industrial
+        scene.fog = new THREE.Fog(0x7f8c8d, 20, 150);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -192,327 +141,309 @@
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // --- LUCES ---
-        const ambient = new THREE.HemisphereLight(0xffffff, 0x080820, 1.2);
+        // --- ILUMINACIÓN (Estilo Garrys Mod) ---
+        const ambient = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
         scene.add(ambient);
 
-        const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-        sun.position.set(10, 20, 10);
+        const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+        sun.position.set(50, 50, 20);
         sun.castShadow = true;
+        sun.shadow.camera.left = -50; sun.shadow.camera.right = 50;
+        sun.shadow.camera.top = 50; sun.shadow.camera.bottom = -50;
+        sun.shadow.mapSize.width = 2048; sun.shadow.mapSize.height = 2048;
         scene.add(sun);
 
-        // --- MUNDO Y MAPA ---
-        const floorGeo = new THREE.PlaneGeometry(300, 300);
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x55efc4 });
+        // --- ESCENARIO DE PRUEBAS ---
+        // Suelo texturizado simple
+        const floorGeo = new THREE.PlaneGeometry(200, 200);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x95a5a6, roughness: 0.8 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // Paredes Decorativas
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x636e72 });
-        function createMound(x, z, s) {
-            const m = new THREE.Mesh(new THREE.BoxGeometry(s, s*2, s), wallMat);
-            m.position.set(x, -s/2, z);
+        // Paredes de límite
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x34495e });
+        function createBoundWall(x, z, w, d) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w, 10, d), wallMat);
+            m.position.set(x, 5, z);
+            m.castShadow = true; m.receiveShadow = true;
             scene.add(m);
         }
-        for(let i=0; i<20; i++) createMound((Math.random()-0.5)*150, (Math.random()-0.5)*150, 10+Math.random()*20);
+        createBoundWall(0, 100, 200, 2);  createBoundWall(0, -100, 200, 2);
+        createBoundWall(100, 0, 2, 200);  createBoundWall(-100, 0, 2, 200);
 
-        // --- SISTEMA DE INVENTARIO LOGICO ---
-        let money = 250;
-        let activeSlotIndex = 0;
-        const inventory = [
-            { type: null, count: 0, icon: "🌀" },
-            { type: null, count: 0, icon: "🌀" },
-            { type: null, count: 0, icon: "🌀" },
-            { type: null, count: 0, icon: "🌀" }
-        ];
+        // --- RAYCASTER (Para selección de objetos) ---
+        const raycaster = new THREE.Raycaster();
+        const centerPoint = new THREE.Vector2(0, 0); // Centro de la pantalla
 
-        const itemData = {
-            "slime": { icon: "😊", label: "Pink Slime" },
-            "food": { icon: "🥕", label: "Zanahoria" },
-            "plort": { icon: "💎", label: "Plort" }
-        };
+        // --- CLASE PROP (Objeto con física ultra-ligera) ---
+        class Prop {
+            constructor(type, position) {
+                this.type = type;
+                let geometry, material;
 
-        function addToInventory(type) {
-            // Intentar sumar a un slot existente del mismo tipo
-            for (let i = 0; i < 4; i++) {
-                if (inventory[i].type === type && inventory[i].count < 20) {
-                    inventory[i].count++;
-                    updateUI();
-                    return true;
+                const mats = {
+                    cube: { color: 0xe67e22 }, // Naranja Prop
+                    sphere: { color: 0x3498db },
+                    wall: { color: 0x2c3e50 }
+                };
+
+                material = new THREE.MeshStandardMaterial({ 
+                    color: mats[type].color, 
+                    roughness: 0.7, 
+                    metalness: 0.2 
+                });
+
+                if (type === 'cube') {
+                    geometry = new THREE.BoxGeometry(2, 2, 2);
+                    this.radius = 1; // Para colisiones simples
+                } else if (type === 'sphere') {
+                    geometry = new THREE.SphereGeometry(1.2, 16, 16);
+                    this.radius = 1.2;
+                } else if (type === 'wall') {
+                    geometry = new THREE.BoxGeometry(0.5, 4, 6);
+                    this.radius = 2; // Aproximación
                 }
+
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.copy(position);
+                this.mesh.castShadow = true;
+                this.mesh.receiveShadow = true;
+                
+                // Propiedades físicas
+                this.mesh.userData.isProp = true;
+                this.mesh.userData.parentProp = this;
+                
+                this.velocity = new THREE.Vector3(0, 0, 0);
+                this.isFrozen = false;
+                this.isHeld = false;
+
+                scene.add(this.mesh);
+                gameState.props.push(this);
             }
-            // Si no, buscar slot vacío
-            for (let i = 0; i < 4; i++) {
-                if (inventory[i].type === null) {
-                    inventory[i].type = type;
-                    inventory[i].count = 1;
-                    inventory[i].icon = itemData[type].icon;
-                    updateUI();
-                    return true;
-                }
-            }
-            return false;
-        }
 
-        function updateUI() {
-            document.getElementById('money-val').innerText = money;
-            for (let i = 0; i < 4; i++) {
-                const slotEl = document.getElementById(`slot-${i}`);
-                const countEl = document.getElementById(`cnt-${i}`);
-                const iconEl = slotEl.querySelector('.slot-icon');
-                const labelEl = slotEl.querySelector('.slot-label');
-
-                slotEl.classList.toggle('active', i === activeSlotIndex);
-                countEl.innerText = inventory[i].count > 0 ? inventory[i].count : "";
-                iconEl.innerText = inventory[i].count > 0 ? inventory[i].icon : "🌀";
-                labelEl.innerText = inventory[i].count > 0 ? itemData[inventory[i].type].label : "Vacio";
-            }
-        }
-
-        // --- PARCELAS Y CONSTRUCCIÓN ---
-        const plots = [];
-        const plotPos = [
-            {x: 15, z: 15}, {x: -15, z: 15}, {x: 15, z: -15}, {x: -15, z: -15},
-            {x: 30, z: 0}, {x: -30, z: 0}, {x: 0, z: 30}, {x: 0, z: -30}
-        ];
-
-        plotPos.forEach(p => {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(10, 0.5, 10), new THREE.MeshStandardMaterial({color: 0x2d3436}));
-            mesh.position.set(p.x, 0.25, p.z);
-            scene.add(mesh);
-            plots.push({ mesh, type: 'empty', structure: null });
-        });
-
-        let currentPlotInRange = null;
-
-        // --- CLASES ---
-        class Slime {
-            constructor(pos, color = 0xff748c) {
-                this.group = new THREE.Group();
-                const body = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 16), new THREE.MeshStandardMaterial({color}));
-                body.castShadow = true;
-                this.group.add(body);
-                this.group.position.copy(pos);
-                this.group.position.y = 0.6;
-                scene.add(this.group);
-                this.vel = new THREE.Vector3();
-                this.nextJump = 0;
-                this.inCorral = null;
-            }
             update(delta) {
-                if (this.group.position.y > 0.6) this.vel.y -= 18 * delta;
-                else {
-                    this.group.position.y = 0.6;
-                    this.vel.y = 0;
-                    this.vel.x *= 0.9; this.vel.z *= 0.9;
+                if (this.isFrozen || this.isHeld) {
+                    this.velocity.set(0,0,0);
+                    return;
                 }
-                if (this.group.position.y <= 0.6 && Date.now() > this.nextJump) {
-                    this.vel.y = 6;
-                    this.vel.x = (Math.random()-0.5)*10;
-                    this.vel.z = (Math.random()-0.5)*10;
-                    this.nextJump = Date.now() + 2000 + Math.random()*3000;
+
+                // Gravedad simple
+                if (this.mesh.position.y > this.radius) {
+                    this.velocity.y -= 25 * delta;
+                } else {
+                    // Colisión con el suelo
+                    this.mesh.position.y = this.radius;
+                    this.velocity.y *= -0.2; // Rebote suave
+                    this.velocity.x *= 0.95; // Fricción
+                    this.velocity.z *= 0.95;
                 }
-                // Limite corral
-                if (this.inCorral) {
-                    const dX = this.group.position.x - this.inCorral.mesh.position.x;
-                    const dZ = this.group.position.z - this.inCorral.mesh.position.z;
-                    if(Math.abs(dX) > 4.5) { this.vel.x *= -1; this.group.position.x = this.inCorral.mesh.position.x + Math.sign(dX)*4.4; }
-                    if(Math.abs(dZ) > 4.5) { this.vel.z *= -1; this.group.position.z = this.inCorral.mesh.position.z + Math.sign(dZ)*4.4; }
-                }
-                this.group.position.add(this.vel.clone().multiplyScalar(delta));
+
+                // Aplicar movimiento
+                this.mesh.position.add(this.velocity.clone().multiplyScalar(delta));
             }
         }
 
-        class Carrot {
-            constructor(pos) {
-                this.mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0, 0.6), new THREE.MeshStandardMaterial({color: 0xff7f50}));
-                this.mesh.position.copy(pos);
-                this.mesh.position.y = 0.3;
-                this.type = "food";
-                scene.add(this.mesh);
-            }
-        }
-
-        class Plort {
-            constructor(pos) {
-                this.mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.25), new THREE.MeshStandardMaterial({color: 0xff748c, emissive: 0xff748c}));
-                this.mesh.position.copy(pos);
-                this.mesh.position.y = 0.5;
-                this.type = "plort";
-                scene.add(this.mesh);
-            }
-        }
-
-        const slimes = [];
-        const items = [];
-
-        // --- CONTROLES ---
+        // --- CONTROLES Y ARMAS ---
         const controls = new PointerLockControls(camera, document.body);
         const keys = {};
 
-        window.initGame = () => {
+        // Inicialización
+        window.initSandbox = () => {
             controls.lock();
             document.getElementById('start-screen').style.display = 'none';
+            spawnInitialProps();
         };
 
-        // Arreglo del error: Solo se abre el menú si hay una parcela cerca, no al azar al desbloquear
         controls.addEventListener('unlock', () => {
-            if (!currentPlotInRange) {
-                // Si se desbloqueó por ESC, no hacemos nada especial, el start-screen no vuelve.
-            }
+            // No mostramos nada, solo permitimos que el ratón sea libre para la UI
         });
 
+        // Eventos de teclado
         window.addEventListener('keydown', (e) => {
             keys[e.code] = true;
-            if (e.key >= 1 && e.key <= 4) {
-                activeSlotIndex = parseInt(e.key) - 1;
-                updateUI();
-            }
+            if (e.key === '1') selectWeapon('physgun');
+            if (e.key === '2') selectWeapon('toolgun');
+            if (e.key === 'r' || e.key === 'R') reloadAction();
         });
         window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        let isSucking = false;
+        // Eventos de ratón (Fuego)
+        let isFiring = false;
+        let isSecondaryFiring = false;
+
         window.addEventListener('mousedown', (e) => {
             if (!controls.isLocked) return;
-            if (e.button === 0) isSucking = true;
-            if (e.button === 2) fireVacpack();
+            if (e.button === 0) { isFiring = true; handlePrimaryFire(); }
+            if (e.button === 2) { isSecondaryFiring = true; handleSecondaryFire(); }
         });
-        window.addEventListener('mouseup', () => isSucking = false);
+        window.addEventListener('mouseup', (e) => {
+            if (e.button === 0) { isFiring = false; handlePrimaryUp(); }
+            if (e.button === 2) isSecondaryFiring = false;
+        });
+        window.addEventListener('contextmenu', e => e.preventDefault());
 
-        function fireVacpack() {
-            const slot = inventory[activeSlotIndex];
-            if (slot.count <= 0) return;
+        // Rueda del ratón para acercar/alejar objetos con PhysGun
+        window.addEventListener('wheel', (e) => {
+            if (!controls.isLocked || !gameState.heldEntity) return;
+            gameState.heldDistance -= e.deltaY * 0.01;
+            gameState.heldDistance = Math.max(3, Math.min(gameState.heldDistance, 20));
+        });
 
-            const dir = new THREE.Vector3();
-            camera.getWorldDirection(dir);
-            const p = camera.position.clone().add(dir.clone().multiplyScalar(2));
+        // --- LÓGICA DE HERRAMIENTAS ---
 
-            if (slot.type === "slime") {
-                const s = new Slime(p);
-                s.vel.copy(dir.multiplyScalar(20));
-                slimes.push(s);
-            } else if (slot.type === "food") {
-                const c = new Carrot(p);
-                items.push(c);
-            } else if (slot.type === "plort") {
-                money += 30; // Venta rápida
+        function handlePrimaryFire() {
+            if (gameState.currentWeapon === 'physgun') {
+                // Intentar agarrar un objeto
+                raycaster.setFromCamera(centerPoint, camera);
+                const intersects = raycaster.intersectObjects(scene.children);
+                
+                for (let i = 0; i < intersects.length; i++) {
+                    if (intersects[i].object.userData.isProp) {
+                        const propMesh = intersects[i].object;
+                        gameState.heldEntity = propMesh.userData.parentProp;
+                        gameState.heldEntity.isHeld = true;
+                        gameState.heldEntity.isFrozen = false; // Descongelar al agarrar
+                        gameState.heldDistance = intersects[i].distance;
+                        
+                        // Efecto visual (cambio ligero de color)
+                        propMesh.material.emissive.setHex(0x2980b9);
+                        break;
+                    }
+                }
+            } else if (gameState.currentWeapon === 'toolgun') {
+                // Spawnear objeto
+                raycaster.setFromCamera(centerPoint, camera);
+                const intersects = raycaster.intersectObjects([floor, ...scene.children.filter(o => o.userData.isProp)]);
+                
+                if (intersects.length > 0) {
+                    const hitPoint = intersects[0].point;
+                    const spawnPos = hitPoint.clone().add(new THREE.Vector3(0, 1.5, 0)); // Un poco por encima del impacto
+                    new Prop(gameState.currentPropType, spawnPos);
+                }
             }
-
-            slot.count--;
-            if (slot.count <= 0) { slot.type = null; slot.icon = "🌀"; }
-            updateUI();
         }
 
-        // --- LÓGICA DE CONSTRUCCIÓN ---
-        window.handleBuild = (type) => {
-            if (!currentPlotInRange) return;
-            const cost = type === 'corral' ? 100 : 50;
-            if (money < cost) return alert("¡No tienes suficiente dinero!");
-
-            money -= cost;
-            currentPlotInRange.type = type;
-            
-            const visualGeo = type === 'corral' ? new THREE.BoxGeometry(10, 5, 10) : new THREE.PlaneGeometry(9, 9);
-            const visualMat = new THREE.MeshStandardMaterial({
-                color: type === 'corral' ? 0x00d2ff : 0x78e08f, 
-                wireframe: type === 'corral',
-                transparent: true, opacity: 0.5
-            });
-            const mesh = new THREE.Mesh(visualGeo, visualMat);
-            mesh.position.set(currentPlotInRange.mesh.position.x, type==='corral' ? 2.5 : 0.3, currentPlotInRange.mesh.position.z);
-            if(type==='farm') {
-                mesh.rotation.x = -Math.PI/2;
-                setInterval(() => {
-                    const c = new Carrot(mesh.position.clone().add(new THREE.Vector3((Math.random()-0.5)*6, 0, (Math.random()-0.5)*6)));
-                    items.push(c);
-                }, 8000);
+        function handlePrimaryUp() {
+            if (gameState.currentWeapon === 'physgun' && gameState.heldEntity) {
+                // Soltar objeto
+                gameState.heldEntity.isHeld = false;
+                gameState.heldEntity.mesh.material.emissive.setHex(0x000000); // Quitar efecto
+                gameState.heldEntity = null;
             }
-            scene.add(mesh);
-            currentPlotInRange.structure = mesh;
+        }
+
+        function handleSecondaryFire() {
+            if (gameState.currentWeapon === 'physgun' && gameState.heldEntity) {
+                // Congelar objeto en el aire
+                gameState.heldEntity.isFrozen = true;
+                gameState.heldEntity.isHeld = false;
+                gameState.heldEntity.mesh.material.emissive.setHex(0x1a1a1a); // Efecto congelado
+                gameState.heldEntity = null;
+            } else if (gameState.currentWeapon === 'toolgun') {
+                // Herramienta secundaria (eliminar objeto apuntado)
+                raycaster.setFromCamera(centerPoint, camera);
+                const intersects = raycaster.intersectObjects(scene.children);
+                for (let i = 0; i < intersects.length; i++) {
+                    if (intersects[i].object.userData.isProp) {
+                        removeProp(intersects[i].object.userData.parentProp);
+                        break;
+                    }
+                }
+            }
+        }
+
+        function reloadAction() {
+            // 'R' en GMod congela/descongela todo o suelda. Aquí descongelará el objeto apuntado.
+            raycaster.setFromCamera(centerPoint, camera);
+            const intersects = raycaster.intersectObjects(scene.children);
+            for (let i = 0; i < intersects.length; i++) {
+                if (intersects[i].object.userData.isProp) {
+                    const prop = intersects[i].object.userData.parentProp;
+                    prop.isFrozen = !prop.isFrozen;
+                    prop.mesh.material.emissive.setHex(prop.isFrozen ? 0x1a1a1a : 0x000000);
+                    break;
+                }
+            }
+        }
+
+        // --- UI INTERACTIVA ---
+        window.selectWeapon = (weapon) => {
+            gameState.currentWeapon = weapon;
+            document.getElementById('weapon-display').innerText = weapon.toUpperCase();
+            document.getElementById('weapon-display').style.color = weapon === 'physgun' ? '#f1c40f' : '#3498db';
             
-            closeBuildMenu();
+            // Actualizar botones UI
+            document.querySelectorAll('.tool-item').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${weapon}`).classList.add('active');
+            
+            // Si cambiamos de arma, soltamos lo que tengamos
+            handlePrimaryUp();
         };
 
-        window.closeBuildMenu = () => {
-            document.getElementById('build-menu').style.display = 'none';
-            currentPlotInRange = null;
-            controls.lock();
+        window.selectProp = (type) => {
+            gameState.currentPropType = type;
+            selectWeapon('toolgun'); // Cambiar automáticamente a ToolGun
         };
 
-        // --- BUCLE ---
-        for(let i=0; i<8; i++) slimes.push(new Slime(new THREE.Vector3((Math.random()-0.5)*40, 1, (Math.random()-0.5)*40)));
+        window.clearProps = () => {
+            [...gameState.props].forEach(p => removeProp(p));
+        };
+
+        function removeProp(prop) {
+            scene.remove(prop.mesh);
+            const idx = gameState.props.indexOf(prop);
+            if (idx > -1) gameState.props.splice(idx, 1);
+        }
+
+        function spawnInitialProps() {
+            new Prop('cube', new THREE.Vector3(0, 2, -10));
+            new Prop('sphere', new THREE.Vector3(5, 2, -10));
+            new Prop('cube', new THREE.Vector3(-5, 2, -10));
+        }
+
+        // --- BUCLE PRINCIPAL (Game Loop) ---
         const clock = new THREE.Clock();
-        camera.position.set(0, 2, 5);
+        camera.position.set(0, 3, 15); // Posición inicial cámara
 
         function animate() {
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
 
+            // Movimiento del Jugador
             if (controls.isLocked) {
-                const moveSpeed = 12 * delta;
-                if(keys['KeyW']) controls.moveForward(moveSpeed);
-                if(keys['KeyS']) controls.moveForward(-moveSpeed);
-                if(keys['KeyA']) controls.moveRight(-moveSpeed);
-                if(keys['KeyD']) controls.moveRight(moveSpeed);
-
-                // Detección de parcelas
-                plots.forEach(p => {
-                    if (p.type === 'empty' && camera.position.distanceTo(p.mesh.position) < 6) {
-                        currentPlotInRange = p;
-                        controls.unlock();
-                        document.getElementById('build-menu').style.display = 'block';
-                    }
-                });
+                const moveSpeed = 15 * delta;
+                if (keys['KeyW']) controls.moveForward(moveSpeed);
+                if (keys['KeyS']) controls.moveForward(-moveSpeed);
+                if (keys['KeyA']) controls.moveRight(-moveSpeed);
+                if (keys['KeyD']) controls.moveRight(moveSpeed);
             }
 
-            // Slimes
-            slimes.forEach((s, idx) => {
-                s.update(delta);
-                // Detección de corral
-                plots.forEach(p => {
-                    if (p.type === 'corral' && s.group.position.distanceTo(p.mesh.position) < 5) s.inCorral = p;
-                });
+            // Lógica de PhysGun (Mover objeto sostenido)
+            if (gameState.heldEntity) {
+                const targetPos = camera.position.clone();
+                const camDir = new THREE.Vector3();
+                camera.getWorldDirection(camDir);
+                
+                // Calcular la posición objetivo frente a la cámara
+                targetPos.add(camDir.multiplyScalar(gameState.heldDistance));
+                
+                // Suavizado de movimiento (lerp)
+                gameState.heldEntity.mesh.position.lerp(targetPos, 0.2);
+            }
 
-                if (isSucking && s.group.position.distanceTo(camera.position) < 10) {
-                    s.group.position.lerp(camera.position, 0.1);
-                    if (s.group.position.distanceTo(camera.position) < 1.5) {
-                        if (addToInventory("slime")) {
-                            scene.remove(s.group);
-                            slimes.splice(idx, 1);
-                        }
-                    }
-                }
-
-                // Comer
-                items.forEach((it, iIdx) => {
-                    if (it.type === "food" && s.group.position.distanceTo(it.mesh.position) < 1.5) {
-                        scene.remove(it.mesh);
-                        items.splice(iIdx, 1);
-                        items.push(new Plort(s.group.position.clone()));
-                    }
-                });
-            });
-
-            // Items (Comida / Plorts)
-            items.forEach((it, idx) => {
-                if (isSucking && it.mesh.position.distanceTo(camera.position) < 10) {
-                    it.mesh.position.lerp(camera.position, 0.1);
-                    if (it.mesh.position.distanceTo(camera.position) < 1.5) {
-                        if (addToInventory(it.type)) {
-                            scene.remove(it.mesh);
-                            items.splice(idx, 1);
-                        }
-                    }
-                }
+            // Actualizar Física de los Props
+            gameState.props.forEach(prop => {
+                prop.update(delta);
             });
 
             renderer.render(scene, camera);
         }
-        animate();
-        updateUI();
 
+        animate();
+
+        // Responsive
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
