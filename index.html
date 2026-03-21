@@ -175,7 +175,7 @@
             z-index: 50;
         }
 
-        /* HUD de monedas */
+        /* HUD de monedas y sprint */
         #coin-info {
             position: absolute;
             top: 20px;
@@ -189,6 +189,19 @@
             font-family: monospace;
             z-index: 50;
             pointer-events: none;
+        }
+        #sprint-indicator {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            padding: 5px 10px;
+            border-radius: 5px;
+            color: #0f0;
+            font-family: monospace;
+            font-size: 14px;
+            display: none;
+            z-index: 50;
         }
 
         /* Tienda */
@@ -218,6 +231,84 @@
         }
         .shop-item:hover { background: #333; }
         .shop-price { color: gold; font-weight: bold; }
+
+        /* Panel de creador (editor) */
+        #creator-panel {
+            position: absolute;
+            top: 10%;
+            left: 10%;
+            width: 80%;
+            height: 80%;
+            background: rgba(30,30,30,0.95);
+            border: 3px solid #ffaa00;
+            border-radius: 10px;
+            display: none;
+            flex-direction: column;
+            z-index: 400;
+            color: white;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .creator-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #555;
+        }
+        .creator-tab {
+            padding: 10px 20px;
+            background: #222;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+        }
+        .creator-tab.active {
+            background: #ffaa00;
+            color: black;
+        }
+        .creator-content {
+            display: none;
+            padding: 10px;
+        }
+        .creator-content.active {
+            display: block;
+        }
+        .creator-input {
+            margin: 10px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .creator-input label {
+            width: 120px;
+        }
+        .creator-input input, .creator-input select {
+            flex: 1;
+            padding: 5px;
+            background: #111;
+            color: white;
+            border: 1px solid #555;
+        }
+        button.creator-add {
+            margin-top: 15px;
+            background: #2a6;
+            border: none;
+            padding: 10px;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .item-list {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #111;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .item-list div {
+            padding: 5px;
+            border-bottom: 1px solid #333;
+        }
     </style>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
@@ -246,6 +337,7 @@
     <div id="coin-info">
         🪙 <span id="coins-count">0</span>
     </div>
+    <div id="sprint-indicator">🏃 SPRINT</div>
 
     <div id="main-menu">
         <div class="menu-box">
@@ -273,32 +365,40 @@
             <button class="tool-btn" id="tool-weld">Weld (Soldar)</button>
             
             <h2 style="margin-top: 30px;">Armamento</h2>
-            <button class="tool-btn" id="tool-cuchillo">Cuchillo (Melee)</button>
-            <button class="tool-btn" id="tool-pistola">Pistola (M9)</button>
-            <button class="tool-btn" id="tool-escopeta">Escopeta (Spas-12)</button>
-            <button class="tool-btn" id="tool-rifle">Rifle M4</button>
-            <button class="tool-btn" id="tool-subfusil">Subfusil MP5</button>
-            <button class="tool-btn" id="tool-lanzagranadas">Lanzagranadas</button>
+            <div id="weapon-buttons-container">
+                <button class="tool-btn" id="tool-cuchillo">Cuchillo (Melee)</button>
+                <button class="tool-btn" id="tool-pistola">Pistola (M9)</button>
+                <button class="tool-btn" id="tool-escopeta">Escopeta (Spas-12)</button>
+                <button class="tool-btn" id="tool-rifle">Rifle M4</button>
+                <button class="tool-btn" id="tool-subfusil">Subfusil MP5</button>
+                <button class="tool-btn" id="tool-lanzagranadas">Lanzagranadas</button>
+            </div>
+
+            <h2 style="margin-top: 30px;">Construcción</h2>
+            <div id="prop-buttons-container">
+                <button class="tool-btn" id="spawn-cube">Cubo de Acero</button>
+                <button class="tool-btn" id="spawn-box">Caja de Madera</button>
+                <button class="tool-btn" id="spawn-sphere">Esfera Goma</button>
+                <button class="tool-btn" id="spawn-ramp">Rampa Metal</button>
+                <button class="tool-btn" id="spawn-cylinder">Barril</button>
+                <button class="tool-btn" id="spawn-wall">Pared</button>
+                <button class="tool-btn" id="spawn-platform">Plataforma</button>
+            </div>
 
             <h2 style="margin-top: 30px;">Host Admin</h2>
             <button class="tool-btn" id="btn-start-wave" style="background-color: #500;">Iniciar Supervivencia</button>
             <button class="tool-btn" id="daynight-btn" style="background-color: #2266aa;">Alternar Día/Noche</button>
             <button class="tool-btn" id="spawn-zombie-btn" style="background-color: #aa4422;">Generar Zombie</button>
+            <button class="tool-btn" id="open-creator-btn" style="background-color: #6622aa;">Abrir Editor</button>
 
             <h2 style="margin-top: 30px;">Tienda</h2>
             <button class="tool-btn" id="open-shop-btn" style="background-color: #226622;">Abrir Tienda (B)</button>
         </div>
         <div class="menu-content">
             <h3>Construcción Básica</h3>
-            <button class="item-btn" id="spawn-cube">Cubo de Acero<br>(Pesado)</button>
-            <button class="item-btn" id="spawn-box">Caja de Madera<br>(Ligera)</button>
-            <button class="item-btn" id="spawn-sphere">Esfera Goma<br>(Rebota)</button>
-            
-            <h3>Arquitectura / Rampas</h3>
-            <button class="item-btn" id="spawn-ramp">Rampa<br>(Metal)</button>
-            <button class="item-btn" id="spawn-cylinder">Barril<br>(Explosivo)</button>
-            <button class="item-btn" id="spawn-wall">Pared<br>(Concreto)</button>
-            <button class="item-btn" id="spawn-platform">Plataforma<br>(Plana)</button>
+            <div id="prop-grid" class="menu-content" style="display: flex; flex-wrap: wrap; gap: 20px;">
+                <!-- Los props originales ya están en el sidebar, aquí se pueden poner adicionales, pero por simplicidad usamos el sidebar -->
+            </div>
         </div>
     </div>
 
@@ -315,23 +415,104 @@
     <!-- Tienda -->
     <div id="shop-menu">
         <h2 style="text-align:center; color:#ffaa00;">TIENDA</h2>
-        <div class="shop-item" data-weapon="escopeta">
-            <span>🔫 Escopeta SPAS-12</span>
-            <span class="shop-price">50 🪙</span>
-        </div>
-        <div class="shop-item" data-weapon="rifle">
-            <span>🔫 Rifle M4</span>
-            <span class="shop-price">100 🪙</span>
-        </div>
-        <div class="shop-item" data-weapon="subfusil">
-            <span>🔫 Subfusil MP5</span>
-            <span class="shop-price">75 🪙</span>
-        </div>
-        <div class="shop-item" data-weapon="lanzagranadas">
-            <span>💥 Lanzagranadas</span>
-            <span class="shop-price">150 🪙</span>
+        <div id="shop-items-container">
+            <div class="shop-item" data-weapon="escopeta">
+                <span>🔫 Escopeta SPAS-12</span>
+                <span class="shop-price">50 🪙</span>
+            </div>
+            <div class="shop-item" data-weapon="rifle">
+                <span>🔫 Rifle M4</span>
+                <span class="shop-price">100 🪙</span>
+            </div>
+            <div class="shop-item" data-weapon="subfusil">
+                <span>🔫 Subfusil MP5</span>
+                <span class="shop-price">75 🪙</span>
+            </div>
+            <div class="shop-item" data-weapon="lanzagranadas">
+                <span>💥 Lanzagranadas</span>
+                <span class="shop-price">150 🪙</span>
+            </div>
         </div>
         <button id="close-shop-btn" style="margin-top:20px; background:#444; border:none; padding:10px; color:white; cursor:pointer;">Cerrar</button>
+    </div>
+
+    <!-- Panel de creador -->
+    <div id="creator-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Editor de Contenido (Host)</h2>
+            <button id="close-creator-btn" style="background:#a22; border:none; padding:5px 15px; color:white; cursor:pointer;">X</button>
+        </div>
+        <div class="creator-tabs">
+            <div class="creator-tab active" data-tab="props">Props</div>
+            <div class="creator-tab" data-tab="enemies">Enemigos</div>
+            <div class="creator-tab" data-tab="weapons">Armas</div>
+            <div class="creator-tab" data-tab="waves">Oleadas</div>
+        </div>
+
+        <!-- Prop Creator -->
+        <div id="tab-props" class="creator-content active">
+            <h3>Crear nuevo Prop</h3>
+            <div class="creator-input"><label>Nombre:</label><input type="text" id="prop-name" placeholder="Ej: Bloque de Oro"></div>
+            <div class="creator-input"><label>Color (hex):</label><input type="color" id="prop-color" value="#ffaa33"></div>
+            <div class="creator-input"><label>Tamaño (XYZ):</label><input type="text" id="prop-size" placeholder="1.5,1.5,1.5" value="1.5,1.5,1.5"></div>
+            <div class="creator-input"><label>Masa (kg):</label><input type="number" id="prop-mass" value="100"></div>
+            <div class="creator-input"><label>Tipo de colisión:</label>
+                <select id="prop-shape">
+                    <option value="box">Caja</option>
+                    <option value="sphere">Esfera</option>
+                    <option value="cylinder">Cilindro</option>
+                </select>
+            </div>
+            <button class="creator-add" id="add-prop-btn">Añadir Prop</button>
+            <h4>Props personalizados:</h4>
+            <div id="custom-props-list" class="item-list"></div>
+        </div>
+
+        <!-- Enemy Creator -->
+        <div id="tab-enemies" class="creator-content">
+            <h3>Crear nuevo Enemigo</h3>
+            <div class="creator-input"><label>Nombre:</label><input type="text" id="enemy-name" placeholder="Ej: Zombie Rápido"></div>
+            <div class="creator-input"><label>Salud:</label><input type="number" id="enemy-health" value="100"></div>
+            <div class="creator-input"><label>Velocidad:</label><input type="number" id="enemy-speed" value="8"></div>
+            <div class="creator-input"><label>Daño por ataque:</label><input type="number" id="enemy-damage" value="10"></div>
+            <div class="creator-input"><label>Color (hex):</label><input type="color" id="enemy-color" value="#ff6600"></div>
+            <button class="creator-add" id="add-enemy-btn">Añadir Enemigo</button>
+            <h4>Enemigos personalizados:</h4>
+            <div id="custom-enemies-list" class="item-list"></div>
+        </div>
+
+        <!-- Weapon Creator -->
+        <div id="tab-weapons" class="creator-content">
+            <h3>Crear nueva Arma</h3>
+            <div class="creator-input"><label>Nombre:</label><input type="text" id="weapon-name" placeholder="Ej: Láser"></div>
+            <div class="creator-input"><label>Daño:</label><input type="number" id="weapon-damage" value="30"></div>
+            <div class="creator-input"><label>Cadencia (segundos):</label><input type="number" step="0.05" id="weapon-cooldown" value="0.2"></div>
+            <div class="creator-input"><label>Municiones máx:</label><input type="number" id="weapon-maxammo" value="20"></div>
+            <div class="creator-input"><label>Alcance:</label><input type="number" id="weapon-range" value="70"></div>
+            <div class="creator-input"><label>Precio:</label><input type="number" id="weapon-price" value="80"></div>
+            <div class="creator-input"><label>Tipo:</label>
+                <select id="weapon-type">
+                    <option value="hitscan">Hitscan</option>
+                    <option value="shotgun">Escopeta</option>
+                    <option value="explosive">Explosivo</option>
+                </select>
+            </div>
+            <button class="creator-add" id="add-weapon-btn">Añadir Arma</button>
+            <h4>Armas personalizadas:</h4>
+            <div id="custom-weapons-list" class="item-list"></div>
+        </div>
+
+        <!-- Wave Creator -->
+        <div id="tab-waves" class="creator-content">
+            <h3>Configurar Oleadas</h3>
+            <div class="creator-input"><label>Zombies iniciales en oleada 1:</label><input type="number" id="wave-base" value="5"></div>
+            <div class="creator-input"><label>Incremento por oleada:</label><input type="number" id="wave-increment" value="5"></div>
+            <div class="creator-input"><label>Multiplicador de salud por oleada:</label><input type="number" step="0.1" id="wave-health-mult" value="1.1"></div>
+            <div class="creator-input"><label>Multiplicador de velocidad por oleada:</label><input type="number" step="0.05" id="wave-speed-mult" value="1.05"></div>
+            <button class="creator-add" id="apply-wave-config">Aplicar Configuración</button>
+            <h4>Oleada actual:</h4>
+            <div id="wave-config-status">Configuración por defecto</div>
+        </div>
     </div>
 
     <div id="reload-msg">Recargando...</div>
@@ -372,10 +553,14 @@
         let playerBody;
         let playerHealth = 100;
         let isDead = false;
-        const moveData = { forward: false, backward: false, left: false, right: false, jump: false };
-        const playerSpeed = 18;
+        const moveData = { forward: false, backward: false, left: false, right: false, jump: false, sprint: false };
+        let basePlayerSpeed = 18;
+        let sprintMultiplier = 1.5;
+        let playerSpeed = basePlayerSpeed;
         const jumpForce = 9;
         let canJump = false;
+        let jumpCooldown = false;
+        let jumpCooldownTimer = null;
 
         // Herramientas y Physgun
         const raycaster = new THREE.Raycaster();
@@ -387,7 +572,7 @@
         let manipulationDistance = 5;
         let weldFirstBody = null;
 
-        // Sistema de Armas
+        // Sistema de Armas (base)
         const weapons = {
             physgun: { name: "Physgun", ammo: "∞", maxAmmo: "∞", damage: 0, range: 100, cooldown: 0, type: "tool" },
             weld: { name: "Soldador", ammo: "∞", maxAmmo: "∞", damage: 0, range: 10, cooldown: 0, type: "tool" },
@@ -406,6 +591,13 @@
         let waveActive = false;
         let nextSpawnTime = 0;
         const zombieMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00, roughness: 0.8 });
+        // Configuración de oleadas personalizable
+        let waveConfig = {
+            baseZombies: 5,
+            increment: 5,
+            healthMult: 1.1,
+            speedMult: 1.05
+        };
 
         // Multiplayer
         let peer = null;
@@ -416,7 +608,7 @@
         let tickRate = 1000 / 20;
         let lastNetworkTick = 0;
 
-        // Nuevas armas
+        // Nuevas armas por defecto
         weapons.rifle = {
             name: "Rifle M4", ammo: 30, maxAmmo: 30, damage: 22, range: 80,
             cooldown: 0.12, type: "hitscan", reloadTime: 2.0, price: 100
@@ -431,18 +623,17 @@
         };
         weapons.escopeta.price = 50;
 
+        // Almacenes para contenido personalizado
+        let customProps = [];
+        let customEnemies = [];
+        let customWeapons = [];
+
         // Sistema de monedas y compras
         let coins = 0;
         const ownedWeapons = ['cuchillo', 'pistola']; // Inicio solo estas
-        if (!isHost) {
-            // Clientes solo tienen estas al inicio
-        } else {
-            // Host tiene todas (para pruebas)
-            ownedWeapons.push('escopeta', 'rifle', 'subfusil', 'lanzagranadas');
-        }
 
-        // Objetos recogibles en el suelo (monedas, armas)
-        let droppedItems = []; // { type, mesh, body, value, weaponId? }
+        // Objetos recogibles en el suelo (monedas)
+        let droppedItems = [];
         let dropIdCounter = 0;
 
         // Recarga
@@ -463,7 +654,11 @@
         const shopDiv = document.getElementById('shop-menu');
         let shopVisible = false;
 
-        // Árboles decorativos (solo visuales)
+        // Panel creador
+        const creatorDiv = document.getElementById('creator-panel');
+        let creatorVisible = false;
+
+        // Árboles decorativos
         function addTree(x, z) {
             const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B5A2B });
             const foliageMat = new THREE.MeshStandardMaterial({ color: 0x3A9B3A });
@@ -491,8 +686,8 @@
             logConsole("Inicializando Three.js y Cannon-es...");
 
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB); // Azul cielo por defecto
-            scene.fog = null; // Sin niebla en día
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = null;
 
             camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 1000);
 
@@ -502,8 +697,7 @@
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             document.body.appendChild(renderer.domElement);
 
-            // Luces más brillantes para el día
-            const ambientLight = new THREE.AmbientLight(0x404060); // Más brillante
+            const ambientLight = new THREE.AmbientLight(0x404060);
             scene.add(ambientLight);
             
             const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.5);
@@ -517,7 +711,6 @@
             dirLight.shadow.mapSize.height = 2048;
             scene.add(dirLight);
 
-            // Luz de relleno extra
             const fillLight = new THREE.PointLight(0xccaa88, 0.5);
             fillLight.position.set(0, 10, 0);
             scene.add(fillLight);
@@ -552,7 +745,7 @@
             jointBody.collisionFilterMask = 0;
             world.addBody(jointBody);
 
-            // Añadir árboles decorativos alrededor del mapa
+            // Árboles
             for (let i = 0; i < 150; i++) {
                 const angle = Math.random() * Math.PI * 2;
                 const radius = 180 + Math.random() * 70;
@@ -566,6 +759,7 @@
             
             setupNetwork();
             setupUI();
+            setupCreator();
             
             window.addEventListener('resize', onWindowResize);
             document.addEventListener('keydown', onKeyDown);
@@ -575,7 +769,7 @@
             document.addEventListener('wheel', onMouseWheel);
 
             document.body.addEventListener('click', () => {
-                if (gameActive && !isDead && document.getElementById('spawn-menu').style.display !== 'flex' && !shopVisible) {
+                if (gameActive && !isDead && document.getElementById('spawn-menu').style.display !== 'flex' && !shopVisible && !creatorVisible) {
                     controls.lock();
                 }
             });
@@ -618,7 +812,6 @@
             document.getElementById('btn-host').onclick = () => {
                 isHost = true;
                 gameActive = true;
-                // El host tiene todas las armas (para pruebas)
                 ownedWeapons.push('escopeta', 'rifle', 'subfusil', 'lanzagranadas');
                 document.getElementById('main-menu').style.display = 'none';
                 controls.lock();
@@ -640,7 +833,6 @@
                     document.getElementById('main-menu').style.display = 'none';
                     controls.lock();
                     logConsole("Conectado al Host exitosamente.");
-                    // Cliente solo tiene cuchillo y pistola inicialmente
                     ownedWeapons.length = 0;
                     ownedWeapons.push('cuchillo', 'pistola');
                     equipWeapon('pistola');
@@ -727,19 +919,15 @@
 
                 case 'drop_coin':
                     if (!isHost) {
-                        // Cliente recibe una moneda nueva
                         spawnCoin(data.payload.pos, data.payload.value, data.payload.id);
                     }
                     break;
 
                 case 'pickup_coin':
                     if (isHost) {
-                        // Host registra que un cliente recogió una moneda
                         const drop = droppedItems.find(d => d.id === data.payload.id);
                         if (drop) {
                             removeDrop(drop);
-                            // Sumar monedas al cliente
-                            // Enviar actualización de monedas al cliente
                             connections.forEach(conn => {
                                 if (conn.peer === senderId) {
                                     conn.send({ type: 'update_coins', payload: { coins: data.payload.coins } });
@@ -761,7 +949,6 @@
                         const weapon = data.payload.weapon;
                         const price = weapons[weapon]?.price;
                         if (price && data.payload.coins >= price) {
-                            // Restar monedas al cliente y otorgar arma
                             const newCoins = data.payload.coins - price;
                             connections.forEach(conn => {
                                 if (conn.peer === senderId) {
@@ -778,7 +965,38 @@
                         if (!ownedWeapons.includes(data.payload.weapon)) {
                             ownedWeapons.push(data.payload.weapon);
                             logConsole(`¡Arma desbloqueada: ${weapons[data.payload.weapon].name}!`);
+                            refreshWeaponUI();
                         }
+                    }
+                    break;
+
+                case 'custom_prop':
+                    if (!isHost) {
+                        customProps.push(data.payload);
+                        refreshPropUI();
+                    }
+                    break;
+
+                case 'custom_enemy':
+                    if (!isHost) {
+                        customEnemies.push(data.payload);
+                        refreshEnemyUI();
+                    }
+                    break;
+
+                case 'custom_weapon':
+                    if (!isHost) {
+                        customWeapons.push(data.payload);
+                        weapons[data.payload.id] = data.payload;
+                        refreshWeaponUI();
+                        refreshShopUI();
+                    }
+                    break;
+
+                case 'wave_config':
+                    if (!isHost) {
+                        waveConfig = data.payload;
+                        document.getElementById('wave-config-status').innerHTML = `Base: ${waveConfig.baseZombies}, Inc: ${waveConfig.increment}, Salud x${waveConfig.healthMult}, Velocidad x${waveConfig.speedMult}`;
                     }
                     break;
             }
@@ -811,6 +1029,11 @@
                 });
             });
             newConn.send({ type: 'wave_state', payload: { wave: currentWave, alive: zombiesAlive } });
+            // Enviar contenido personalizado
+            customProps.forEach(prop => newConn.send({ type: 'custom_prop', payload: prop }));
+            customEnemies.forEach(enemy => newConn.send({ type: 'custom_enemy', payload: enemy }));
+            customWeapons.forEach(weapon => newConn.send({ type: 'custom_weapon', payload: weapon }));
+            newConn.send({ type: 'wave_config', payload: waveConfig });
         }
 
         function networkTick() {
@@ -921,6 +1144,32 @@
             });
         }
 
+        // Función para crear props personalizados
+        function createCustomProp(name, colorHex, sizeVec, mass, shapeType) {
+            const geometry = (() => {
+                switch(shapeType) {
+                    case 'box': return new THREE.BoxGeometry(sizeVec.x, sizeVec.y, sizeVec.z);
+                    case 'sphere': return new THREE.SphereGeometry(Math.max(sizeVec.x, sizeVec.y, sizeVec.z)/2, 32, 32);
+                    case 'cylinder': return new THREE.CylinderGeometry(sizeVec.x/2, sizeVec.x/2, sizeVec.y, 16);
+                    default: return new THREE.BoxGeometry(sizeVec.x, sizeVec.y, sizeVec.z);
+                }
+            })();
+            const material = new THREE.MeshStandardMaterial({ color: colorHex });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            const cannonShape = (() => {
+                switch(shapeType) {
+                    case 'box': return new CANNON.Box(new CANNON.Vec3(sizeVec.x/2, sizeVec.y/2, sizeVec.z/2));
+                    case 'sphere': return new CANNON.Sphere(Math.max(sizeVec.x, sizeVec.y, sizeVec.z)/2);
+                    case 'cylinder': return new CANNON.Cylinder(sizeVec.x/2, sizeVec.x/2, sizeVec.y, 16);
+                    default: return new CANNON.Box(new CANNON.Vec3(sizeVec.x/2, sizeVec.y/2, sizeVec.z/2));
+                }
+            })();
+            const body = new CANNON.Body({ mass, material: physicsMaterial });
+            body.addShape(cannonShape);
+            return { mesh, body };
+        }
+
         function spawnPropAuthoritative(type, pos, quat, vel) {
             const netId = ++propIdCounter;
             createPropInstance(netId, type, pos, quat);
@@ -948,6 +1197,21 @@
             let geometry, material, shape, mass, cMat;
             const size = 1.5;
 
+            // Verificar si es un prop personalizado
+            const customProp = customProps.find(p => p.id === type);
+            if (customProp) {
+                const { mesh, body } = createCustomProp(customProp.name, customProp.color, customProp.size, customProp.mass, customProp.shape);
+                mesh.position.copy(posVec);
+                mesh.quaternion.copy(quatVec);
+                scene.add(mesh);
+                body.position.copy(posVec);
+                body.quaternion.copy(quatVec);
+                world.addBody(body);
+                objectsToSync.push({ netId, propType: type, mesh, body, forceSync: true });
+                return;
+            }
+
+            // Props por defecto
             switch(type) {
                 case 'cube':
                     geometry = new THREE.BoxGeometry(size, size, size);
@@ -1043,7 +1307,7 @@
         }
 
         function equipWeapon(weaponId) {
-            if (!ownedWeapons.includes(weaponId)) {
+            if (!ownedWeapons.includes(weaponId) && weaponId !== 'physgun' && weaponId !== 'weld') {
                 logConsole(`No tienes ${weapons[weaponId]?.name}. Cómprala en la tienda.`);
                 return;
             }
@@ -1161,7 +1425,7 @@
         }
 
         /* ======================================================================
-           SISTEMA DE ZOMBIES Y OLEADAS
+           SISTEMA DE ZOMBIES Y OLEADAS (con enemigos personalizados)
            ====================================================================== */
         function startWaveSurvival() {
             if (!isHost) return;
@@ -1173,7 +1437,7 @@
         }
 
         function initWave() {
-            zombiesToSpawn = currentWave * 5 + 5;
+            zombiesToSpawn = waveConfig.baseZombies + (currentWave - 1) * waveConfig.increment;
             zombiesAlive = zombiesToSpawn;
             nextSpawnTime = performance.now() + 2000;
             updateWaveUI(currentWave, zombiesAlive);
@@ -1183,8 +1447,30 @@
         function spawnZombie() {
             const id = ++zombieIdCounter;
             
+            // Seleccionar un tipo de enemigo (por defecto o personalizado)
+            let enemyType = null;
+            if (customEnemies.length > 0 && Math.random() < 0.3) {
+                enemyType = customEnemies[Math.floor(Math.random() * customEnemies.length)];
+            }
+            
+            let health = 100;
+            let speed = 8;
+            let color = 0x00ff00;
+            let damage = 10;
+            if (enemyType) {
+                health = enemyType.health;
+                speed = enemyType.speed;
+                color = enemyType.color;
+                damage = enemyType.damage;
+            }
+            
+            // Aplicar escalado por oleada
+            health = Math.floor(health * Math.pow(waveConfig.healthMult, currentWave - 1));
+            speed = speed * Math.pow(waveConfig.speedMult, currentWave - 1);
+            
+            const material = new THREE.MeshStandardMaterial({ color: color, roughness: 0.6 });
             const geo = new THREE.CapsuleGeometry(1, 3, 4, 8);
-            const mesh = new THREE.Mesh(geo, zombieMaterial);
+            const mesh = new THREE.Mesh(geo, material);
             mesh.castShadow = true;
             scene.add(mesh);
 
@@ -1209,7 +1495,7 @@
             body.updateMassProperties();
             world.addBody(body);
 
-            zombies.push({ id, mesh, body, health: 100 + (currentWave * 10), speed: 8 + (currentWave * 0.5) });
+            zombies.push({ id, mesh, body, health: health, speed: speed, damage: damage });
             if (waveActive) zombiesToSpawn--;
         }
 
@@ -1231,7 +1517,6 @@
                     zombies.splice(index, 1);
                     if (waveActive) zombiesAlive--;
                     
-                    // Dropear monedas
                     const coinValue = 10 + Math.floor(Math.random() * 15);
                     const pos = z.body.position;
                     spawnCoin({ x: pos.x, y: pos.y + 1, z: pos.z }, coinValue);
@@ -1267,7 +1552,6 @@
             droppedItems.push({ id, type: 'coin', mesh, body, value });
             
             if (isHost && !customId) {
-                // Notificar a clientes sobre la nueva moneda
                 broadcast('drop_coin', { pos, value, id });
             }
         }
@@ -1284,7 +1568,6 @@
             coins += amount;
             document.getElementById('coins-count').innerText = coins;
             if (!isHost) {
-                // Enviar al host la actualización
                 connections[0]?.send({ type: 'update_coins', payload: { coins } });
             }
         }
@@ -1298,13 +1581,11 @@
             const price = weapon.price;
             if (coins >= price) {
                 if (isHost) {
-                    // Host compra directamente
                     coins -= price;
                     ownedWeapons.push(weaponId);
                     document.getElementById('coins-count').innerText = coins;
                     logConsole(`Has comprado ${weapon.name}.`);
                 } else {
-                    // Cliente envía solicitud de compra al host
                     connections[0]?.send({ type: 'buy_weapon', payload: { weapon: weaponId, coins } });
                 }
             } else {
@@ -1349,9 +1630,7 @@
                     if (now - lastDamage > 500) {
                         zombieDamageCooldown.set(z.id, now);
                         if (targetPos === playerBody.position) {
-                            takeDamage(10);
-                        } else {
-                            // Daño a cliente (simplificado)
+                            takeDamage(z.damage);
                         }
                     }
                 }
@@ -1417,7 +1696,7 @@
         function onMouseDown(event) {
             if (!controls.isLocked || isDead) return;
             
-            if (['cuchillo', 'pistola', 'escopeta', 'rifle', 'subfusil', 'lanzagranadas'].includes(currentTool)) {
+            if (['cuchillo', 'pistola', 'escopeta', 'rifle', 'subfusil', 'lanzagranadas', ...Object.keys(customWeapons)].includes(currentTool)) {
                 if (event.button === 0) fireWeapon();
                 return;
             }
@@ -1527,8 +1806,19 @@
                 case 'KeyA': moveData.left = true; break;
                 case 'KeyS': moveData.backward = true; break;
                 case 'KeyD': moveData.right = true; break;
+                case 'ShiftLeft': 
+                    moveData.sprint = true;
+                    playerSpeed = basePlayerSpeed * sprintMultiplier;
+                    document.getElementById('sprint-indicator').style.display = 'block';
+                    break;
                 case 'Space': 
-                    if (canJump && controls.isLocked) { playerBody.velocity.y = jumpForce; canJump = false; }
+                    if (canJump && controls.isLocked && !jumpCooldown) {
+                        playerBody.velocity.y = jumpForce;
+                        canJump = false;
+                        jumpCooldown = true;
+                        if (jumpCooldownTimer) clearTimeout(jumpCooldownTimer);
+                        jumpCooldownTimer = setTimeout(() => { jumpCooldown = false; }, 300);
+                    }
                     break;
                 case 'KeyQ': toggleQMenu(); break;
                 case 'Tab': toggleInventory(); break;
@@ -1553,6 +1843,11 @@
                 case 'KeyA': moveData.left = false; break;
                 case 'KeyS': moveData.backward = false; break;
                 case 'KeyD': moveData.right = false; break;
+                case 'ShiftLeft':
+                    moveData.sprint = false;
+                    playerSpeed = basePlayerSpeed;
+                    document.getElementById('sprint-indicator').style.display = 'none';
+                    break;
             }
         }
 
@@ -1561,13 +1856,14 @@
             const isShowing = menu.style.display === 'flex';
             if (forceState === false || isShowing) {
                 menu.style.display = 'none';
-                if (!shopVisible) controls.lock();
+                if (!shopVisible && !creatorVisible) controls.lock();
             } else if (forceState === true || !isShowing) {
                 menu.style.display = 'flex';
                 controls.unlock();
                 moveData.forward = moveData.backward = moveData.left = moveData.right = false;
                 if (inventoryVisible) toggleInventory();
                 if (shopVisible) toggleShop();
+                if (creatorVisible) toggleCreator();
             }
         }
 
@@ -1608,6 +1904,24 @@
             if (shopVisible) {
                 controls.unlock();
                 if (document.getElementById('spawn-menu').style.display === 'flex') toggleQMenu(false);
+                if (inventoryVisible) toggleInventory();
+                if (creatorVisible) toggleCreator();
+            } else {
+                controls.lock();
+            }
+        }
+
+        function toggleCreator() {
+            if (!isHost) {
+                logConsole("Solo el Host puede usar el editor.");
+                return;
+            }
+            creatorVisible = !creatorVisible;
+            creatorDiv.style.display = creatorVisible ? 'flex' : 'none';
+            if (creatorVisible) {
+                controls.unlock();
+                if (document.getElementById('spawn-menu').style.display === 'flex') toggleQMenu(false);
+                if (shopVisible) toggleShop();
                 if (inventoryVisible) toggleInventory();
             } else {
                 controls.lock();
@@ -1665,11 +1979,169 @@
             body.updateMassProperties();
             world.addBody(body);
 
-            zombies.push({ id, mesh, body, health: 100 + (currentWave * 10), speed: 8 + (currentWave * 0.5) });
+            zombies.push({ id, mesh, body, health: 100 + (currentWave * 10), speed: 8 + (currentWave * 0.5), damage: 10 });
             if (waveActive) zombiesAlive++;
             updateWaveUI(currentWave, zombiesAlive);
             broadcast('wave_state', { wave: currentWave, alive: zombiesAlive });
             logConsole("Zombie generado manualmente.");
+        }
+
+        // Funciones del creador
+        function setupCreator() {
+            // Pestañas
+            document.querySelectorAll('.creator-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.creator-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    const tabId = tab.dataset.tab;
+                    document.querySelectorAll('.creator-content').forEach(content => content.classList.remove('active'));
+                    document.getElementById(`tab-${tabId}`).classList.add('active');
+                });
+            });
+
+            // Añadir prop
+            document.getElementById('add-prop-btn').addEventListener('click', () => {
+                const name = document.getElementById('prop-name').value.trim();
+                if (!name) return;
+                const color = document.getElementById('prop-color').value;
+                const sizeStr = document.getElementById('prop-size').value;
+                const sizeArr = sizeStr.split(',').map(Number);
+                const size = new THREE.Vector3(sizeArr[0] || 1.5, sizeArr[1] || 1.5, sizeArr[2] || 1.5);
+                const mass = parseFloat(document.getElementById('prop-mass').value);
+                const shape = document.getElementById('prop-shape').value;
+                const id = `custom_prop_${Date.now()}_${Math.random()}`;
+                const newProp = { id, name, color, size: { x: size.x, y: size.y, z: size.z }, mass, shape };
+                customProps.push(newProp);
+                refreshPropUI();
+                // Sincronizar con clientes
+                broadcast('custom_prop', newProp);
+                logConsole(`Prop personalizado añadido: ${name}`);
+            });
+
+            // Añadir enemigo
+            document.getElementById('add-enemy-btn').addEventListener('click', () => {
+                const name = document.getElementById('enemy-name').value.trim();
+                if (!name) return;
+                const health = parseFloat(document.getElementById('enemy-health').value);
+                const speed = parseFloat(document.getElementById('enemy-speed').value);
+                const damage = parseFloat(document.getElementById('enemy-damage').value);
+                const color = document.getElementById('enemy-color').value;
+                const id = `custom_enemy_${Date.now()}_${Math.random()}`;
+                const newEnemy = { id, name, health, speed, damage, color };
+                customEnemies.push(newEnemy);
+                refreshEnemyUI();
+                broadcast('custom_enemy', newEnemy);
+                logConsole(`Enemigo personalizado añadido: ${name}`);
+            });
+
+            // Añadir arma
+            document.getElementById('add-weapon-btn').addEventListener('click', () => {
+                const name = document.getElementById('weapon-name').value.trim();
+                if (!name) return;
+                const damage = parseFloat(document.getElementById('weapon-damage').value);
+                const cooldown = parseFloat(document.getElementById('weapon-cooldown').value);
+                const maxAmmo = parseInt(document.getElementById('weapon-maxammo').value);
+                const range = parseFloat(document.getElementById('weapon-range').value);
+                const price = parseFloat(document.getElementById('weapon-price').value);
+                const type = document.getElementById('weapon-type').value;
+                const id = `custom_weapon_${Date.now()}_${Math.random()}`;
+                const newWeapon = {
+                    id, name, ammo: maxAmmo, maxAmmo, damage, range,
+                    cooldown, type, price, reloadTime: 2.0
+                };
+                if (type === 'shotgun') {
+                    newWeapon.pellets = 8;
+                    newWeapon.spread = 0.1;
+                }
+                customWeapons.push(newWeapon);
+                weapons[id] = newWeapon;
+                refreshWeaponUI();
+                refreshShopUI();
+                broadcast('custom_weapon', newWeapon);
+                logConsole(`Arma personalizada añadida: ${name}`);
+            });
+
+            // Aplicar configuración de oleadas
+            document.getElementById('apply-wave-config').addEventListener('click', () => {
+                waveConfig.baseZombies = parseInt(document.getElementById('wave-base').value);
+                waveConfig.increment = parseInt(document.getElementById('wave-increment').value);
+                waveConfig.healthMult = parseFloat(document.getElementById('wave-health-mult').value);
+                waveConfig.speedMult = parseFloat(document.getElementById('wave-speed-mult').value);
+                document.getElementById('wave-config-status').innerHTML = `Base: ${waveConfig.baseZombies}, Inc: ${waveConfig.increment}, Salud x${waveConfig.healthMult}, Velocidad x${waveConfig.speedMult}`;
+                broadcast('wave_config', waveConfig);
+                logConsole("Configuración de oleadas actualizada.");
+            });
+
+            document.getElementById('close-creator-btn').addEventListener('click', toggleCreator);
+        }
+
+        function refreshPropUI() {
+            const container = document.getElementById('prop-buttons-container');
+            // Limpiar botones personalizados (conservar los originales)
+            const originalBtns = Array.from(container.children).filter(btn => !btn.id.includes('custom_'));
+            container.innerHTML = '';
+            originalBtns.forEach(btn => container.appendChild(btn));
+            customProps.forEach(prop => {
+                const btn = document.createElement('button');
+                btn.className = 'tool-btn';
+                btn.textContent = prop.name;
+                btn.id = `spawn-${prop.id}`;
+                btn.onclick = () => requestSpawn(prop.id);
+                container.appendChild(btn);
+            });
+        }
+
+        function refreshEnemyUI() {
+            const listDiv = document.getElementById('custom-enemies-list');
+            listDiv.innerHTML = '';
+            customEnemies.forEach(e => {
+                const div = document.createElement('div');
+                div.textContent = `${e.name} (Salud:${e.health} Vel:${e.speed} Daño:${e.damage})`;
+                listDiv.appendChild(div);
+            });
+        }
+
+        function refreshWeaponUI() {
+            const container = document.getElementById('weapon-buttons-container');
+            const originalBtns = Array.from(container.children).filter(btn => !btn.id.includes('custom_'));
+            container.innerHTML = '';
+            originalBtns.forEach(btn => container.appendChild(btn));
+            customWeapons.forEach(weapon => {
+                const btn = document.createElement('button');
+                btn.className = 'tool-btn';
+                btn.textContent = weapon.name;
+                btn.id = `tool-${weapon.id}`;
+                btn.onclick = () => equipWeapon(weapon.id);
+                container.appendChild(btn);
+            });
+            // Actualizar inventario
+            const invContainer = document.getElementById('inventory');
+            const originalInv = Array.from(invContainer.children).filter(child => !child.classList || !child.dataset.weapon || !child.dataset.weapon.startsWith('custom_'));
+            invContainer.innerHTML = '';
+            originalInv.forEach(el => invContainer.appendChild(el));
+            customWeapons.forEach(weapon => {
+                const item = document.createElement('div');
+                item.className = 'inv-item';
+                item.dataset.weapon = weapon.id;
+                item.innerHTML = `<span>${weapon.name}</span><span class="key">[${Object.keys(weapons).indexOf(weapon.id)+1}]</span>`;
+                item.addEventListener('click', () => selectWeapon(weapon.id));
+                invContainer.appendChild(item);
+            });
+        }
+
+        function refreshShopUI() {
+            const container = document.getElementById('shop-items-container');
+            const originalItems = Array.from(container.children).filter(child => !child.dataset.weapon || !child.dataset.weapon.startsWith('custom_'));
+            container.innerHTML = '';
+            originalItems.forEach(el => container.appendChild(el));
+            customWeapons.forEach(weapon => {
+                const item = document.createElement('div');
+                item.className = 'shop-item';
+                item.dataset.weapon = weapon.id;
+                item.innerHTML = `<span>🔫 ${weapon.name}</span><span class="shop-price">${weapon.price} 🪙</span>`;
+                item.addEventListener('click', () => buyWeapon(weapon.id));
+                container.appendChild(item);
+            });
         }
 
         function setupUI() {
@@ -1689,6 +2161,10 @@
                     btn.onclick = spawnManualZombie;
                 } else if (btn.id === 'open-shop-btn') {
                     btn.onclick = toggleShop;
+                } else if (btn.id === 'open-creator-btn') {
+                    btn.onclick = toggleCreator;
+                } else if (btn.id.startsWith('spawn-')) {
+                    // Ya asignados
                 } else {
                     btn.onclick = (e) => {
                         toolBtns.forEach(t => t.classList.remove('active'));
@@ -1709,12 +2185,11 @@
                 });
             });
 
-            // Tienda items
             document.querySelectorAll('.shop-item').forEach(item => {
                 item.addEventListener('click', () => {
                     const weapon = item.dataset.weapon;
                     buyWeapon(weapon);
-                    toggleShop(); // Cerrar tienda después de comprar (opcional)
+                    toggleShop();
                 });
             });
             document.getElementById('close-shop-btn').onclick = toggleShop;
@@ -1794,7 +2269,6 @@
                 }
             }
 
-            // Actualizar recogida de monedas (solo host)
             if (isHost) {
                 const playerPos = playerBody.position;
                 for (let i = 0; i < droppedItems.length; i++) {
@@ -1804,7 +2278,6 @@
                         updateCoins(drop.value);
                         removeDrop(drop);
                         i--;
-                        // Notificar a clientes sobre la recogida
                         broadcast('pickup_coin', { id: drop.id, coins: coins });
                     }
                 }
