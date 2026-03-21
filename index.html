@@ -3,63 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebGMod Clone - Three.js + Cannon-es</title>
+    <title>WebGMod P2P Survival - Full Engine</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        /* ==========================================
+           ESTILOS DE LA INTERFAZ Y EL HUD
+           ========================================== */
+        body { margin: 0; overflow: hidden; background-color: #333; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
         canvas { display: block; }
         
+        /* Retícula / Mira */
         #crosshair {
-            position: absolute; top: 50%; left: 50%; width: 10px; height: 10px;
-            background-color: rgba(255, 255, 255, 0.8); border-radius: 50%;
+            position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
+            background-color: rgba(0, 255, 0, 0.9); border-radius: 50%;
             transform: translate(-50%, -50%); pointer-events: none; z-index: 10;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
 
         /* Interfaz Q-Menu (Spawn Menu) */
         #spawn-menu {
-            position: absolute; top: 10%; left: 10%; width: 80%; height: 80%;
-            background-color: rgba(30, 30, 30, 0.85); backdrop-filter: blur(5px);
-            border: 1px solid #555; border-radius: 8px; color: white;
-            display: none; flex-direction: row; z-index: 100;
+            position: absolute; top: 5%; left: 5%; width: 90%; height: 90%;
+            background-color: rgba(20, 20, 20, 0.95); backdrop-filter: blur(10px);
+            border: 2px solid #444; border-radius: 8px; color: white;
+            display: none; flex-direction: row; z-index: 100; box-shadow: 0 0 20px rgba(0,0,0,0.8);
         }
 
-        .menu-sidebar { width: 250px; background-color: rgba(20, 20, 20, 0.9); padding: 15px; border-right: 1px solid #444; overflow-y: auto; }
-        .menu-content { flex-grow: 1; padding: 20px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 15px; overflow-y: auto; }
+        .menu-sidebar { width: 280px; background-color: rgba(10, 10, 10, 0.9); padding: 20px; border-right: 2px solid #333; overflow-y: auto; }
+        .menu-content { flex-grow: 1; padding: 25px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 20px; overflow-y: auto; }
         
-        h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid #555; padding-bottom: 10px; }
-        h3 { font-size: 1rem; color: #aaa; }
+        h2 { margin-top: 0; font-size: 1.4rem; border-bottom: 2px solid #555; padding-bottom: 10px; color: #ffaa00; }
+        h3 { font-size: 1.1rem; color: #ccc; width: 100%; border-bottom: 1px solid #444; margin-top: 20px; padding-bottom: 5px; }
 
         .item-btn {
-            width: 100px; height: 100px; background-color: #444; border: 2px solid transparent;
-            border-radius: 5px; cursor: pointer; display: flex; flex-direction: column;
+            width: 120px; height: 120px; background-color: #2a2a2a; border: 2px solid #555;
+            border-radius: 8px; cursor: pointer; display: flex; flex-direction: column;
             align-items: center; justify-content: center; color: white; transition: all 0.2s;
+            font-weight: bold; text-align: center;
         }
-        .item-btn:hover { border-color: #0078D7; background-color: #555; }
+        .item-btn:hover { border-color: #ffaa00; background-color: #3a3a3a; transform: scale(1.05); }
         
-        .tool-btn { width: 100%; padding: 10px; margin-bottom: 5px; background: #333; border: none; color: white; cursor: pointer; text-align: left; border-radius: 3px; }
-        .tool-btn:hover { background: #444; border-left: 4px solid #0078D7; }
-        .tool-btn.active { background: #0078D7; border-left: 4px solid white; }
+        .tool-btn { width: 100%; padding: 15px; margin-bottom: 8px; background: #222; border: 1px solid #444; color: white; cursor: pointer; text-align: left; border-radius: 4px; font-size: 1rem; transition: background 0.2s; }
+        .tool-btn:hover { background: #333; border-left: 6px solid #ffaa00; }
+        .tool-btn.active { background: #ffaa00; color: black; border-left: 6px solid white; font-weight: bold; }
 
         /* Consola / Log UI */
         #console-ui {
-            position: absolute; bottom: 10px; left: 10px; width: 300px; max-height: 150px;
-            background-color: rgba(0, 0, 0, 0.5); color: #0f0; font-family: monospace;
-            padding: 10px; border-radius: 5px; overflow-y: auto; pointer-events: none; font-size: 12px;
+            position: absolute; bottom: 20px; left: 20px; width: 350px; height: 200px;
+            background-color: rgba(0, 0, 0, 0.7); color: #00ff00; font-family: 'Courier New', Courier, monospace;
+            padding: 15px; border-radius: 5px; overflow-y: auto; pointer-events: none; font-size: 13px;
+            border: 1px solid #333; text-shadow: 1px 1px 0px #000; z-index: 50;
         }
         
-        #instructions { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); color: white; text-shadow: 1px 1px 2px black; text-align: center; pointer-events: none; }
+        /* Menú Principal de Conexión P2P */
+        #main-menu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(15, 15, 15, 0.98); z-index: 1000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white;
+        }
+        .menu-box {
+            background: #222; padding: 40px; border-radius: 10px; border: 2px solid #555;
+            text-align: center; width: 400px;
+        }
+        .menu-box input {
+            width: 90%; padding: 15px; margin: 15px 0; background: #111; border: 1px solid #444; color: white; border-radius: 5px; font-size: 1.1rem; text-align: center;
+        }
+        .menu-box button {
+            width: 100%; padding: 15px; margin: 10px 0; background: #ffaa00; border: none; color: black; font-weight: bold; font-size: 1.2rem; border-radius: 5px; cursor: pointer; transition: background 0.2s;
+        }
+        .menu-box button:hover { background: #ffcc00; }
+        .menu-box button.secondary { background: #444; color: white; }
+        .menu-box button.secondary:hover { background: #555; }
+
+        /* HUD del Jugador (Salud, Armas, Olas) */
+        #hud {
+            position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; align-items: flex-end; z-index: 50; pointer-events: none;
+        }
+        #health-bar-container { width: 300px; height: 30px; background: #222; border: 2px solid #000; border-radius: 5px; margin-bottom: 10px; position: relative; }
+        #health-bar { width: 100%; height: 100%; background: #cc0000; transition: width 0.2s ease-out; }
+        #health-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-weight: bold; font-size: 16px; text-shadow: 1px 1px 2px black; }
         
-        /* Stats.js container */
+        #weapon-info { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 5px; color: white; text-align: right; border: 1px solid #444; }
+        #weapon-name { font-size: 24px; font-weight: bold; color: #ffaa00; margin-bottom: 5px; }
+        #ammo-info { font-size: 18px; }
+
+        #wave-info {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); padding: 15px 30px; border-radius: 10px; color: white; text-align: center; border: 2px solid #ff0000; z-index: 50; pointer-events: none; display: none;
+        }
+        #wave-number { font-size: 30px; font-weight: bold; color: #ff0000; }
+        #zombies-alive { font-size: 18px; color: #ccc; }
+
+        /* Pantalla de Muerte */
+        #death-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(150, 0, 0, 0.8); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white;
+        }
+        #death-screen h1 { font-size: 5rem; margin: 0; text-shadow: 4px 4px 0px #000; }
+
+        /* Daño visual */
+        #damage-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 40%, rgba(255,0,0,0.4) 100%); opacity: 0; pointer-events: none; z-index: 40; transition: opacity 0.1s; }
+        
         #stats-container { position: absolute; top: 0; left: 0; z-index: 50; }
     </style>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
 
+    <div id="damage-overlay"></div>
     <div id="crosshair"></div>
     <div id="stats-container"></div>
     
-    <div id="instructions">
-        Click para jugar | W,A,S,D: Mover | Espacio: Saltar | Q: Spawn Menu<br>
-        Physgun: Clic Izquierdo (Mover) | Rueda (Alejar/Acercar) | Clic Derecho (Congelar)
+    <div id="wave-info">
+        <div id="wave-number">OLEADA 1</div>
+        <div id="zombies-alive">Zombies restantes: 0</div>
+    </div>
+
+    <div id="hud">
+        <div id="health-bar-container">
+            <div id="health-bar"></div>
+            <div id="health-text">100 / 100</div>
+        </div>
+        <div id="weapon-info">
+            <div id="weapon-name">Physgun</div>
+            <div id="ammo-info">∞ / ∞</div>
+        </div>
+    </div>
+
+    <div id="main-menu">
+        <div class="menu-box">
+            <h1 style="color: #ffaa00; margin-top:0;">WebGMod P2P</h1>
+            <p>Selecciona un modo de juego</p>
+            <div id="my-id-display" style="color: #aaa; margin-bottom: 20px; font-family: monospace;">Generando ID de red...</div>
+            
+            <button id="btn-host">Crear Servidor (Host)</button>
+            <hr style="border-color: #444; margin: 20px 0;">
+            <input type="text" id="join-id-input" placeholder="Pega el ID del Host aquí">
+            <button id="btn-join" class="secondary">Unirse a Servidor</button>
+        </div>
+    </div>
+
+    <div id="death-screen">
+        <h1>HAS MUERTO</h1>
+        <p>Los zombies te han devorado.</p>
+        <button onclick="location.reload()" style="padding: 15px 30px; font-size: 1.5rem; background: #222; color: white; border: 2px solid white; cursor: pointer; margin-top: 20px;">Reiniciar Juego</button>
     </div>
 
     <div id="spawn-menu">
@@ -67,17 +151,30 @@
             <h2>Herramientas</h2>
             <button class="tool-btn active" id="tool-physgun">Physgun (Manipular)</button>
             <button class="tool-btn" id="tool-weld">Weld (Soldar)</button>
-            <button class="tool-btn" id="tool-thruster">Thruster (Propulsor)</button>
+            
+            <h2 style="margin-top: 30px;">Armamento</h2>
+            <button class="tool-btn" id="tool-cuchillo">Cuchillo (Melee)</button>
+            <button class="tool-btn" id="tool-pistola">Pistola (M9)</button>
+            <button class="tool-btn" id="tool-escopeta">Escopeta (Spas-12)</button>
+
+            <h2 style="margin-top: 30px;">Host Admin</h2>
+            <button class="tool-btn" id="btn-start-wave" style="background-color: #500;">Iniciar Supervivencia</button>
         </div>
         <div class="menu-content">
-            <div style="width: 100%;"><h2>Objetos (Props)</h2></div>
-            <button class="item-btn" id="spawn-cube">Cubo<br>(Metal)</button>
-            <button class="item-btn" id="spawn-sphere">Esfera<br>(Goma)</button>
-            <button class="item-btn" id="spawn-box">Caja<br>(Madera)</button>
+            <h3>Construcción Básica</h3>
+            <button class="item-btn" id="spawn-cube">Cubo de Acero<br>(Pesado)</button>
+            <button class="item-btn" id="spawn-box">Caja de Madera<br>(Ligera)</button>
+            <button class="item-btn" id="spawn-sphere">Esfera Goma<br>(Rebota)</button>
+            
+            <h3>Arquitectura / Rampas</h3>
+            <button class="item-btn" id="spawn-ramp">Rampa<br>(Metal)</button>
+            <button class="item-btn" id="spawn-cylinder">Barril<br>(Explosivo)</button>
+            <button class="item-btn" id="spawn-wall">Pared<br>(Concreto)</button>
+            <button class="item-btn" id="spawn-platform">Plataforma<br>(Plana)</button>
         </div>
     </div>
 
-    <div id="console-ui">Motor Iniciado...</div>
+    <div id="console-ui">Motor Iniciando Secuencia...<br>Cargando Dependencias...</div>
 
     <script type="importmap">
         {
@@ -95,108 +192,146 @@
         import Stats from 'three/addons/libs/stats.module.js';
         import * as CANNON from 'cannon-es';
 
-        // --- SISTEMA BASE ---
+        /* ======================================================================
+           VARIABLES GLOBALES Y ESTADOS DEL MOTOR
+           ====================================================================== */
+        // Render & Core
         let camera, scene, renderer, controls, stats;
-        let world;
         let lastTime = performance.now();
-        const objectsToSync = []; 
-        let currentTool = 'physgun';
+        let gameActive = false;
+        
+        // Física
+        let world;
+        let physicsMaterial, playerMaterial, bounceMaterial;
+        const objectsToSync = []; // Arrays de sincronización de render y física
+        let propIdCounter = 0; // ID único para sincronizar props en red
 
-        // --- MATERIALES FÍSICOS ---
-        let physicsMaterial, playerMaterial;
-        let physicsContactMaterial;
-
-        // --- VARIABLES DEL JUGADOR ---
+        // Jugador Local
         let playerBody;
+        let playerHealth = 100;
+        let isDead = false;
         const moveData = { forward: false, backward: false, left: false, right: false, jump: false };
-        const playerSpeed = 15;
-        const jumpForce = 8;
+        const playerSpeed = 18;
+        const jumpForce = 9;
         let canJump = false;
 
-        // --- VARIABLES DE LA PHYSGUN ---
+        // Herramientas y Physgun
         const raycaster = new THREE.Raycaster();
+        let currentTool = 'physgun';
         let isManipulating = false;
         let manipulatedBody = null;
         let jointConstraint = null;
-        let jointBody = null; // Cuerpo cinemático que la cámara mueve
+        let jointBody = null; 
         let manipulationDistance = 5;
-
-        // --- VARIABLES DE TOOLGUN (Weld) ---
         let weldFirstBody = null;
 
+        // Sistema de Armas
+        const weapons = {
+            physgun: { name: "Physgun", ammo: "∞", maxAmmo: "∞", damage: 0, range: 100, cooldown: 0, type: "tool" },
+            weld: { name: "Soldador", ammo: "∞", maxAmmo: "∞", damage: 0, range: 10, cooldown: 0, type: "tool" },
+            cuchillo: { name: "Cuchillo de Combate", ammo: "∞", maxAmmo: "∞", damage: 35, range: 3, cooldown: 0.5, type: "melee" },
+            pistola: { name: "Pistola M9", ammo: 15, maxAmmo: 15, damage: 25, range: 50, cooldown: 0.2, type: "hitscan" },
+            escopeta: { name: "Escopeta SPAS-12", ammo: 8, maxAmmo: 8, damage: 15, pellets: 8, range: 30, spread: 0.1, cooldown: 0.8, type: "shotgun" }
+        };
+        let lastFireTime = 0;
+
+        // Sistema de Zombies y Olas (Solo el Host los procesa, los clientes los renderizan)
+        let zombies = [];
+        let zombieIdCounter = 0;
+        let currentWave = 0;
+        let zombiesToSpawn = 0;
+        let zombiesAlive = 0;
+        let waveActive = false;
+        let nextSpawnTime = 0;
+        const zombieMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00, roughness: 0.8 }); // Estilo old school
+
+        // Multiplayer (PeerJS)
+        let peer = null;
+        let isHost = false;
+        let connections = []; // Conexiones activas (Si eres host, son los clientes. Si eres cliente, es la conexión al host)
+        let networkPlayers = {}; // Otros jugadores en la partida { id: { mesh, lastUpdate } }
+        let myPeerId = null;
+        let tickRate = 1000 / 20; // Enviar datos 20 veces por segundo
+        let lastNetworkTick = 0;
+
+        /* ======================================================================
+           INICIALIZACIÓN DEL MOTOR
+           ====================================================================== */
         init();
         animate();
 
         function init() {
-            // 1. Configuración de Three.js (Render)
+            logConsole("Inicializando Three.js y Cannon-es...");
+
+            // 1. Escena y Renderizado
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB); // Skybox básico
-            scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+            scene.background = new THREE.Color(0x1a1a1a); // Cielo oscuro atmosférico
+            scene.fog = new THREE.FogExp2(0x1a1a1a, 0.015); // Niebla para optimizar y dar ambiente
 
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); // antialias false para estética old school / rendimiento
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             document.body.appendChild(renderer.domElement);
 
-            // Luces
-            const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+            // Luces (Estilo mapa sombrío)
+            const ambientLight = new THREE.AmbientLight(0x222222);
             scene.add(ambientLight);
             
-            const dirLight = new THREE.DirectionalLight(0xffffff, 2);
-            dirLight.position.set(50, 100, 50);
+            const dirLight = new THREE.DirectionalLight(0x99aaff, 1.2);
+            dirLight.position.set(100, 200, 50);
             dirLight.castShadow = true;
-            dirLight.shadow.camera.top = 50;
-            dirLight.shadow.camera.bottom = -50;
-            dirLight.shadow.camera.left = -50;
-            dirLight.shadow.camera.right = 50;
+            dirLight.shadow.camera.top = 100;
+            dirLight.shadow.camera.bottom = -100;
+            dirLight.shadow.camera.left = -100;
+            dirLight.shadow.camera.right = 100;
             dirLight.shadow.mapSize.width = 2048;
             dirLight.shadow.mapSize.height = 2048;
             scene.add(dirLight);
 
-            // 2. Configuración de Cannon-es (Físicas)
+            // 2. Físicas (Cannon-es)
             world = new CANNON.World();
-            world.gravity.set(0, -9.81, 0);
-            world.broadphase = new CANNON.SAPBroadphase(world); // Optimización de colisiones
-            world.solver.iterations = 20;
+            world.gravity.set(0, -15, 0); // Gravedad un poco más fuerte para mejor feel de salto
+            world.broadphase = new CANNON.SAPBroadphase(world);
+            world.solver.iterations = 30; // Más iteraciones para que los Weld no tiemblen
+            world.defaultContactMaterial.friction = 0.5;
 
-            // Materiales de física
             physicsMaterial = new CANNON.Material("standard");
             playerMaterial = new CANNON.Material("player");
+            bounceMaterial = new CANNON.Material("bounce");
             
-            physicsContactMaterial = new CANNON.ContactMaterial(physicsMaterial, physicsMaterial, {
-                friction: 0.3,
-                restitution: 0.1
-            });
-            const playerContactMaterial = new CANNON.ContactMaterial(playerMaterial, physicsMaterial, {
-                friction: 0.0, // Cero fricción para que el jugador no se quede pegado a las paredes
-                restitution: 0.0
-            });
+            const physicsContactMaterial = new CANNON.ContactMaterial(physicsMaterial, physicsMaterial, { friction: 0.4, restitution: 0.1 });
+            const playerContactMaterial = new CANNON.ContactMaterial(playerMaterial, physicsMaterial, { friction: 0.0, restitution: 0.0 });
+            const bounceContactMaterial = new CANNON.ContactMaterial(bounceMaterial, physicsMaterial, { friction: 0.3, restitution: 0.8 });
+            
             world.addContactMaterial(physicsContactMaterial);
             world.addContactMaterial(playerContactMaterial);
+            world.addContactMaterial(bounceContactMaterial);
 
-            // 3. Entorno (Suelo)
-            createFloor();
-
-            // 4. Jugador (Control y Físicas)
+            // 3. Crear Entorno y Jugador
+            createEnvironment();
             createPlayer();
 
-            // 5. Herramienta Physgun (Cuerpo cinemático oculto para las restricciones)
+            // Cuerpo cinemático para la Physgun
             const jointShape = new CANNON.Sphere(0.1);
-            jointBody = new CANNON.Body({ mass: 0 }); // mass 0 en Cannon-es = Cinemático/Estático
+            jointBody = new CANNON.Body({ mass: 0 });
             jointBody.addShape(jointShape);
-            jointBody.collisionFilterGroup = 0; // No colisiona con nada
+            jointBody.collisionFilterGroup = 0;
             jointBody.collisionFilterMask = 0;
             world.addBody(jointBody);
 
-            // 6. Stats & UI
+            // 4. Utilidades
             stats = new Stats();
             document.getElementById('stats-container').appendChild(stats.dom);
+            
+            // 5. Inicializar Red P2P
+            setupNetwork();
+            
+            // 6. Configurar Interfaz de Usuario e Inputs
             setupUI();
-
-            // 7. Event Listeners
+            
             window.addEventListener('resize', onWindowResize);
             document.addEventListener('keydown', onKeyDown);
             document.addEventListener('keyup', onKeyUp);
@@ -204,114 +339,733 @@
             document.addEventListener('mouseup', onMouseUp);
             document.addEventListener('wheel', onMouseWheel);
 
-            // Iniciar bloqueando el puntero
+            // Lock pointer general
             document.body.addEventListener('click', () => {
-                if (document.getElementById('spawn-menu').style.display !== 'flex') {
+                if (gameActive && !isDead && document.getElementById('spawn-menu').style.display !== 'flex') {
                     controls.lock();
+                }
+            });
+            
+            logConsole("Motor cargado correctamente. Esperando conexión P2P.");
+        }
+
+        /* ======================================================================
+           SISTEMA DE RED MULTIPLAYER (PEER JS)
+           ====================================================================== */
+        function setupNetwork() {
+            // Generar un ID aleatorio fácil de leer
+            const randomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            
+            peer = new Peer(randomId, {
+                debug: 2
+            });
+
+            peer.on('open', function(id) {
+                myPeerId = id;
+                document.getElementById('my-id-display').innerText = `Tu ID: ${id}`;
+                logConsole(`P2P Iniciado. ID Local: ${id}`);
+            });
+
+            // Si alguien se conecta a nosotros (Somos el Host)
+            peer.on('connection', function(conn) {
+                if (!isHost) {
+                    logConsole("Rechazando conexión entrante, no soy host.");
+                    conn.close();
+                    return;
+                }
+                
+                logConsole(`Jugador conectado: ${conn.peer}`);
+                connections.push(conn);
+                setupConnectionEvents(conn);
+                
+                // Enviar el estado actual del mundo (Props y Zombies) al nuevo jugador
+                syncFullWorldState(conn);
+            });
+            
+            peer.on('error', function(err) {
+                logConsole(`Error de red: ${err.type}`);
+                alert("Error de red: " + err.type);
+            });
+
+            // Botón HOST
+            document.getElementById('btn-host').onclick = () => {
+                isHost = true;
+                gameActive = true;
+                document.getElementById('main-menu').style.display = 'none';
+                controls.lock();
+                logConsole("Servidor creado. Eres el HOST autoritativo.");
+            };
+
+            // Botón JOIN
+            document.getElementById('btn-join').onclick = () => {
+                const hostId = document.getElementById('join-id-input').value.toUpperCase();
+                if (!hostId) return alert("Ingresa un ID válido");
+                
+                logConsole(`Conectando al Host: ${hostId}...`);
+                const conn = peer.connect(hostId, { reliable: true });
+                
+                conn.on('open', function() {
+                    isHost = false;
+                    gameActive = true;
+                    connections.push(conn);
+                    setupConnectionEvents(conn);
+                    document.getElementById('main-menu').style.display = 'none';
+                    controls.lock();
+                    logConsole("Conectado al Host exitosamente.");
+                });
+            };
+        }
+
+        function setupConnectionEvents(conn) {
+            conn.on('data', function(data) {
+                handleNetworkData(data, conn.peer);
+            });
+            conn.on('close', function() {
+                logConsole(`Jugador desconectado: ${conn.peer}`);
+                connections = connections.filter(c => c.peer !== conn.peer);
+                if (networkPlayers[conn.peer]) {
+                    scene.remove(networkPlayers[conn.peer].mesh);
+                    delete networkPlayers[conn.peer];
                 }
             });
         }
 
-        function createFloor() {
-            // Three.js Render
-            const planeGeometry = new THREE.PlaneGeometry(200, 200);
-            const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8, metalness: 0.2 });
+        function broadcast(type, payload, excludePeerId = null) {
+            const message = { type, payload };
+            connections.forEach(conn => {
+                if (conn.peer !== excludePeerId) {
+                    conn.send(message);
+                }
+            });
+        }
+
+        function handleNetworkData(data, senderId) {
+            switch(data.type) {
+                case 'player_move':
+                    updateNetworkPlayer(senderId, data.payload);
+                    // Si soy host, retransmito el movimiento a los demás
+                    if (isHost) broadcast('player_move', { id: senderId, ...data.payload }, senderId);
+                    break;
+                    
+                case 'spawn_prop':
+                    if (isHost) {
+                        // El host recibe la petición, spawnea el prop autoritativamente y avisa a todos
+                        spawnPropAuthoritative(data.payload.propType, data.payload.position, data.payload.quaternion, data.payload.velocity);
+                    }
+                    break;
+                    
+                case 'sync_prop':
+                    // Cliente recibe sincronización física de un prop o spawn de un nuevo prop
+                    if (!isHost) syncClientProp(data.payload);
+                    break;
+                    
+                case 'shoot_event':
+                    // Efectos visuales de disparos de otros jugadores
+                    createGunshotEffect(data.payload.start, data.payload.end);
+                    if (isHost) broadcast('shoot_event', data.payload, senderId);
+                    // Si el cliente disparó y le dio a un zombie, el HOST calcula el daño autoritativamente (Simplificado aquí: confiamos en el cliente para el hit)
+                    if (isHost && data.payload.hitZombieId !== null) {
+                        damageZombie(data.payload.hitZombieId, data.payload.damage);
+                    }
+                    break;
+                    
+                case 'sync_zombies':
+                    // Cliente recibe estado de todos los zombies desde el host
+                    if (!isHost) updateClientZombies(data.payload);
+                    break;
+                    
+                case 'wave_state':
+                    if (!isHost) updateWaveUI(data.payload.wave, data.payload.alive);
+                    break;
+            }
+        }
+
+        function updateNetworkPlayer(id, data) {
+            if (!networkPlayers[id]) {
+                // Crear avatar para el jugador (Caja azul estilo retro)
+                const geo = new THREE.BoxGeometry(1.5, 3, 1.5);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x0055ff });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.castShadow = true;
+                scene.add(mesh);
+                networkPlayers[id] = { mesh: mesh, targetPos: new THREE.Vector3(), targetQuat: new THREE.Quaternion() };
+            }
+            
+            // Guardar posición objetivo para interpolar en el render loop y suavizar lag
+            networkPlayers[id].targetPos.set(data.px, data.py, data.pz);
+            // networkPlayers[id].mesh.position.copy(networkPlayers[id].targetPos); // Asignación directa (sin interpolar para simplificar el código masivo)
+            networkPlayers[id].targetQuat.set(data.rx, data.ry, data.rz, data.rw);
+        }
+
+        function syncFullWorldState(newConn) {
+            // Host envía todos los props existentes al nuevo jugador
+            objectsToSync.forEach(obj => {
+                newConn.send({
+                    type: 'sync_prop',
+                    payload: {
+                        id: obj.netId,
+                        type: obj.propType,
+                        px: obj.body.position.x, py: obj.body.position.y, pz: obj.body.position.z,
+                        rx: obj.body.quaternion.x, ry: obj.body.quaternion.y, rz: obj.body.quaternion.z, rw: obj.body.quaternion.w
+                    }
+                });
+            });
+            // Sincronizar estado de oleada
+            newConn.send({ type: 'wave_state', payload: { wave: currentWave, alive: zombiesAlive } });
+        }
+
+        function networkTick() {
+            if (!gameActive || isDead) return;
+            const now = performance.now();
+            if (now - lastNetworkTick > tickRate) {
+                lastNetworkTick = now;
+                
+                // 1. Todos envían su posición
+                const pos = playerBody.position;
+                const rot = camera.quaternion;
+                const moveDataPayload = { px: pos.x, py: pos.y, pz: pos.z, rx: rot.x, ry: rot.y, rz: rot.z, rw: rot.w };
+                
+                if (isHost) {
+                    broadcast('player_move', { id: 'host', ...moveDataPayload });
+                    
+                    // 2. Host envía posiciones de físicas (props)
+                    objectsToSync.forEach(obj => {
+                        // Optimización de red: Solo enviar si el objeto se mueve
+                        if (obj.body.velocity.lengthSquared() > 0.01 || obj.body.angularVelocity.lengthSquared() > 0.01 || obj.forceSync) {
+                            broadcast('sync_prop', {
+                                id: obj.netId, type: obj.propType,
+                                px: obj.body.position.x, py: obj.body.position.y, pz: obj.body.position.z,
+                                rx: obj.body.quaternion.x, ry: obj.body.quaternion.y, rz: obj.body.quaternion.z, rw: obj.body.quaternion.w
+                            });
+                            obj.forceSync = false;
+                        }
+                    });
+
+                    // 3. Host envía posiciones de zombies
+                    if (zombies.length > 0) {
+                        const zombieData = zombies.map(z => ({
+                            id: z.id, px: z.body.position.x, py: z.body.position.y, pz: z.body.position.z,
+                            rx: z.body.quaternion.x, ry: z.body.quaternion.y, rz: z.body.quaternion.z, rw: z.body.quaternion.w,
+                            hp: z.health
+                        }));
+                        broadcast('sync_zombies', zombieData);
+                    }
+                } else {
+                    // Cliente envía su posición al host
+                    if (connections.length > 0) connections[0].send({ type: 'player_move', payload: moveDataPayload });
+                }
+            }
+        }
+
+        /* ======================================================================
+           SISTEMA DE ENTORNO Y CONSTRUCCIÓN DE PROPS
+           ====================================================================== */
+        function createEnvironment() {
+            // Suelo con textura de cuadrícula old-school generada procedimentalmente
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#444'; ctx.fillRect(0, 0, 512, 512);
+            ctx.strokeStyle = '#222'; ctx.lineWidth = 4;
+            ctx.beginPath();
+            for(let i=0; i<=512; i+=64) { ctx.moveTo(i,0); ctx.lineTo(i,512); ctx.moveTo(0,i); ctx.lineTo(512,i); }
+            ctx.stroke();
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(50, 50);
+
+            const planeGeometry = new THREE.PlaneGeometry(500, 500);
+            const planeMaterial = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9 });
             const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
             planeMesh.rotation.x = -Math.PI / 2;
             planeMesh.receiveShadow = true;
             scene.add(planeMesh);
 
-            // Grid visual
-            const gridHelper = new THREE.GridHelper(200, 100, 0x000000, 0x000000);
-            gridHelper.material.opacity = 0.2;
-            gridHelper.material.transparent = true;
-            gridHelper.position.y = 0.01;
-            scene.add(gridHelper);
-
-            // Cannon.js Física
             const groundShape = new CANNON.Plane();
             const groundBody = new CANNON.Body({ mass: 0, material: physicsMaterial });
             groundBody.addShape(groundShape);
             groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
             world.addBody(groundBody);
+
+            // Muros delimitadores del mapa
+            const wallShape = new CANNON.Box(new CANNON.Vec3(250, 50, 1));
+            const positions = [[0, 250], [0, -250], [250, 0], [-250, 0]];
+            const rotations = [0, 0, Math.PI/2, Math.PI/2];
+            
+            for(let i=0; i<4; i++) {
+                const wallBody = new CANNON.Body({ mass: 0 });
+                wallBody.addShape(wallShape);
+                wallBody.position.set(positions[i][0], 50, positions[i][1]);
+                wallBody.quaternion.setFromEuler(0, rotations[i], 0);
+                world.addBody(wallBody);
+            }
         }
 
         function createPlayer() {
-            // Three.js Cámara control
             controls = new PointerLockControls(camera, document.body);
             scene.add(controls.getObject());
 
-            // Cannon.js Cuerpo del jugador (Esfera para deslizarse mejor por el suelo)
-            const radius = 1;
+            // Capsula física para el jugador (Esfera inferior + Cilindro)
+            // Para simplificar y evitar caídas raras, usamos una esfera que no rota.
+            const radius = 1.2;
             const sphereShape = new CANNON.Sphere(radius);
-            playerBody = new CANNON.Body({ mass: 80, material: playerMaterial });
+            playerBody = new CANNON.Body({ mass: 85, material: playerMaterial });
             playerBody.addShape(sphereShape);
             playerBody.position.set(0, 5, 0);
-            playerBody.linearDamping = 0.9;
-            playerBody.angularDamping = 1.0; // Evitar que la esfera ruede visualmente la cámara
+            playerBody.linearDamping = 0.9; // Fricción del aire alta para control responsivo (Quake-like)
+            playerBody.fixedRotation = true; // No permitir que ruede
+            playerBody.updateMassProperties();
             world.addBody(playerBody);
 
-            // Detección de salto (colisión con el suelo)
             playerBody.addEventListener("collide", (e) => {
                 const contact = e.contact;
-                if (contact.bi.id == playerBody.id) {
-                    contact.ni.negate(contact.ni);
-                }
+                if (contact.bi.id == playerBody.id) { contact.ni.negate(contact.ni); }
                 if (contact.ni.y > 0.5) canJump = true;
             });
         }
 
-        // --- SISTEMA DE SPAWN ---
-        function spawnObject(type) {
-            logConsole(`Spawneando: ${type}`);
-            let geometry, material, shape, mass;
+        // Host ejecuta esto localmente y avisa
+        function spawnPropAuthoritative(type, pos, quat, vel) {
+            const netId = ++propIdCounter;
+            createPropInstance(netId, type, pos, quat);
+            
+            // Aplicar velocidad inicial (Ej. si fue lanzado)
+            const obj = objectsToSync.find(o => o.netId === netId);
+            if (obj && vel) {
+                obj.body.velocity.set(vel.x, vel.y, vel.z);
+                obj.forceSync = true;
+            }
+        }
+
+        // Clientes ejecutan esto cuando reciben update de físicas
+        function syncClientProp(data) {
+            let obj = objectsToSync.find(o => o.netId === data.id);
+            if (!obj) {
+                // Si no existe, lo creamos (Spawn)
+                createPropInstance(data.id, data.type, new THREE.Vector3(data.px, data.py, data.pz), new THREE.Quaternion(data.rx, data.ry, data.rz, data.rw));
+                obj = objectsToSync.find(o => o.netId === data.id);
+            } else {
+                // Actualizar física (Cuerpo cinemático en el cliente para que el render lo copie suavemente)
+                // En un juego P2P real, los props en el cliente deberían ser DYNAMIC pero con su posición corregida. 
+                // Aquí, el host dicta todo para evitar desincronizaciones de físicas de pila (stacking).
+                obj.body.position.set(data.px, data.py, data.pz);
+                obj.body.quaternion.set(data.rx, data.ry, data.rz, data.rw);
+                obj.body.velocity.set(0,0,0); // El cliente no simula la física, solo refleja la posición
+                obj.body.angularVelocity.set(0,0,0);
+            }
+        }
+
+        function createPropInstance(netId, type, posVec, quatVec) {
+            let geometry, material, shape, mass, cMat;
             const size = 1.5;
 
-            // Posición frente al jugador
-            const spawnPos = new THREE.Vector3(0, 0, -5);
-            spawnPos.applyQuaternion(camera.quaternion);
-            spawnPos.add(controls.getObject().position);
-
-            if (type === 'cube' || type === 'box') {
-                geometry = new THREE.BoxGeometry(size, size, size);
-                shape = new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2));
-                mass = (type === 'cube') ? 50 : 10; // Cubo = metal, Caja = madera
-                const color = (type === 'cube') ? 0x888888 : 0x8B4513;
-                material = new THREE.MeshStandardMaterial({ color: color, roughness: 0.4 });
-            } else if (type === 'sphere') {
-                geometry = new THREE.SphereGeometry(size / 2, 32, 32);
-                shape = new CANNON.Sphere(size / 2);
-                mass = 20;
-                material = new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.2, metalness: 0.1 });
+            switch(type) {
+                case 'cube':
+                    geometry = new THREE.BoxGeometry(size, size, size);
+                    shape = new CANNON.Box(new CANNON.Vec3(size/2, size/2, size/2));
+                    mass = 150; material = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6 }); cMat = physicsMaterial; break;
+                case 'box':
+                    geometry = new THREE.BoxGeometry(size*1.5, size*1.5, size*1.5);
+                    shape = new CANNON.Box(new CANNON.Vec3(size*0.75, size*0.75, size*0.75));
+                    mass = 30; material = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.9 }); cMat = physicsMaterial; break;
+                case 'sphere':
+                    geometry = new THREE.SphereGeometry(size, 32, 32);
+                    shape = new CANNON.Sphere(size);
+                    mass = 40; material = new THREE.MeshStandardMaterial({ color: 0xcc0000 }); cMat = bounceMaterial; break;
+                case 'ramp':
+                    // Cuña (Rampa) usando Cilindro modificado
+                    geometry = new THREE.CylinderGeometry(size*2, size*2, size*4, 3);
+                    shape = new CANNON.Cylinder(size*2, size*2, size*4, 3);
+                    mass = 200; material = new THREE.MeshStandardMaterial({ color: 0x555555 }); cMat = physicsMaterial; break;
+                case 'cylinder':
+                    geometry = new THREE.CylinderGeometry(size, size, size*3, 16);
+                    shape = new CANNON.Cylinder(size, size, size*3, 16);
+                    mass = 60; material = new THREE.MeshStandardMaterial({ color: 0xdd8800 }); cMat = physicsMaterial; break;
+                case 'wall':
+                    geometry = new THREE.BoxGeometry(size*6, size*4, size*0.5);
+                    shape = new CANNON.Box(new CANNON.Vec3(size*3, size*2, size*0.25));
+                    mass = 500; material = new THREE.MeshStandardMaterial({ color: 0x999999 }); cMat = physicsMaterial; break;
+                case 'platform':
+                    geometry = new THREE.BoxGeometry(size*8, size*0.5, size*8);
+                    shape = new CANNON.Box(new CANNON.Vec3(size*4, size*0.25, size*4));
+                    mass = 800; material = new THREE.MeshStandardMaterial({ color: 0x444444 }); cMat = physicsMaterial; break;
             }
 
             const mesh = new THREE.Mesh(geometry, material);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
+            mesh.castShadow = true; mesh.receiveShadow = true;
             scene.add(mesh);
 
-            const body = new CANNON.Body({ mass: mass, material: physicsMaterial });
+            const body = new CANNON.Body({ mass: isHost ? mass : 0, material: cMat }); // Cliente usa masa 0 para que el host controle todo
             body.addShape(shape);
-            body.position.copy(spawnPos);
+            if (type === 'ramp' || type === 'cylinder') {
+                 // Corregir orientación del cilindro de Cannon vs Three
+                 const q = new CANNON.Quaternion();
+                 q.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
+                 body.quaternion.copy(q);
+            }
+            
+            body.position.copy(posVec);
+            if (quatVec) body.quaternion.copy(quatVec);
             world.addBody(body);
 
-            // Usamos mesh normal (no InstancedMesh) porque cada objeto necesita su propio Rigidbody independiente
-            // para que las restricciones (Weld, Physgun) funcionen correctamente en Cannon-es.
-            objectsToSync.push({ mesh, body });
-            
-            // Cerrar menú si está abierto
+            objectsToSync.push({ netId, propType: type, mesh, body, forceSync: true });
+        }
+
+        // Llamado por el UI del jugador local
+        function requestSpawn(type) {
+            logConsole(`Solicitando spawn: ${type}`);
+            const spawnPos = new THREE.Vector3(0, 0, -5);
+            spawnPos.applyQuaternion(camera.quaternion);
+            spawnPos.add(controls.getObject().position);
+            spawnPos.y += 2; // Spawn un poco más alto
+
+            const payload = { propType: type, position: spawnPos, quaternion: new THREE.Quaternion(), velocity: {x:0, y:0, z:0} };
+
+            if (isHost) {
+                spawnPropAuthoritative(payload.propType, payload.position, payload.quaternion, payload.velocity);
+            } else if (connections.length > 0) {
+                connections[0].send({ type: 'spawn_prop', payload: payload });
+            }
             toggleQMenu(false);
         }
 
-        // --- LÓGICA DE HERRAMIENTAS (Physgun / Weld) ---
-        function onMouseDown(event) {
-            if (!controls.isLocked) return;
-            if (event.button !== 0 && event.button !== 2) return; // Solo clic izq (0) o der (2)
-
-            // Raycast desde el centro de la cámara
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        /* ======================================================================
+           SISTEMA DE ARMAS Y COMBATE
+           ====================================================================== */
+        function equipWeapon(weaponId) {
+            currentTool = weaponId;
+            const wInfo = weapons[weaponId];
+            document.getElementById('weapon-name').innerText = wInfo.name;
+            document.getElementById('ammo-info').innerText = `${wInfo.ammo} / ${wInfo.maxAmmo}`;
+            logConsole(`Equipado: ${wInfo.name}`);
             
-            // Extraer meshes de la lista de sincronización
+            // Limpiar estados de herramientas viejas
+            weldFirstBody = null;
+            if (isManipulating) stopManipulation();
+        }
+
+        function fireWeapon() {
+            const now = performance.now() / 1000;
+            const weapon = weapons[currentTool];
+            
+            if (now - lastFireTime < weapon.cooldown) return;
+            if (weapon.ammo !== "∞" && weapon.ammo <= 0) {
+                logConsole("*Click* Sin munición.");
+                return; // Falta recarga, pero para el prototipo lo dejamos así o munición infinita
+            }
+            
+            lastFireTime = now;
+            
+            if (weapon.ammo !== "∞") {
+                weapon.ammo--;
+                document.getElementById('ammo-info').innerText = `${weapon.ammo} / ${weapon.maxAmmo}`;
+            }
+
+            // Aplicar retroceso visual básico a la cámara
+            camera.rotation.x += 0.05;
+
+            const camPos = controls.getObject().position;
+            const camDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+
+            if (weapon.type === "shotgun") {
+                for (let i = 0; i < weapon.pellets; i++) {
+                    const spreadDir = camDir.clone();
+                    spreadDir.x += (Math.random() - 0.5) * weapon.spread;
+                    spreadDir.y += (Math.random() - 0.5) * weapon.spread;
+                    spreadDir.z += (Math.random() - 0.5) * weapon.spread;
+                    spreadDir.normalize();
+                    performHitscan(camPos, spreadDir, weapon.range, weapon.damage);
+                }
+            } else if (weapon.type === "hitscan" || weapon.type === "melee") {
+                performHitscan(camPos, camDir, weapon.range, weapon.damage);
+            }
+        }
+
+        function performHitscan(origin, direction, maxDistance, damage) {
+            raycaster.set(origin, direction);
+            
+            // Construir lista de todos los meshes interceptables (Props + Zombies)
+            const meshes = objectsToSync.map(o => o.mesh);
+            zombies.forEach(z => meshes.push(z.mesh));
+            
+            const intersects = raycaster.intersectObjects(meshes, false);
+            const endPoint = origin.clone().add(direction.clone().multiplyScalar(maxDistance));
+            let hitPoint = endPoint;
+            let hitZombieId = null;
+
+            if (intersects.length > 0 && intersects[0].distance <= maxDistance) {
+                hitPoint = intersects[0].point;
+                const hitMesh = intersects[0].object;
+                
+                // Verificar si golpeamos un zombie
+                const zombieHit = zombies.find(z => z.mesh === hitMesh);
+                if (zombieHit) {
+                    hitZombieId = zombieHit.id;
+                    createImpactEffect(hitPoint, 0xff0000); // Sangre
+                } else {
+                    // Golpe a un Prop
+                    createImpactEffect(hitPoint, 0xffff00); // Chispa
+                    
+                    // Aplicar impulso físico si somos host
+                    if (isHost) {
+                        const syncObj = objectsToSync.find(o => o.mesh === hitMesh);
+                        if (syncObj && syncObj.body.mass > 0) {
+                            const force = direction.clone().multiplyScalar(damage * 50);
+                            syncObj.body.applyImpulse(new CANNON.Vec3(force.x, force.y, force.z), new CANNON.Vec3(hitPoint.x, hitPoint.y, hitPoint.z));
+                            syncObj.forceSync = true;
+                        }
+                    }
+                }
+            }
+
+            // Dibujar trazadora (Visual effect) localmente y enviarla a la red
+            if (currentTool !== 'cuchillo') {
+                createGunshotEffect(origin, hitPoint);
+                const payload = { start: origin, end: hitPoint, damage: damage, hitZombieId: hitZombieId };
+                if (isHost) broadcast('shoot_event', payload);
+                else if (connections.length > 0) connections[0].send({ type: 'shoot_event', payload: payload });
+                
+                // Si somos host y golpeamos un zombie, aplicar daño directo
+                if (isHost && hitZombieId !== null) {
+                    damageZombie(hitZombieId, damage);
+                }
+            } else if (hitZombieId !== null && isHost) {
+                 damageZombie(hitZombieId, damage); // Cuchillazo silencioso
+            }
+        }
+
+        // Efecto visual temporal para la bala
+        function createGunshotEffect(start, end) {
+            const material = new THREE.LineBasicMaterial({ color: 0xffffaa, transparent: true, opacity: 0.8 });
+            const points = [start, end];
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geometry, material);
+            scene.add(line);
+            
+            // Eliminar después de 50ms
+            setTimeout(() => { scene.remove(line); geometry.dispose(); material.dispose(); }, 50);
+        }
+
+        function createImpactEffect(pos, colorHex) {
+            const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(pos);
+            scene.add(mesh);
+            setTimeout(() => { scene.remove(mesh); geo.dispose(); mat.dispose(); }, 150);
+        }
+
+        /* ======================================================================
+           SISTEMA DE ZOMBIES Y OLEADAS (Manejado por el Host)
+           ====================================================================== */
+        function startWaveSurvival() {
+            if (!isHost) return;
+            currentWave = 1;
+            waveActive = true;
+            initWave();
+            toggleQMenu(false);
+            logConsole("¡Muerte Inminente! Olas iniciadas.");
+        }
+
+        function initWave() {
+            zombiesToSpawn = currentWave * 5 + 5;
+            zombiesAlive = zombiesToSpawn;
+            nextSpawnTime = performance.now() + 2000;
+            updateWaveUI(currentWave, zombiesAlive);
+            broadcast('wave_state', { wave: currentWave, alive: zombiesAlive });
+        }
+
+        function spawnZombie() {
+            const id = ++zombieIdCounter;
+            
+            // Render
+            const geo = new THREE.CapsuleGeometry(1, 3, 4, 8);
+            const mesh = new THREE.Mesh(geo, zombieMaterial);
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            // Física (Cilindro es mejor para caminar)
+            const shape = new CANNON.Cylinder(1, 1, 3, 8);
+            const body = new CANNON.Body({ mass: 60, material: playerMaterial });
+            // Generar posición aleatoria en el borde del mapa
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 150 + Math.random() * 50;
+            body.position.set(Math.cos(angle) * dist, 5, Math.sin(angle) * dist);
+            
+            // Corregir rotación del cilindro de Cannon
+            const q = new CANNON.Quaternion();
+            q.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
+            body.addShape(shape, new CANNON.Vec3(0,0,0), q);
+            
+            body.fixedRotation = true;
+            body.updateMassProperties();
+            world.addBody(body);
+
+            zombies.push({ id, mesh, body, health: 100 + (currentWave * 10), speed: 8 + (currentWave * 0.5) });
+            zombiesToSpawn--;
+        }
+
+        function damageZombie(id, amount) {
+            const index = zombies.findIndex(z => z.id === id);
+            if (index !== -1) {
+                const z = zombies[index];
+                z.health -= amount;
+                
+                // Efecto de empuje
+                const dir = new CANNON.Vec3(z.body.position.x - playerBody.position.x, 0, z.body.position.z - playerBody.position.z);
+                dir.normalize();
+                z.body.velocity.x += dir.x * 5;
+                z.body.velocity.z += dir.z * 5;
+
+                if (z.health <= 0) {
+                    // Muerte del zombie
+                    world.removeBody(z.body);
+                    scene.remove(z.mesh);
+                    z.mesh.geometry.dispose();
+                    zombies.splice(index, 1);
+                    zombiesAlive--;
+                    
+                    updateWaveUI(currentWave, zombiesAlive);
+                    broadcast('wave_state', { wave: currentWave, alive: zombiesAlive });
+
+                    if (zombiesAlive <= 0 && zombiesToSpawn <= 0) {
+                        // Fin de la ola
+                        setTimeout(() => {
+                            currentWave++;
+                            initWave();
+                        }, 5000); // 5 segundos de descanso
+                    }
+                }
+            }
+        }
+
+        function updateZombiesAI(dt) {
+            if (!isHost || zombies.length === 0) return;
+
+            zombies.forEach(z => {
+                // Encontrar el objetivo más cercano (Host o Clientes)
+                let minTargetDist = Infinity;
+                let targetPos = playerBody.position; // Por defecto el Host
+
+                // Revisar distancia al host
+                const hostDist = z.body.position.distanceTo(playerBody.position);
+                minTargetDist = hostDist;
+
+                // Revisar distancia a clientes
+                for (const peerId in networkPlayers) {
+                    const cPos = networkPlayers[peerId].targetPos;
+                    // Conversión simple a CANNON.Vec3 para la distancia
+                    const vPos = new CANNON.Vec3(cPos.x, cPos.y, cPos.z);
+                    const cDist = z.body.position.distanceTo(vPos);
+                    if (cDist < minTargetDist) {
+                        minTargetDist = cDist;
+                        targetPos = vPos;
+                    }
+                }
+
+                // Pathfinding básico de vector directo
+                const dir = new THREE.Vector3(targetPos.x - z.body.position.x, 0, targetPos.z - z.body.position.z);
+                const dist = dir.length();
+                
+                if (dist > 2) { // Rango de ataque
+                    dir.normalize();
+                    // Aplicar velocidad
+                    z.body.velocity.x = dir.x * z.speed;
+                    z.body.velocity.z = dir.z * z.speed;
+                    
+                    // Rotar malla para mirar al objetivo
+                    z.mesh.lookAt(targetPos.x, z.mesh.position.y, targetPos.z);
+                } else {
+                    // Está atacando
+                    z.body.velocity.x = 0;
+                    z.body.velocity.z = 0;
+                    
+                    // Daño masivo si está muy cerca (Aproximación para el prototipo)
+                    if (Math.random() < 0.1) { // 10% de probabilidad por frame de hacer daño si está pegado
+                        if (targetPos === playerBody.position) {
+                            takeDamage(10);
+                        } else {
+                            // Enviar evento de daño al cliente (no implementado en red para brevedad, asumimos Host toma el aggro principal)
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateClientZombies(zombieDataArray) {
+            // Sincronizar estado de zombies enviados por el host al cliente
+            zombieDataArray.forEach(data => {
+                let z = zombies.find(z => z.id === data.id);
+                if (!z) {
+                    // Instanciar visualmente
+                    const geo = new THREE.CapsuleGeometry(1, 3, 4, 8);
+                    const mesh = new THREE.Mesh(geo, zombieMaterial);
+                    scene.add(mesh);
+                    zombies.push({ id: data.id, mesh: mesh, health: data.hp });
+                    z = zombies[zombies.length - 1];
+                }
+                
+                // Actualizar posiciones visuales
+                z.mesh.position.set(data.px, data.py, data.pz);
+                z.mesh.quaternion.set(data.rx, data.ry, data.rz, data.rw);
+                z.health = data.hp;
+            });
+
+            // Eliminar zombies que el host ya no reporta
+            for (let i = zombies.length - 1; i >= 0; i--) {
+                if (!zombieDataArray.find(d => d.id === zombies[i].id)) {
+                    scene.remove(zombies[i].mesh);
+                    zombies[i].mesh.geometry.dispose();
+                    zombies.splice(i, 1);
+                }
+            }
+        }
+
+        function updateWaveUI(wave, alive) {
+            const waveUI = document.getElementById('wave-info');
+            waveUI.style.display = 'block';
+            document.getElementById('wave-number').innerText = `OLEADA ${wave}`;
+            document.getElementById('zombies-alive').innerText = `Zombies restantes: ${alive}`;
+        }
+
+        function takeDamage(amount) {
+            if (isDead) return;
+            playerHealth -= amount;
+            document.getElementById('health-text').innerText = `${Math.max(0, playerHealth)} / 100`;
+            document.getElementById('health-bar').style.width = `${Math.max(0, playerHealth)}%`;
+            
+            // Pantallazo rojo
+            const overlay = document.getElementById('damage-overlay');
+            overlay.style.opacity = 1;
+            setTimeout(() => { overlay.style.opacity = 0; }, 200);
+
+            if (playerHealth <= 0) {
+                die();
+            }
+        }
+
+        function die() {
+            isDead = true;
+            controls.unlock();
+            document.getElementById('death-screen').style.display = 'flex';
+            playerBody.mass = 0; // Detener físicas
+        }
+
+        /* ======================================================================
+           HERRAMIENTAS E INTERACCIÓN (PHYSGUN Y WELD)
+           ====================================================================== */
+        function onMouseDown(event) {
+            if (!controls.isLocked || isDead) return;
+            
+            if (['cuchillo', 'pistola', 'escopeta'].includes(currentTool)) {
+                if (event.button === 0) fireWeapon();
+                return;
+            }
+
+            if (event.button !== 0 && event.button !== 2) return;
+
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             const intersectableMeshes = objectsToSync.map(obj => obj.mesh);
             const intersects = raycaster.intersectObjects(intersectableMeshes);
 
@@ -323,33 +1077,44 @@
                     const body = syncObj.body;
 
                     if (currentTool === 'physgun') {
+                        // IMPORTANTE: En P2P, modificar objetos de otros es complejo. 
+                        // Para este engine, permitiremos que solo el Host manipule libremente todo con físicas perfectas,
+                        // o delegamos comandos al servidor si somos cliente.
+                        if (!isHost) {
+                            logConsole("Solo el Host puede usar la Physgun por ahora (Físicas Autoridad).");
+                            return;
+                        }
+
                         if (event.button === 0) {
-                            // Clic Izquierdo: Agarrar (Descongelar si estaba congelado)
-                            if (body.mass === 0) {
-                                body.mass = body.originalMass || 10;
+                            if (body.mass === 0) { // Descongelar
+                                body.mass = body.originalMass || 50;
                                 body.type = CANNON.Body.DYNAMIC;
                                 body.updateMassProperties();
                                 body.wakeUp();
                             }
-                            startManipulation(body, intersects[0].point);
+                            startManipulation(body, intersects[0].point, syncObj);
                         } else if (event.button === 2) {
-                            // Clic Derecho: Congelar (Freeze)
+                            // Congelar
                             body.originalMass = body.mass;
                             body.mass = 0;
                             body.type = CANNON.Body.STATIC;
                             body.updateMassProperties();
                             body.velocity.set(0,0,0);
                             body.angularVelocity.set(0,0,0);
-                            logConsole(`Objeto congelado (Freeze)`);
+                            syncObj.forceSync = true;
+                            logConsole(`Objeto Congelado`);
                         }
                     } else if (currentTool === 'weld') {
+                        if (!isHost) { logConsole("Solo Host puede hacer Weld."); return; }
                         if (event.button === 0) {
                             if (!weldFirstBody) {
                                 weldFirstBody = body;
                                 logConsole("Weld: Selecciona el segundo objeto...");
                             } else {
                                 if (weldFirstBody !== body) {
-                                    createWeldConstraint(weldFirstBody, body);
+                                    const constraint = new CANNON.LockConstraint(weldFirstBody, body);
+                                    world.addConstraint(constraint);
+                                    logConsole("Objetos Soldados (Weld).");
                                     weldFirstBody = null;
                                 }
                             }
@@ -360,81 +1125,57 @@
         }
 
         function onMouseUp(event) {
-            if (event.button === 0 && isManipulating) {
-                stopManipulation();
-            }
+            if (event.button === 0 && isManipulating) stopManipulation();
         }
 
         function onMouseWheel(event) {
             if (isManipulating) {
-                // Acercar / Alejar objeto con la rueda
-                manipulationDistance -= Math.sign(event.deltaY) * 0.5;
-                manipulationDistance = Math.max(1, Math.min(manipulationDistance, 50));
+                manipulationDistance -= Math.sign(event.deltaY) * 1.0;
+                manipulationDistance = Math.max(2, Math.min(manipulationDistance, 80));
             }
         }
 
-        function startManipulation(body, hitPoint) {
+        function startManipulation(body, hitPoint, syncObj) {
             manipulatedBody = body;
             isManipulating = true;
-            
-            // Calcular distancia inicial
             manipulationDistance = controls.getObject().position.distanceTo(hitPoint);
-
-            // Mover el cuerpo cinemático oculto al punto de impacto
             jointBody.position.copy(hitPoint);
 
-            // Crear restricción punto a punto (PointToPointConstraint)
-            // Calculamos el punto de pivote local en el objeto agarrado
             const localPivot = new CANNON.Vec3();
             manipulatedBody.pointToLocalFrame(new CANNON.Vec3(hitPoint.x, hitPoint.y, hitPoint.z), localPivot);
 
-            jointConstraint = new CANNON.PointToPointConstraint(
-                manipulatedBody, localPivot,
-                jointBody, new CANNON.Vec3(0, 0, 0)
-            );
+            jointConstraint = new CANNON.PointToPointConstraint(manipulatedBody, localPivot, jointBody, new CANNON.Vec3(0,0,0));
             world.addConstraint(jointConstraint);
             
-            // Reducir amortiguación para que se sienta más responsivo al mover
-            manipulatedBody.linearDamping = 0.9;
-            manipulatedBody.angularDamping = 0.9;
+            manipulatedBody.linearDamping = 0.99;
+            manipulatedBody.angularDamping = 0.99;
+            syncObj.forceSync = true;
         }
 
         function stopManipulation() {
             if (!isManipulating) return;
             world.removeConstraint(jointConstraint);
             jointConstraint = null;
-            
-            // Restaurar amortiguación normal
             manipulatedBody.linearDamping = 0.01;
             manipulatedBody.angularDamping = 0.01;
-            
             manipulatedBody = null;
             isManipulating = false;
         }
 
-        function createWeldConstraint(bodyA, bodyB) {
-            // LockConstraint fija la rotación y posición relativa entre dos objetos
-            const constraint = new CANNON.LockConstraint(bodyA, bodyB);
-            world.addConstraint(constraint);
-            logConsole("Weld: Objetos soldados exitosamente.");
-        }
-
-        // --- CONTROLES Y ENTRADAS ---
+        /* ======================================================================
+           CONTROLES Y BUCLE PRINCIPAL
+           ====================================================================== */
         function onKeyDown(event) {
+            if (isDead) return;
             switch (event.code) {
                 case 'KeyW': moveData.forward = true; break;
                 case 'KeyA': moveData.left = true; break;
                 case 'KeyS': moveData.backward = true; break;
                 case 'KeyD': moveData.right = true; break;
                 case 'Space': 
-                    if (canJump && controls.isLocked) {
-                        playerBody.velocity.y = jumpForce;
-                        canJump = false;
-                    }
+                    if (canJump && controls.isLocked) { playerBody.velocity.y = jumpForce; canJump = false; }
                     break;
-                case 'KeyQ': 
-                    toggleQMenu();
-                    break;
+                case 'KeyQ': toggleQMenu(); break;
             }
         }
 
@@ -450,40 +1191,42 @@
         function toggleQMenu(forceState) {
             const menu = document.getElementById('spawn-menu');
             const isShowing = menu.style.display === 'flex';
-            
             if (forceState === false || isShowing) {
                 menu.style.display = 'none';
-                controls.lock(); // Volver al juego
+                controls.lock();
             } else if (forceState === true || !isShowing) {
                 menu.style.display = 'flex';
-                controls.unlock(); // Liberar ratón para usar el menú
-                moveData.forward = moveData.backward = moveData.left = moveData.right = false; // Detener jugador
+                controls.unlock();
+                moveData.forward = moveData.backward = moveData.left = moveData.right = false;
             }
         }
 
         function setupUI() {
-            // Botones de Spawn
-            document.getElementById('spawn-cube').onclick = () => spawnObject('cube');
-            document.getElementById('spawn-sphere').onclick = () => spawnObject('sphere');
-            document.getElementById('spawn-box').onclick = () => spawnObject('box');
+            const items = ['cube', 'box', 'sphere', 'ramp', 'cylinder', 'wall', 'platform'];
+            items.forEach(i => {
+                const el = document.getElementById(`spawn-${i}`);
+                if(el) el.onclick = () => requestSpawn(i);
+            });
 
-            // Botones de Herramientas
-            const tools = ['physgun', 'weld', 'thruster'];
-            tools.forEach(tool => {
-                document.getElementById(`tool-${tool}`).onclick = (e) => {
-                    tools.forEach(t => document.getElementById(`tool-${t}`).classList.remove('active'));
-                    e.target.classList.add('active');
-                    currentTool = tool;
-                    weldFirstBody = null; // Reset estado si cambiamos
-                    logConsole(`Herramienta equipada: ${tool.toUpperCase()}`);
-                };
+            const toolBtns = document.querySelectorAll('.tool-btn');
+            toolBtns.forEach(btn => {
+                if (btn.id === 'btn-start-wave') {
+                    btn.onclick = startWaveSurvival;
+                } else {
+                    btn.onclick = (e) => {
+                        toolBtns.forEach(t => t.classList.remove('active'));
+                        e.target.classList.add('active');
+                        equipWeapon(btn.id.replace('tool-', ''));
+                    };
+                }
             });
         }
 
         function logConsole(msg) {
-            const consoleEl = document.getElementById('console-ui');
-            consoleEl.innerHTML += `<br>> ${msg}`;
-            consoleEl.scrollTop = consoleEl.scrollHeight;
+            const el = document.getElementById('console-ui');
+            const time = new Date().toLocaleTimeString();
+            el.innerHTML += `<br><span style="color:#aaa;">[${time}]</span> ${msg}`;
+            el.scrollTop = el.scrollHeight;
         }
 
         function onWindowResize() {
@@ -492,63 +1235,82 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // --- BUCLE PRINCIPAL (RENDER Y FÍSICAS) ---
         function animate() {
             requestAnimationFrame(animate);
+            if (!gameActive) return;
 
             const time = performance.now();
-            const dt = (time - lastTime) / 1000;
+            const dt = Math.min((time - lastTime) / 1000, 0.1); // Limitar delta time para evitar saltos en la física
             lastTime = time;
 
-            // 1. Lógica del Jugador (Físicas aplicadas al Input)
-            if (controls.isLocked) {
-                // Obtener dirección de la cámara ignorando el eje Y
-                const cameraDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                cameraDir.y = 0;
-                cameraDir.normalize();
-
-                const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-                cameraRight.y = 0;
-                cameraRight.normalize();
+            // 1. Input del Jugador
+            if (controls.isLocked && !isDead) {
+                const camDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); camDir.y = 0; camDir.normalize();
+                const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion); camRight.y = 0; camRight.normalize();
 
                 const velocity = new THREE.Vector3();
-                if (moveData.forward) velocity.add(cameraDir);
-                if (moveData.backward) velocity.sub(cameraDir);
-                if (moveData.right) velocity.add(cameraRight);
-                if (moveData.left) velocity.sub(cameraRight);
+                if (moveData.forward) velocity.add(camDir);
+                if (moveData.backward) velocity.sub(camDir);
+                if (moveData.right) velocity.add(camRight);
+                if (moveData.left) velocity.sub(camRight);
 
                 velocity.normalize().multiplyScalar(playerSpeed);
                 
-                // Aplicar velocidad al cuerpo de Cannon, manteniendo la velocidad en Y (gravedad/salto)
+                // Aplicar velocidad horizontal a Cannon
                 playerBody.velocity.x = velocity.x;
                 playerBody.velocity.z = velocity.z;
 
-                // Sincronizar Cámara con el cuerpo físico (añadiendo altura de los ojos)
                 controls.getObject().position.copy(playerBody.position);
-                controls.getObject().position.y += 1.5; // Altura de la vista
+                controls.getObject().position.y += 1.8; // Altura de los ojos
             }
 
-            // 2. Lógica de la Physgun (Actualizar posición del joint)
+            // 2. Lógica Physgun
             if (isManipulating && controls.isLocked) {
-                // Calcular posición objetivo basada en la cámara y la distancia de manipulación
                 const targetPos = new THREE.Vector3(0, 0, -manipulationDistance);
                 targetPos.applyQuaternion(camera.quaternion);
                 targetPos.add(controls.getObject().position);
-                
-                // Mover el cuerpo cinemático oculto a esa posición
                 jointBody.position.copy(targetPos);
+                
+                // Forzar sincronización en red mientras manipulamos
+                const syncObj = objectsToSync.find(o => o.body === manipulatedBody);
+                if (syncObj) syncObj.forceSync = true;
             }
 
-            // 3. Avanzar simulación de físicas
+            // 3. Lógica Host: Zombies y Spawn
+            if (isHost) {
+                if (waveActive && zombiesToSpawn > 0 && time > nextSpawnTime) {
+                    spawnZombie();
+                    nextSpawnTime = time + 1500; // Spawn cada 1.5s
+                }
+                updateZombiesAI(dt);
+            }
+
+            // Interpolación de jugadores en red (Clientes)
+            for (const peerId in networkPlayers) {
+                const p = networkPlayers[peerId];
+                p.mesh.position.lerp(p.targetPos, 0.3);
+                p.mesh.quaternion.slerp(p.targetQuat, 0.3);
+            }
+
+            // 4. Paso de Físicas
             world.step(1 / 60, dt, 3);
 
-            // 4. Sincronizar Físicas -> Three.js (Render)
+            // 5. Sincronización visual
             for (let i = 0; i < objectsToSync.length; i++) {
                 objectsToSync[i].mesh.position.copy(objectsToSync[i].body.position);
                 objectsToSync[i].mesh.quaternion.copy(objectsToSync[i].body.quaternion);
             }
+            if (isHost) {
+                for (let i = 0; i < zombies.length; i++) {
+                    zombies[i].mesh.position.copy(zombies[i].body.position);
+                    // Solo rotamos visualmente en Y para que no se incline el modelo
+                }
+            }
 
-            // Renderizar y actualizar stats
+            // 6. Enviar datos de red
+            networkTick();
+
+            // 7. Render
             renderer.render(scene, camera);
             stats.update();
         }
