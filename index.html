@@ -2,70 +2,61 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Gmod HTML5 - Ultimate Edition</title>
+    <title>Gmod Web Pro: Source Edition</title>
     <style>
-        :root { --source-orange: #ffb400; --ui-bg: rgba(20, 20, 20, 0.85); }
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Tahoma', sans-serif; cursor: crosshair; }
+        :root { --hl2-orange: #ff9d00; --hl2-bg: rgba(0, 0, 0, 0.6); }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Verdana', sans-serif; }
         
-        /* HUD & UI */
-        #gui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .hud-vitals { position: absolute; bottom: 30px; left: 30px; color: var(--source-orange); font-size: 32px; font-weight: bold; text-shadow: 2px 2px #000; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); }
+        /* HUD ESTILO HALF-LIFE 2 */
+        #hud { position: absolute; bottom: 30px; left: 30px; display: flex; gap: 40px; pointer-events: none; }
+        .stat { color: var(--hl2-orange); font-size: 42px; font-weight: bold; text-shadow: 3px 3px 0px rgba(0,0,0,0.8); }
+        .stat-label { font-size: 14px; display: block; }
         
-        /* Spawn Menu (Q) */
-        #spawn-menu { 
-            position: fixed; top: 10%; left: 10%; width: 80%; height: 80%; 
-            background: var(--ui-bg); border: 2px solid #555; display: none; 
-            pointer-events: auto; padding: 20px; color: white; overflow-y: auto;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px;
-        }
-        .prop-card { 
-            background: #333; border: 1px solid #777; padding: 10px; text-align: center; 
-            cursor: pointer; transition: 0.2s; 
-        }
-        .prop-card:hover { background: var(--source-orange); color: black; }
+        #weapon-bucket { position: absolute; bottom: 30px; right: 30px; color: var(--hl2-orange); text-align: right; }
+        #crosshair { position: fixed; top: 50%; left: 50%; width: 24px; height: 24px; border: 2px solid var(--hl2-orange); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: var(--hl2-orange); transform: translate(-50%, -50%); }
 
-        /* Tool Menu (C) */
-        #tool-menu {
-            position: fixed; right: 0; top: 0; width: 250px; height: 100%;
-            background: rgba(30, 30, 30, 0.9); border-left: 2px solid var(--source-orange);
-            color: white; padding: 20px; display: none; pointer-events: auto;
+        /* MENÚS */
+        #q-menu, #mode-menu { 
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 70vw; height: 60vh; background: var(--hl2-bg); border: 2px solid var(--hl2-orange);
+            display: none; color: white; padding: 30px; overflow-y: auto; z-index: 1000;
         }
-        .tool-btn { width: 100%; padding: 10px; margin: 5px 0; background: #444; border: none; color: white; cursor: pointer; }
-        .tool-btn.active { background: var(--source-orange); color: black; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        .btn { background: #333; padding: 15px; border: 1px solid #555; cursor: pointer; text-align: center; }
+        .btn:hover { background: var(--hl2-orange); color: black; }
 
-        #multiplayer-status { position: absolute; top: 10px; right: 10px; color: #0f0; font-family: monospace; }
+        #mode-indicator { position: absolute; top: 20px; left: 20px; color: white; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
-    <div id="gui-container">
-        <div id="crosshair"></div>
-        <div class="hud-vitals">
-            <div>+ 100</div>
-            <div style="font-size: 18px;">ARMOR 100</div>
+    <div id="crosshair"></div>
+    <div id="mode-indicator">MODE: SANDBOX</div>
+
+    <div id="hud">
+        <div class="stat"><span class="stat-label">HEALTH</span><span id="hp">100</span></div>
+        <div class="stat"><span class="stat-label">ARMOR</span><span id="ap">0</span></div>
+        <div class="stat"><span class="stat-label">AMMO</span><span>45 / 90</span></div>
+    </div>
+
+    <div id="weapon-bucket">
+        <h2 id="current-weapon">PHYSICS GUN</h2>
+        <div style="font-size: 12px;">[1] PhysGun [2] Gravity Gun [3] Crowbar [4] Pistol</div>
+    </div>
+
+    <div id="q-menu">
+        <h2>SPAWN MENU (Q)</h2>
+        <div class="grid" id="spawn-list"></div>
+    </div>
+
+    <div id="mode-menu">
+        <h2>SELECT GAMEMODE (F1)</h2>
+        <div class="grid">
+            <div class="btn" onclick="setMode('Sandbox')">SANDBOX</div>
+            <div class="btn" onclick="setMode('Combat')">COMBAT (PVP)</div>
+            <div class="btn" onclick="setMode('Zombie')">ZOMBIE SURVIVAL</div>
         </div>
-        <div id="multiplayer-status">MODO: SINGLEPLAYER (PeerJS ID: <span id="peer-id">Conectando...</span>)</div>
-    </div>
-
-    <div id="spawn-menu">
-        <h1 style="grid-column: 1/-1">Spawn Menu</h1>
-        <div class="prop-card" onclick="Gmod.spawn('cube')">CUBO</div>
-        <div class="prop-card" onclick="Gmod.spawn('sphere')">ESFERA</div>
-        <div class="prop-card" onclick="Gmod.spawn('cylinder')">CILINDRO</div>
-        <div class="prop-card" onclick="Gmod.spawn('wall')">MURO</div>
-        <div class="prop-card" onclick="Gmod.spawn('car')">CHASIS</div>
-    </div>
-
-    <div id="tool-menu">
-        <h3>HERRAMIENTAS</h3>
-        <button class="tool-btn active">Physics Gun</button>
-        <button class="tool-btn">Weld (Soldar)</button>
-        <button class="tool-btn">Thruster</button>
-        <button class="tool-btn">Remover</button>
-        <hr>
-        <input type="text" id="remote-id" placeholder="ID del Amigo" style="width: 100%">
-        <button class="tool-btn" onclick="Gmod.connect()">CONECTAR P2P</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -74,30 +65,26 @@
 
     <script>
     /**
-     * GMOD WEB ENGINE - CORE ARCHITECTURE
-     * Desarrollado para simular las mecánicas de Source Engine en JS.
+     * GMOD WEB - FULL SOURCE SIMULATION
      */
-    const Gmod = (() => {
-        // --- VARIABLES DE MOTOR ---
+    const Engine = (() => {
         let scene, camera, renderer, world, clock;
-        let pBodies = [], pMeshes = [];
-        let controls, moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-        let peer, connection;
-        
-        // Physics Gun Logic
-        let pickedObject = null;
-        let pickConstraint = null;
-        let pickDistance = 5;
+        let playerBody, playerMesh, controlsEnabled = false;
+        let moveF = false, moveB = false, moveL = false, moveR = false, canJump = false;
+        let physicsObjects = [], meshes = [];
+        let gameMode = 'Sandbox';
 
-        // --- INICIALIZACIÓN ---
+        // Physics Gun
+        let pickedObj = null, pickDist = 7;
+
         function init() {
+            // 1. Escena y Cielo Azul (Gmod style)
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x444466);
-            scene.fog = new THREE.Fog(0x444466, 0, 100);
+            scene.background = new THREE.Color(0x71adff); // Cielo claro
+            scene.fog = new THREE.Fog(0x71adff, 10, 200);
 
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 2, 5);
-
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.shadowMap.enabled = true;
@@ -105,207 +92,210 @@
 
             clock = new THREE.Clock();
 
-            // Mundo Físico
+            // 2. Físicas
             world = new CANNON.World();
-            world.gravity.set(0, -9.82, 0);
-            world.broadphase = new CANNON.NaiveBroadphase();
+            world.gravity.set(0, -15, 0); // Gravedad un poco más fuerte para que se sienta pesado
 
-            setupLights();
+            setupPlayer();
             setupMap();
-            setupEventListeners();
-            setupNetworking();
+            setupInput();
+            createSpawnList();
             animate();
         }
 
-        function setupLights() {
-            const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambient);
-            const sun = new THREE.DirectionalLight(0xffffff, 1);
-            sun.position.set(10, 20, 10);
-            sun.castShadow = true;
-            scene.add(sun);
+        function setupPlayer() {
+            // Cuerpo físico del jugador (un cilindro o caja)
+            const shape = new CANNON.Box(new CANNON.Vec3(0.5, 1.8, 0.5));
+            playerBody = new CANNON.Body({ mass: 80, fixedRotation: true });
+            playerBody.addShape(shape);
+            playerBody.position.set(0, 5, 0);
+            world.addBody(playerBody);
+
+            // Colisión con el suelo para saltar
+            playerBody.addEventListener("collide", (e) => {
+                if(Math.abs(e.contact.ni.y) > 0.5) canJump = true;
+            });
         }
 
         function setupMap() {
-            // Suelo Infinito
-            const groundGeo = new THREE.PlaneGeometry(200, 200);
-            const groundMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
-            const groundMesh = new THREE.Mesh(groundGeo, groundMat);
-            groundMesh.rotation.x = -Math.PI / 2;
-            groundMesh.receiveShadow = true;
-            scene.add(groundMesh);
+            // Suelo con grid
+            const floorGeo = new THREE.PlaneGeometry(500, 500);
+            const floorMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI/2;
+            floor.receiveShadow = true;
+            scene.add(floor);
 
-            const groundBody = new CANNON.Body({ mass: 0 });
-            groundBody.addShape(new CANNON.Plane());
-            groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-            world.addBody(groundBody);
+            const floorBody = new CANNON.Body({ mass: 0 });
+            floorBody.addShape(new CANNON.Plane());
+            floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
+            world.addBody(floorBody);
+
+            // Luz
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(20, 50, 10);
+            light.castShadow = true;
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
         }
 
-        // --- LÓGICA DE HERRAMIENTAS (PHYSICS GUN) ---
-        function handlePhysicsGun() {
-            if (pickedObject) {
-                // Calcular posición objetivo frente a la cámara
-                const targetPos = new THREE.Vector3(0, 0, -pickDistance);
-                targetPos.applyQuaternion(camera.quaternion);
-                targetPos.add(camera.position);
-
-                // Mover el cuerpo físico suavemente hacia el target
-                pickedObject.velocity.set(
-                    (targetPos.x - pickedObject.position.x) * 10,
-                    (targetPos.y - pickedObject.position.y) * 10,
-                    (targetPos.z - pickedObject.position.z) * 10
-                );
-            }
-        }
-
-        function raycast() {
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-            const intersects = raycaster.intersectObjects(pMeshes);
-
-            if (intersects.length > 0) {
-                const mesh = intersects[0].object;
-                const index = pMeshes.indexOf(mesh);
-                return pBodies[index];
-            }
-            return null;
-        }
-
-        // --- SISTEMA DE SPAWN ---
         function spawn(type) {
-            let shape, geo;
-            const pos = new THREE.Vector3(0, 2, -pickDistance).applyQuaternion(camera.quaternion).add(camera.position);
-
-            switch(type) {
-                case 'cube': 
-                    geo = new THREE.BoxGeometry(1, 1, 1);
-                    shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
-                    break;
-                case 'sphere':
-                    geo = new THREE.SphereGeometry(0.6, 16, 16);
-                    shape = new CANNON.Sphere(0.6);
-                    break;
-                case 'wall':
-                    geo = new THREE.BoxGeometry(4, 2, 0.2);
-                    shape = new CANNON.Box(new CANNON.Vec3(2, 1, 0.1));
-                    break;
+            let shape, geo, mass = 10;
+            if(type === 'Crate') {
+                geo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+                shape = new CANNON.Box(new CANNON.Vec3(0.75, 0.75, 0.75));
+            } else if(type === 'Barrel') {
+                geo = new THREE.CylinderGeometry(0.5, 0.5, 1.5, 12);
+                shape = new CANNON.Cylinder(0.5, 0.5, 1.5, 12);
+            } else {
+                geo = new THREE.SphereGeometry(1, 16, 16);
+                shape = new CANNON.Sphere(1);
             }
 
             const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: Math.random() * 0xffffff }));
             mesh.castShadow = true;
-            const body = new CANNON.Body({ mass: 5 });
+            const body = new CANNON.Body({ mass: mass });
             body.addShape(shape);
-            body.position.set(pos.x, pos.y, pos.z);
+
+            // Spawn frente al jugador
+            const forward = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+            body.position.set(
+                playerBody.position.x + forward.x * 5,
+                playerBody.position.y + 2,
+                playerBody.position.z + forward.z * 5
+            );
 
             world.addBody(body);
             scene.add(mesh);
-            pBodies.push(body);
-            pMeshes.push(mesh);
+            physicsObjects.push(body);
+            meshes.push(mesh);
             
-            // Cerrar menú después de spawnear
-            document.getElementById('spawn-menu').style.display = 'none';
-            renderer.domElement.requestPointerLock();
+            if(gameMode === 'Zombie') {
+                // Si es modo zombie, los objetos rojos te atacan
+                mesh.material.color.setHex(0xff0000);
+            }
         }
 
-        // --- EVENTOS ---
-        function setupEventListeners() {
-            document.addEventListener('keydown', (e) => {
-                if(e.code === 'KeyQ') {
-                    const m = document.getElementById('spawn-menu');
-                    m.style.display = (m.style.display === 'grid') ? 'none' : 'grid';
-                    if(m.style.display === 'grid') document.exitPointerLock();
+        function setupInput() {
+            document.addEventListener('keydown', e => {
+                if(e.code === 'KeyQ') toggleUI('q-menu');
+                if(e.code === 'F1') toggleUI('mode-menu');
+                if(e.code === 'KeyW') moveF = true;
+                if(e.code === 'KeyS') moveB = true;
+                if(e.code === 'KeyA') moveL = true;
+                if(e.code === 'KeyD') moveR = true;
+                if(e.code === 'Space' && canJump) {
+                    playerBody.velocity.y = 8;
+                    canJump = false;
                 }
-                if(e.code === 'KeyC') {
-                    const t = document.getElementById('tool-menu');
-                    t.style.display = (t.style.display === 'block') ? 'none' : 'block';
+            });
+            document.addEventListener('keyup', e => {
+                if(e.code === 'KeyW') moveF = false;
+                if(e.code === 'KeyS') moveB = false;
+                if(e.code === 'KeyA') moveL = false;
+                if(e.code === 'KeyD') moveR = false;
+            });
+            
+            renderer.domElement.addEventListener('mousedown', () => {
+                if(!controlsEnabled) {
+                    renderer.domElement.requestPointerLock();
+                } else {
+                    // Acción de arma (PhysGun)
+                    pickedObj = raycast();
                 }
-                if(e.code === 'KeyW') moveForward = true;
-                if(e.code === 'KeyS') moveBackward = true;
-                if(e.code === 'KeyA') moveLeft = true;
-                if(e.code === 'KeyD') moveRight = true;
             });
-
-            document.addEventListener('keyup', (e) => {
-                if(e.code === 'KeyW') moveForward = false;
-                if(e.code === 'KeyS') moveBackward = false;
-                if(e.code === 'KeyA') moveLeft = false;
-                if(e.code === 'KeyD') moveRight = false;
-            });
-
-            document.addEventListener('mousedown', (e) => {
-                if(e.button === 0) pickedObject = raycast(); // Left click pick
-            });
-
-            document.addEventListener('mouseup', () => pickedObject = null);
-
+            document.addEventListener('mouseup', () => pickedObj = null);
+            
             document.addEventListener('mousemove', (e) => {
                 if(document.pointerLockElement === renderer.domElement) {
                     camera.rotation.y -= e.movementX * 0.002;
                     camera.rotation.x -= e.movementY * 0.002;
-                    camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+                    camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x));
                 }
             });
 
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
+            document.addEventListener('pointerlockchange', () => {
+                controlsEnabled = document.pointerLockElement === renderer.domElement;
             });
         }
 
-        // --- MULTIPLAYER (PEERJS) ---
-        function setupNetworking() {
-            peer = new Peer();
-            peer.on('open', id => document.getElementById('peer-id').innerText = id);
-            peer.on('connection', conn => {
-                connection = conn;
-                setupDataHandler();
-            });
+        function raycast() {
+            const ray = new THREE.Raycaster();
+            ray.setFromCamera(new THREE.Vector2(0,0), camera);
+            const intersects = ray.intersectObjects(meshes);
+            if(intersects.length > 0) {
+                return physicsObjects[meshes.indexOf(intersects[0].object)];
+            }
+            return null;
         }
 
-        function connect() {
-            const id = document.getElementById('remote-id').value;
-            connection = peer.connect(id);
-            setupDataHandler();
+        function toggleUI(id) {
+            const el = document.getElementById(id);
+            const isOpen = el.style.display === 'block';
+            el.style.display = isOpen ? 'none' : 'block';
+            if(!isOpen) document.exitPointerLock();
         }
 
-        function setupDataHandler() {
-            connection.on('data', data => {
-                // Aquí se manejarían los paquetes de posición de otros jugadores
-                console.log("Datos recibidos:", data);
-            });
-        }
-
-        // --- LOOP PRINCIPAL ---
         function animate() {
             requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-
+            const dt = clock.getDelta();
             world.step(1/60);
-            handlePhysicsGun();
 
-            // Sync Meshes
-            for(let i=0; i<pBodies.length; i++) {
-                pMeshes[i].position.copy(pBodies[i].position);
-                pMeshes[i].quaternion.copy(pBodies[i].quaternion);
+            // 1. Movimiento del Jugador
+            const speed = 15;
+            const inputDir = new THREE.Vector3();
+            if(moveF) inputDir.z -= 1;
+            if(moveB) inputDir.z += 1;
+            if(moveL) inputDir.x -= 1;
+            if(moveR) inputDir.x += 1;
+            inputDir.normalize();
+
+            const vel = new THREE.Vector3(inputDir.x * speed, playerBody.velocity.y, inputDir.z * speed);
+            vel.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new CANNON.Vec3(0,1,0), camera.rotation.y));
+            playerBody.velocity.set(vel.x, vel.y, vel.z);
+
+            // Sincronizar Cámara con Jugador
+            camera.position.set(playerBody.position.x, playerBody.position.y + 0.8, playerBody.position.z);
+
+            // 2. Physics Gun
+            if(pickedObj) {
+                const target = new THREE.Vector3(0,0, -pickDist).applyQuaternion(camera.quaternion).add(camera.position);
+                pickedObj.position.lerp(new CANNON.Vec3(target.x, target.y, target.z), 0.2, pickedObj.position);
+                pickedObj.velocity.set(0,0,0);
             }
 
-            // Player Movement
-            if(document.pointerLockElement === renderer.domElement) {
-                const speed = 10 * delta;
-                if(moveForward) camera.translateZ(-speed);
-                if(moveBackward) camera.translateZ(speed);
-                if(moveLeft) camera.translateX(-speed);
-                if(moveRight) camera.translateX(speed);
+            // 3. Sincronizar Objetos
+            for(let i=0; i<physicsObjects.length; i++) {
+                meshes[i].position.copy(physicsObjects[i].position);
+                meshes[i].quaternion.copy(physicsObjects[i].quaternion);
             }
 
             renderer.render(scene, camera);
         }
 
-        return { init, spawn, connect };
+        function createSpawnList() {
+            const list = ['Crate', 'Barrel', 'Sphere', 'Npc_Zombie'];
+            const container = document.getElementById('spawn-list');
+            list.forEach(item => {
+                const b = document.createElement('div');
+                b.className = 'btn';
+                b.innerText = item;
+                b.onclick = () => { spawn(item); toggleUI('q-menu'); };
+                container.appendChild(b);
+            });
+        }
+
+        window.setMode = (m) => {
+            gameMode = m;
+            document.getElementById('mode-indicator').innerText = "MODE: " + m.toUpperCase();
+            toggleUI('mode-menu');
+            if(m === 'Zombie') alert("¡Cuidado! Los objetos ahora son hostiles.");
+        };
+
+        return { init, spawn };
     })();
 
-    Gmod.init();
+    Engine.init();
     </script>
 </body>
 </html>
