@@ -2,39 +2,26 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Ultimate JS Minecraft P2P</title>
+    <title>Minecraft JS - Colisiones y Construcción Total</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; }
+        body { margin: 0; overflow: hidden; font-family: 'Courier New', monospace; background: #87CEEB; }
         #crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; border: 2px solid white; transform: translate(-50%, -50%); pointer-events: none; mix-blend-mode: difference; z-index: 10; }
-        #ui-container { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        #hotbar { display: flex; background: rgba(0,0,0,0.8); padding: 6px; border: 4px solid #333; border-radius: 4px; }
-        .slot { width: 50px; height: 50px; border: 4px solid #888; margin: 0 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #555; color: white; position: relative; }
-        .slot.selected { border-color: #ffffff; background: #777; box-shadow: 0 0 15px rgba(255,255,255,0.3); }
-        .count { position: absolute; bottom: 2px; right: 5px; font-size: 14px; color: #ffeb3b; font-weight: bold; text-shadow: 1px 1px #000; }
-        .icon { font-size: 20px; }
-        #p2p-panel { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.85); color: #00ff00; padding: 12px; border: 2px solid #444; border-radius: 8px; font-size: 12px; }
-        input { background: #222; border: 1px solid #555; color: white; padding: 4px; margin-top: 5px; width: 100px; }
-        button { cursor: pointer; background: #444; color: white; border: none; padding: 4px 8px; transition: 0.2s; }
-        button:hover { background: #666; }
+        #ui { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; background: rgba(0,0,0,0.7); padding: 8px; border: 4px solid #333; gap: 10px; }
+        .slot { width: 50px; height: 50px; border: 3px solid #888; background: #555; display: flex; justify-content: center; align-items: center; color: white; position: relative; }
+        .slot.selected { border-color: white; background: #777; }
+        .count { position: absolute; bottom: 2px; right: 5px; font-size: 12px; color: yellow; }
+        #debug { position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 5px; font-size: 12px; }
     </style>
 </head>
 <body>
 
 <div id="crosshair"></div>
-<div id="p2p-panel">
-    <b>MULTI JUGADOR P2P</b><br>
-    Tu ID: <span id="my-id" style="color:white">Conectando...</span><br>
-    <input id="peer-id" placeholder="ID del amigo">
-    <button onclick="connectToPeer()">CONECTAR</button>
-</div>
-
-<div id="ui-container">
-    <div id="hotbar">
-        <div class="slot selected" id="slot-1"><span class="icon">🌿</span><div class="count" id="cnt-1">0</div></div>
-        <div class="slot" id="slot-2"><span class="icon">🟫</span><div class="count" id="cnt-2">0</div></div>
-        <div class="slot" id="slot-3"><span class="icon">🧱</span><div class="count" id="cnt-3">0</div></div>
-    </div>
+<div id="debug">WASD: Mover | CLICK: Romper | R-CLICK: Poner | 1-3: Bloques</div>
+<div id="ui">
+    <div class="slot selected" id="slot-1">🌿<div class="count" id="cnt-1">0</div></div>
+    <div class="slot" id="slot-2">🟫<div class="count" id="cnt-2">0</div></div>
+    <div class="slot" id="slot-3">🧱<div class="count" id="cnt-3">0</div></div>
 </div>
 
 <script type="importmap">
@@ -44,52 +31,44 @@
 <script type="module">
 import * as THREE from 'three';
 
-// --- CONFIGURACIÓN ---
+// --- CONFIG ---
 const CHUNK_SIZE = 16;
 const WORLD = new Map();
 let selectedSlot = 1;
-const inventory = { 1: 0, 2: 0, 3: 0 };
+const inventory = { 1: 5, 2: 5, 3: 5 }; // Iniciamos con 5 de cada para probar
 let velocity = new THREE.Vector3();
-let canJump = false;
+let playerPos = new THREE.Vector3(8, 10, 8);
 
-// --- ESCENA E ILUMINACIÓN ---
+// --- MOTOR ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
-scene.fog = new THREE.Fog(0x87CEEB, 20, 50);
-
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: false });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
 document.body.appendChild(renderer.domElement);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
-scene.add(ambientLight);
-const sunLight = new THREE.DirectionalLight(0xffffff, 0.5);
-sunLight.position.set(10, 20, 10);
-scene.add(sunLight);
+const light = new THREE.AmbientLight(0xffffff, 1);
+scene.add(light);
 
-// --- SELECCIONADOR DE BLOQUE (HIGHLIGHT) ---
-const highlightGeo = new THREE.BoxGeometry(1.02, 1.02, 1.02);
-const highlightMat = new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true, transparent: true, opacity: 0.5 });
-const blockHighlight = new THREE.Mesh(highlightGeo, highlightMat);
-scene.add(blockHighlight);
-
-// --- MATERIALES Y TEXTURAS ---
-function createBlockMat(color) {
+// Materiales
+function createTex(color) {
     const canvas = document.createElement('canvas');
     canvas.width = 16; canvas.height = 16;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = color; ctx.fillRect(0,0,16,16);
-    ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.strokeRect(0,0,16,16);
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.strokeRect(0,0,16,16);
     const t = new THREE.CanvasTexture(canvas);
     t.magFilter = THREE.NearestFilter;
     return new THREE.MeshLambertMaterial({ map: t });
 }
-const mats = [null, createBlockMat('#5da437'), createBlockMat('#79553a'), createBlockMat('#828282')];
+const mats = [null, createTex('#5da437'), createTex('#79553a'), createTex('#828282')];
 const boxGeo = new THREE.BoxGeometry(1, 1, 1);
 
-// --- LÓGICA DE MUNDO ---
+// Highlight
+const highlight = new THREE.Mesh(new THREE.BoxGeometry(1.01, 1.01, 1.01), new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: true}));
+scene.add(highlight);
+
+// --- LÓGICA DE COLISIONES Y MUNDO ---
 function getVoxel(x, y, z) {
     const cx = Math.floor(x / CHUNK_SIZE);
     const cz = Math.floor(z / CHUNK_SIZE);
@@ -98,6 +77,7 @@ function getVoxel(x, y, z) {
     const lx = Math.floor(x) - cx * CHUNK_SIZE;
     const ly = Math.floor(y);
     const lz = Math.floor(z) - cz * CHUNK_SIZE;
+    if (ly < 0 || ly >= 16) return 0;
     return chunk.data[lx + ly*CHUNK_SIZE + lz*CHUNK_SIZE*16] || 0;
 }
 
@@ -113,22 +93,20 @@ function setVoxel(x, y, z, type) {
     const lz = Math.floor(z) - cz * CHUNK_SIZE;
     const idx = lx + ly*CHUNK_SIZE + lz*CHUNK_SIZE*16;
 
-    if (type === 0) { // Romper
-        const old = chunk.data[idx];
-        if (old > 0) { inventory[old]++; updateUI(); }
-    }
-    
+    if (type === 0 && chunk.data[idx] > 0) inventory[chunk.data[idx]]++;
     chunk.data[idx] = type;
+
     const blockName = `b_${Math.floor(x)}_${ly}_${Math.floor(z)}`;
-    const existing = chunk.mesh.getObjectByName(blockName);
-    if (existing) chunk.mesh.remove(existing);
+    const old = chunk.mesh.getObjectByName(blockName);
+    if (old) chunk.mesh.remove(old);
 
     if (type > 0) {
         const cube = new THREE.Mesh(boxGeo, mats[type]);
-        cube.position.set(Math.floor(x) + 0.5, ly + 0.5, Math.floor(z) + 0.5);
+        cube.position.set(Math.floor(x)+0.5, ly+0.5, Math.floor(z)+0.5);
         cube.name = blockName;
         chunk.mesh.add(cube);
     }
+    updateUI();
 }
 
 class Chunk {
@@ -142,15 +120,64 @@ class Chunk {
                 const type = y === 3 ? 1 : 2;
                 this.data[i] = type;
                 const cube = new THREE.Mesh(boxGeo, mats[type]);
-                cube.position.set(cx * CHUNK_SIZE + x + 0.5, y + 0.5, cz * CHUNK_SIZE + z + 0.5);
-                cube.name = `b_${cx * CHUNK_SIZE + x}_${y}_${cz * CHUNK_SIZE + z}`;
+                cube.position.set(cx*CHUNK_SIZE+x+0.5, y+0.5, cz*CHUNK_SIZE+z+0.5);
+                cube.name = `b_${cx*CHUNK_SIZE+x}_${y}_${cz*CHUNK_SIZE+z}`;
                 this.mesh.add(cube);
             }
         }
     }
 }
 
-// --- CONTROLES E INTERACCIÓN ---
+// --- FÍSICAS DE COLISIÓN ---
+function checkCollision(pos) {
+    // Revisar caja de colisión simple alrededor de la posición
+    const playerRadius = 0.3;
+    for(let x = -playerRadius; x <= playerRadius; x += playerRadius*2) {
+        for(let z = -playerRadius; z <= playerRadius; z += playerRadius*2) {
+            for(let y = -1.5; y <= 0.1; y += 0.8) {
+                if (getVoxel(pos.x + x, pos.y + y, pos.z + z) > 0) return true;
+            }
+        }
+    }
+    return false;
+}
+
+// --- INTERACCIÓN ---
+window.addEventListener('mousedown', (e) => {
+    if (document.pointerLockElement !== renderer.domElement) {
+        renderer.domElement.requestPointerLock();
+        return;
+    }
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(0,0), camera);
+    const intersects = ray.intersectObjects(scene.children, true);
+    
+    // Filtrar para no chocar con el propio highlight
+    const hit = intersects.find(i => i.object !== highlight);
+
+    if (hit) {
+        const pos = hit.point.clone();
+        if (e.button === 0) { // Romper
+            pos.add(hit.face.normal.clone().multiplyScalar(-0.1));
+            setVoxel(pos.x, pos.y, pos.z, 0);
+        } else if (e.button === 2 && inventory[selectedSlot] > 0) { // Poner
+            pos.add(hit.face.normal.clone().multiplyScalar(0.1));
+            // No poner bloque si el jugador está ahí
+            if (Math.abs(pos.x - camera.position.x) > 0.6 || Math.abs(pos.z - camera.position.z) > 0.6) {
+                setVoxel(pos.x, pos.y, pos.z, selectedSlot);
+                inventory[selectedSlot]--;
+                updateUI();
+            }
+        }
+    }
+});
+
+function updateUI() {
+    for(let i=1; i<=3; i++) document.getElementById('cnt-'+i).innerText = inventory[i];
+}
+
+// --- BUCLE ---
+camera.position.set(8, 10, 8);
 const keys = {};
 document.addEventListener('keydown', e => {
     keys[e.code] = true;
@@ -162,52 +189,6 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => keys[e.code] = false);
 
-window.addEventListener('mousedown', (e) => {
-    if (document.pointerLockElement !== renderer.domElement) {
-        renderer.domElement.requestPointerLock();
-        return;
-    }
-    const ray = new THREE.Raycaster();
-    ray.setFromCamera(new THREE.Vector2(0,0), camera);
-    const intersects = ray.intersectObjects(scene.children, true);
-    if (intersects.length > 0 && intersects[0].object !== blockHighlight) {
-        const i = intersects[0];
-        const pos = i.point.clone();
-        if (e.button === 0) { // Romper
-            pos.add(i.face.normal.clone().multiplyScalar(-0.5));
-            setVoxel(pos.x, pos.y, pos.z, 0);
-        } else if (e.button === 2 && inventory[selectedSlot] > 0) { // Colocar
-            pos.add(i.face.normal.clone().multiplyScalar(0.5));
-            setVoxel(pos.x, pos.y, pos.z, selectedSlot);
-            inventory[selectedSlot]--;
-            updateUI();
-        }
-    }
-});
-
-function updateUI() {
-    for(let i=1; i<=3; i++) document.getElementById('cnt-'+i).innerText = inventory[i];
-}
-
-// --- P2P NETWORK ---
-const peer = new Peer();
-let conn;
-const others = {};
-peer.on('open', id => document.getElementById('my-id').innerText = id);
-peer.on('connection', c => { conn = c; setupConn(); });
-window.connectToPeer = () => { conn = peer.connect(document.getElementById('peer-id').value); setupConn(); };
-function setupConn() {
-    conn.on('data', data => {
-        if (!others[data.id]) {
-            others[data.id] = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.8, 0.6), new THREE.MeshLambertMaterial({color: 0xff0000}));
-            scene.add(others[data.id]);
-        }
-        others[data.id].position.set(data.x, data.y, data.z);
-    });
-}
-
-// --- BUCLE PRINCIPAL ---
-camera.position.set(8, 10, 8);
 let yaw = 0, pitch = 0;
 document.addEventListener('mousemove', e => {
     if (document.pointerLockElement === renderer.domElement) {
@@ -221,43 +202,56 @@ document.addEventListener('mousemove', e => {
 function animate() {
     requestAnimationFrame(animate);
     
-    // Gravedad y Colisión Suelo Simple
+    // Gravedad
     velocity.y -= 0.01;
-    if (getVoxel(camera.position.x, camera.position.y - 1.6, camera.position.z) > 0) {
-        velocity.y = Math.max(0, velocity.y);
-        canJump = true;
+    let nextPos = camera.position.clone();
+    nextPos.y += velocity.y;
+    
+    if (checkCollision(nextPos)) {
+        if (velocity.y < 0) velocity.y = 0; // Toca suelo
+        nextPos.y = camera.position.y;
     }
-    if (keys['Space'] && canJump) { velocity.y = 0.18; canJump = false; }
-    camera.position.y += velocity.y;
+    camera.position.y = nextPos.y;
 
-    // Movimiento
+    // Movimiento con colisión X/Z
     const move = new THREE.Vector3();
     if (keys['KeyW']) move.z -= 1; if (keys['KeyS']) move.z += 1;
     if (keys['KeyA']) move.x -= 1; if (keys['KeyD']) move.x += 1;
-    move.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), yaw));
-    camera.position.addScaledVector(move.normalize(), 0.12);
+    move.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), yaw)).normalize();
 
-    // Chunks 3x3
+    const speed = 0.1;
+    ['x', 'z'].forEach(axis => {
+        let tempPos = camera.position.clone();
+        tempPos[axis] += move[axis] * speed;
+        if (!checkCollision(tempPos)) {
+            camera.position[axis] = tempPos[axis];
+        }
+    });
+
+    if (keys['Space'] && checkCollision(camera.position.clone().add(new THREE.Vector3(0,-0.1,0)))) {
+        velocity.y = 0.15;
+    }
+
+    // Update Chunks 3x3
     const cx = Math.floor(camera.position.x / CHUNK_SIZE);
     const cz = Math.floor(camera.position.z / CHUNK_SIZE);
     for(let x=-1; x<=1; x++) for(let z=-1; z<=1; z++) {
-        const k = `${cx+x},${cz+z}`;
-        if (!WORLD.has(k)) WORLD.set(k, new Chunk(cx+x, cz+z));
+        if (!WORLD.has(`${cx+x},${cz+z}`)) WORLD.set(`${cx+x},${cz+z}`, new Chunk(cx+x, cz+z));
     }
 
-    // Raycast para el Highlight
+    // Update Highlight
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(0,0), camera);
-    const intersects = ray.intersectObjects(scene.children, true);
-    if (intersects.length > 0 && intersects[0].object !== blockHighlight) {
-        const p = intersects[0].point.clone().add(intersects[0].face.normal.clone().multiplyScalar(-0.5));
-        blockHighlight.position.set(Math.floor(p.x)+0.5, Math.floor(p.y)+0.5, Math.floor(p.z)+0.5);
-        blockHighlight.visible = true;
-    } else { blockHighlight.visible = false; }
+    const hit = ray.intersectObjects(scene.children, true).find(i => i.object !== highlight);
+    if (hit) {
+        const p = hit.point.clone().add(hit.face.normal.clone().multiplyScalar(-0.1));
+        highlight.position.set(Math.floor(p.x)+0.5, Math.floor(p.y)+0.5, Math.floor(p.z)+0.5);
+        highlight.visible = true;
+    } else { highlight.visible = false; }
 
-    if (conn && conn.open) conn.send({id: peer.id, x: camera.position.x, y: camera.position.y, z: camera.position.z});
     renderer.render(scene, camera);
 }
+updateUI();
 animate();
 </script>
 </body>
