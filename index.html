@@ -2,239 +2,172 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Pet Simulator: Loot Edition</title>
+    <title>Mini Slime Rancher 3D</title>
     <style>
-        :root { --p: #ffdf00; --bg: #1a1d24; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: #fff; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        
-        #game-container { width: 500px; border: 5px solid #333; border-radius: 15px; overflow: hidden; background: #000; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-
-        /* ESCENARIO */
-        #world { width: 100%; height: 350px; background-color: #4CAF50; position: relative; transition: background 0.5s; overflow: hidden; cursor: crosshair; }
-        
-        #hud { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 20px; font-size: 14px; border: 1px solid #555; }
-
-        /* OBJETOS DE BOTÍN */
-        .loot { position: absolute; font-size: 30px; cursor: pointer; user-select: none; z-index: 5; text-align: center; transition: transform 0.1s; }
-        .loot:active { transform: scale(0.8); }
-        .hp-bar { width: 40px; height: 6px; background: #000; border: 1px solid #fff; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); border-radius: 3px; display: none; }
-        .hp-fill { height: 100%; background: #ff4444; width: 100%; transition: width 0.2s; }
-
-        /* MASCOTAS */
-        .pet { position: absolute; font-size: 26px; transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 6; pointer-events: none; }
-
-        /* UI INFERIOR */
-        #ui-bottom { background: #222; padding: 12px; display: flex; justify-content: space-between; align-items: center; border-top: 3px solid #333; }
-        #inventory { display: flex; gap: 8px; }
-        .slot { width: 40px; height: 40px; background: #333; border: 2px solid #555; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-        
-        button { background: #4a90e2; border: none; color: white; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #357abd; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        #zone-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #333; padding: 20px; border-radius: 10px; display: none; z-index: 20; border: 2px solid #fff; width: 200px; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; text-shadow: 2px 2px 4px black; pointer-events: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); }
     </style>
 </head>
 <body>
 
-    <div id="game-container">
-        <div id="hud">💰 <span id="coin-count">0</span> | 📍 <span id="zone-name">Pradera</span></div>
-
-        <div id="world"></div>
-
-        <div id="ui-bottom">
-            <div id="inventory">
-                <div class="slot" id="s0"></div>
-                <div class="slot" id="s1"></div>
-                <div class="slot" id="s2"></div>
-                <div class="slot" id="s3"></div>
-                <div class="slot" id="s4"></div>
-            </div>
-            <div style="display: flex; gap: 5px;">
-                <button onclick="toggleMenu('zone-menu')">Mundos</button>
-                <button id="btn-buy" onclick="buyEgg()">Huevo (50 💰)</button>
-            </div>
-        </div>
-
-        <div id="zone-menu">
-            <h3 style="margin-top:0">Viajar:</h3>
-            <div id="zone-options"></div>
-            <br>
-            <button style="width:100%" onclick="toggleMenu('zone-menu')">Cerrar</button>
-        </div>
+    <div id="ui">
+        <h1>Mini Slime Rancher</h1>
+        <p>WASD para mover | Clic para Capturar | Esc para salir</p>
     </div>
+    <div id="crosshair"></div>
 
-    <script>
-        let coins = 0;
-        let myPets = [];
-        let currentZoneIdx = 0;
-
-        const zones = [
-            { n: 'Pradera', color: '#7cfc00', cost: 0, mult: 1 },
-            { n: 'Océano', color: '#00bfff', cost: 1000, mult: 8 },
-            { n: 'Volcán', color: '#ff4500', cost: 10000, mult: 50 },
-            { n: 'Vacío', color: '#483d8b', cost: 100000, mult: 500 }
-        ];
-
-        const petPool = [
-            { e: '🐶', p: 1, prob: 0.5 },
-            { e: '🐱', p: 4, prob: 0.3 },
-            { e: '🦊', p: 15, prob: 0.15 },
-            { e: '🐉', p: 100, prob: 0.05 }
-        ];
-
-        const lootTypes = [
-            { e: '🪙', hp: 1, reward: 1, prob: 0.7 },
-            { e: '💵', hp: 5, reward: 8, prob: 0.2 },
-            { e: '💰', hp: 20, reward: 50, prob: 0.08 },
-            { e: '📦', hp: 100, reward: 300, prob: 0.02 }
-        ];
-
-        const world = document.getElementById('world');
-
-        function spawnLoot() {
-            if (document.querySelectorAll('.loot').length >= 12) return;
-            
-            const roll = Math.random();
-            let acc = 0;
-            let type = lootTypes[0];
-            for(let l of lootTypes) {
-                acc += l.prob;
-                if(roll <= acc) { type = l; break; }
-            }
-
-            const lEl = document.createElement('div');
-            lEl.className = 'loot';
-            lEl.dataset.hp = type.hp;
-            lEl.dataset.maxHp = type.hp;
-            lEl.dataset.reward = type.reward;
-            lEl.innerHTML = `
-                <div class="hp-bar"><div class="hp-fill"></div></div>
-                <span>${type.e}</span>
-            `;
-            
-            lEl.style.left = (10 + Math.random() * 80) + '%';
-            lEl.style.top = (20 + Math.random() * 50) + '%';
-            
-            lEl.onclick = () => attackLoot(lEl);
-            world.appendChild(lEl);
-        }
-
-        function attackLoot(lootEl) {
-            const rect = lootEl.getBoundingClientRect();
-            const worldRect = world.getBoundingClientRect();
-            
-            // 1. Mover mascotas
-            const petElements = document.querySelectorAll('.pet');
-            petElements.forEach(pet => {
-                pet.style.left = (rect.left - worldRect.left + 5) + 'px';
-                pet.style.top = (rect.top - worldRect.top + 5) + 'px';
-            });
-
-            // 2. Calcular Daño
-            setTimeout(() => {
-                let damage = 1; 
-                myPets.forEach(p => damage += p.p);
-                
-                let currentHp = parseInt(lootEl.dataset.hp);
-                let maxHp = parseInt(lootEl.dataset.maxHp);
-                currentHp -= damage;
-                lootEl.dataset.hp = currentHp;
-
-                // Mostrar y actualizar barra de vida
-                const bar = lootEl.querySelector('.hp-bar');
-                const fill = lootEl.querySelector('.hp-fill');
-                if(maxHp > 1) {
-                    bar.style.display = 'block';
-                    fill.style.width = Math.max(0, (currentHp / maxHp) * 100) + '%';
-                }
-
-                // Efecto de golpe
-                lootEl.style.transform = 'scale(1.3)';
-                setTimeout(() => lootEl.style.transform = 'scale(1)', 100);
-
-                if (currentHp <= 0) {
-                    coins += parseInt(lootEl.dataset.reward) * zones[currentZoneIdx].mult;
-                    lootEl.remove();
-                    spawnLoot();
-                }
-
-                updateUI();
-                
-                // Volver mascotas a su sitio
-                petElements.forEach((pet, i) => {
-                    pet.style.left = (15 + (i * 45)) + 'px';
-                    pet.style.top = '300px';
-                });
-            }, 300);
-        }
-
-        function buyEgg() {
-            if (coins >= 50 && myPets.length < 5) {
-                coins -= 50;
-                const roll = Math.random();
-                let acc = 0;
-                let selected = petPool[0];
-                for(let p of petPool) {
-                    acc += p.prob;
-                    if(roll <= acc) { selected = p; break; }
-                }
-                myPets.push(selected);
-                renderPets();
-                updateUI();
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
             }
         }
+    </script>
 
-        function renderPets() {
-            document.querySelectorAll('.pet').forEach(p => p.remove());
-            myPets.forEach((p, i) => {
-                const petEl = document.createElement('div');
-                petEl.className = 'pet';
-                petEl.innerHTML = p.e;
-                petEl.style.left = (15 + (i * 45)) + 'px';
-                petEl.style.top = '300px';
-                world.appendChild(petEl);
-                document.getElementById('s' + i).innerHTML = p.e;
-            });
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        // --- Configuración Escena ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Cielo azul
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // --- Luces ---
+        const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
+        scene.add(light);
+
+        // --- Suelo (El Rancho) ---
+        const floorGeo = new THREE.PlaneGeometry(100, 100);
+        const floorMat = new THREE.MeshLambertMaterial({ color: 0x7cfc00 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        // --- El Slime (Pink Slime) ---
+        const slimes = [];
+        function createSlime(x, z) {
+            const slimeGroup = new THREE.Group();
+            
+            // Cuerpo
+            const bodyGeo = new THREE.SphereGeometry(0.5, 32, 32);
+            const bodyMat = new THREE.MeshPhongMaterial({ color: 0xff69b4, transparent: true, opacity: 0.9 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            slimeGroup.add(body);
+
+            // Ojos
+            const eyeGeo = new THREE.SphereGeometry(0.05, 16, 16);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            const eyeL = eyeMat.clone();
+            const eye1 = new THREE.Mesh(eyeGeo, eyeL);
+            eye1.position.set(0.2, 0.2, 0.4);
+            const eye2 = new THREE.Mesh(eyeGeo, eyeL);
+            eye2.position.set(-0.2, 0.2, 0.4);
+            slimeGroup.add(eye1, eye2);
+
+            slimeGroup.position.set(x, 0.5, z);
+            scene.add(slimeGroup);
+            slimes.push(slimeGroup);
         }
 
-        function travel(idx) {
-            const zone = zones[idx];
-            if (coins >= zone.cost) {
-                if(idx !== currentZoneIdx) coins -= zone.cost;
-                currentZoneIdx = idx;
-                world.style.backgroundColor = zone.color;
-                document.getElementById('zone-name').innerText = zone.n;
-                toggleMenu('zone-menu');
-                // Limpiar mundo y respawnear
-                document.querySelectorAll('.loot').forEach(l => l.remove());
-                for(let i=0; i<8; i++) spawnLoot();
-                updateUI();
+        // Crear unos cuantos slimes
+        for(let i=0; i<10; i++) {
+            createSlime(Math.random()*20-10, Math.random()*20-10);
+        }
+
+        // --- Controles ---
+        const controls = new PointerLockControls(camera, document.body);
+        document.addEventListener('click', () => {
+            if (!controls.isLocked) {
+                controls.lock();
+            } else {
+                // Mecánica de succión
+                checkVacPack();
             }
-        }
-
-        function updateUI() {
-            document.getElementById('coin-count').innerText = Math.floor(coins).toLocaleString();
-            document.getElementById('btn-buy').disabled = (myPets.length >= 5);
-        }
-
-        function toggleMenu(id) {
-            const m = document.getElementById(id);
-            m.style.display = (m.style.display === 'block') ? 'none' : 'block';
-        }
-
-        // Inicializar
-        const zOptions = document.getElementById('zone-options');
-        zones.forEach((z, i) => {
-            const b = document.createElement('button');
-            b.style.width = "100%"; b.style.marginBottom = "5px";
-            b.innerHTML = `${z.n} <br><small>${z.cost > 0 ? z.cost + ' 💰' : 'Gratis'}</small>`;
-            b.onclick = () => travel(i);
-            zOptions.appendChild(b);
         });
 
-        for(let i=0; i<10; i++) spawnLoot();
-        updateUI();
+        // Movimiento
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        const onKeyDown = (e) => {
+            if(e.code === 'KeyW') moveForward = true;
+            if(e.code === 'KeyS') moveBackward = true;
+            if(e.code === 'KeyA') moveLeft = true;
+            if(e.code === 'KeyD') moveRight = true;
+        };
+        const onKeyUp = (e) => {
+            if(e.code === 'KeyW') moveForward = false;
+            if(e.code === 'KeyS') moveBackward = false;
+            if(e.code === 'KeyA') moveLeft = false;
+            if(e.code === 'KeyD') moveRight = false;
+        };
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
+
+        // --- Lógica de Succión (Raycasting) ---
+        const raycaster = new THREE.Raycaster();
+        function checkVacPack() {
+            // El rayo sale del centro de la pantalla
+            raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+            const intersects = raycaster.intersectObjects(slimes, true);
+            
+            if (intersects.length > 0) {
+                const target = intersects[0].object.parent; // El grupo del slime
+                if(intersects[0].distance < 5) { // Solo si está cerca
+                    scene.remove(target);
+                    const index = slimes.indexOf(target);
+                    if (index > -1) slimes.splice(index, 1);
+                    console.log("¡Slime capturado!");
+                }
+            }
+        }
+
+        // --- Bucle de Animación ---
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (controls.isLocked) {
+                // Suavizado de movimiento
+                velocity.x -= velocity.x * 10.0 * 0.016;
+                velocity.z -= velocity.z * 10.0 * 0.016;
+
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+
+                if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * 0.016;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * 0.016;
+
+                controls.moveRight(-velocity.x * 0.016);
+                controls.moveForward(-velocity.z * 0.016);
+            }
+
+            // Animación simple de rebote para los slimes
+            const time = Date.now() * 0.005;
+            slimes.forEach(s => {
+                s.position.y = 0.5 + Math.abs(Math.sin(time + s.position.x)) * 0.3;
+                s.scale.y = 1 - Math.abs(Math.sin(time + s.position.x)) * 0.2;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        camera.position.y = 1.6; // Altura de los ojos
+        animate();
+
+        // Ajuste de ventana
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
     </script>
 </body>
 </html>
