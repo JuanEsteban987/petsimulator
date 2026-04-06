@@ -1,116 +1,105 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Retro OS - Gaming Portal</title>
-    <script src="https://js-dos.com/v7/build/releases/latest/js-dos.js"></script>
+    <title>CUSTOM_CPP_DOOM_ENGINE</title>
     <style>
-        body {
-            margin: 0;
-            background: #245edb url('https://wallpapercave.com/wp/wp4320953.jpg') no-repeat center center fixed;
-            background-size: cover;
-            font-family: 'Tahoma', sans-serif;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .window {
-            width: 820px;
-            background: #ebeadb;
-            border: 3px solid #245edb;
-            border-radius: 8px 8px 0 0;
-            box-shadow: 10px 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .window-header {
-            background: linear-gradient(to right, #245edb 0%, #3f8cf3 100%);
-            padding: 5px 10px;
-            display: flex;
-            justify-content: space-between;
-            color: white;
-            font-weight: bold;
-        }
-
-        #game-view {
-            width: 800px;
-            height: 600px;
-            background: #000;
-            margin: 10px;
-            position: relative;
-        }
-
-        /* El botón de Play estilo YT */
-        .play-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7) url('https://images.stopgame.ru/games/logos/259/doom-23.jpg') no-repeat center;
-            background-size: cover;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 50;
-        }
-
-        .play-btn {
-            width: 90px;
-            height: 60px;
-            background: red;
-            border-radius: 15px;
-            position: relative;
-        }
-
-        .play-btn::after {
-            content: '';
-            position: absolute;
-            top: 15px; left: 35px;
-            border-style: solid;
-            border-width: 15px 0 15px 25px;
-            border-color: transparent transparent transparent white;
-        }
+        body { background: #050505; color: #00ff00; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; overflow: hidden; }
+        #screen { border: 2px solid #333; background: #111; cursor: none; }
+        .hud { width: 640px; background: #222; padding: 10px; border: 2px solid #555; display: flex; justify-content: space-around; }
+        .pixel-font { text-transform: uppercase; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div class="window">
-        <div class="window-header">
-            <span>Doom Player XP</span>
-            <span>[ X ]</span>
-        </div>
-        
-        <div id="game-view">
-            <div id="launcher" class="play-overlay" onclick="startEmulator()">
-                <div class="play-btn"></div>
-            </div>
-            <div id="dos-container" style="width:100%; height:100%;"></div>
-        </div>
+    <h2 class="pixel-font">ENGINE_STATUS: RUNNING_3D</h2>
+    
+    <canvas id="screen" width="640" height="320"></canvas>
+
+    <div class="hud">
+        <div class="pixel-font">LIFE: <span id="hp" style="color: red;">100</span>%</div>
+        <div class="pixel-font">AMMO: 20/--</div>
+        <div class="pixel-font">WEAPON: <span style="color: yellow;">MELEE/RANGE</span></div>
     </div>
 
-    <script>
-        function startEmulator() {
-            const container = document.getElementById("dos-container");
-            const launcher = document.getElementById("launcher");
+<script>
+const canvas = document.getElementById('screen');
+const ctx = canvas.getContext('2d');
 
-            // 1. Ocultar el botón
-            launcher.style.display = "none";
+// --- 1. TU ESCENA (MAPA) ---
+const map = [
+    ['O', 'O', 'O', 'O', 'O'],
+    ['O', ' ', ' ', ' ', 'O'],
+    ['O', ' ', 'E', ' ', 'O'],
+    ['O', ' ', ' ', ' ', 'O'],
+    ['O', 'O', 'O', 'O', 'O']
+];
+const mapSize = 5;
 
-            // 2. URL del juego (Doom Shareware)
-            const gameUrl = "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/2/24b00b14f11dec35557837452790af57485b0d01.jsdos";
+// --- 2. CONFIGURACIÓN DEL JUGADOR ---
+let player = { x: 2.5, y: 1.5, dir: 0, fov: 60 * (Math.PI / 180) };
 
-            // 3. Ejecutar con manejo de errores
-            try {
-                Dos(container).run(gameUrl).then((ci) => {
-                    console.log("Juego cargado correctamente");
-                }).catch((err) => {
-                    console.error("Error al cargar:", err);
-                    alert("Error: El navegador bloqueó el juego. Prueba abriendo este archivo con 'Live Server' o súbelo a un hosting.");
-                });
-            } catch (e) {
-                alert("Error de librería: " + e.message);
+// --- 3. TU TEXTURA "O" (Convertida a colores reales) ---
+const textureData = [
+    "########", "##R##R##", "#RYRRYR#", "#RRRRRR#",
+    "###RR###", "###RR###", "##R##R##", "########"
+];
+const colors = { 'R': '#cc0000', 'Y': '#ffff00', '#': '#444' };
+
+// --- 4. MOTOR DE RAYCASTING (Lógica DOOM) ---
+function frame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Dibujar Suelo y Techo
+    ctx.fillStyle = "#222"; ctx.fillRect(0, 160, 640, 160); // Suelo
+    ctx.fillStyle = "#111"; ctx.fillRect(0, 0, 640, 160);   // Techo
+
+    const numRays = 160; // Resolución horizontal
+    const rayStep = player.fov / numRays;
+
+    for (let i = 0; i < numRays; i++) {
+        let rayAngle = (player.dir - player.fov / 2) + (i * rayStep);
+        let distance = 0;
+        let hitWall = false;
+        let textureX = 0;
+
+        // Lanzar rayo
+        while (!hitWall && distance < 10) {
+            distance += 0.05;
+            let testX = Math.floor(player.x + Math.cos(rayAngle) * distance);
+            let testY = Math.floor(player.y + Math.sin(rayAngle) * distance);
+
+            if (testX < 0 || testX >= mapSize || testY < 0 || testY >= mapSize) {
+                hitWall = true; distance = 10;
+            } else if (map[testY][testX] === 'O') {
+                hitWall = true;
+                // Calcular qué columna de la textura "O" golpear
+                let hitX = player.x + Math.cos(rayAngle) * distance;
+                let hitY = player.y + Math.sin(rayAngle) * distance;
+                textureX = Math.floor(((hitX % 1) + (hitY % 1)) * 8) % 8;
             }
         }
-    </script>
+
+        // Dibujar pared proyectada
+        let ceiling = 160 - (160 / distance);
+        let floor = 320 - ceiling;
+        let wallHeight = floor - ceiling;
+
+        // Dibujar la textura "O" píxel por píxel en la vertical
+        for (let py = 0; py < 8; py++) {
+            let colorChar = textureData[py][textureX];
+            ctx.fillStyle = colors[colorChar];
+            let segmentH = wallHeight / 8;
+            ctx.fillRect(i * 4, ceiling + (py * segmentH), 4, segmentH + 1);
+        }
+    }
+
+    // Movimiento automático de cámara para efecto de juego
+    player.dir += 0.01;
+    requestAnimationFrame(frame);
+}
+
+// Iniciar motor
+frame();
+</script>
 </body>
 </html>
