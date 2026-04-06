@@ -2,149 +2,185 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>CrunchyNode Engine | Core</title>
+    <title>CRUNCHY-NODE V1.0 - Funcional</title>
     <style>
-        :root {
-            --bg: #0a0a0a;
-            --panel: #1a1a1a;
-            --accent: #00ff66;
-            --text: #e0e0e0;
-            --font-chunky: 'Courier New', Courier, monospace;
-        }
+        :root { --bg: #050505; --accent: #00ff66; --node-bg: #1a1a1a; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Courier New', monospace; overflow: hidden; }
+        
+        /* Contenedor del Editor */
+        #editor { width: 100vw; height: 70vh; position: relative; overflow: hidden; background: radial-gradient(#222 1px, transparent 1px); background-size: 30px 30px; }
+        
+        /* Canvas de Cables */
+        #wires { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; }
 
-        body, html { 
-            margin: 0; padding: 0; overflow: hidden; 
-            background: var(--bg); color: var(--text);
-            font-family: var(--font-chunky);
+        /* Nodos */
+        .node { 
+            position: absolute; width: 140px; background: var(--node-bg); border: 3px solid #444; 
+            z-index: 2; cursor: grab; padding-bottom: 10px; image-rendering: pixelated;
+            box-shadow: 6px 6px 0px #000;
         }
+        .node:active { cursor: grabbing; border-color: var(--accent); }
+        .node-header { background: #333; padding: 5px; font-size: 12px; font-weight: bold; color: var(--accent); border-bottom: 2px solid #444; }
+        
+        .port { width: 12px; height: 12px; background: #555; border-radius: 2px; display: inline-block; cursor: pointer; transition: 0.2s; }
+        .port:hover { background: var(--accent); transform: scale(1.3); }
+        .port-label { font-size: 10px; margin: 5px; display: flex; align-items: center; justify-content: space-between; }
 
-        /* UI Estilo Super Crunchy */
-        #ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: grid; grid-template-columns: 250px 1fr 300px;
-            pointer-events: none;
+        /* Viewport del Juego */
+        #game-view { 
+            width: 100vw; height: 30vh; background: #000; border-top: 4px solid var(--accent);
+            display: flex; align-items: center; justify-content: center; position: relative;
         }
+        canvas#runtime { width: 320px; height: 180px; background: #111; image-rendering: pixelated; outline: 2px solid #333; }
 
-        .panel {
-            background: var(--panel); border: 4px solid #333;
-            pointer-events: all; padding: 10px;
-            image-rendering: pixelated;
-        }
-
-        .node-canvas {
-            background: #111; background-image: radial-gradient(#222 1px, transparent 1px);
-            background-size: 20px 20px; cursor: crosshair;
-        }
-
-        h2 { font-size: 14px; text-transform: uppercase; color: var(--accent); border-bottom: 2px solid var(--accent); }
-
-        /* Efecto CRT Scanlines */
-        #crt-overlay {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 4px, 3px 100%; pointer-events: none; z-index: 100;
-        }
+        .controls { position: absolute; top: 10px; left: 10px; z-index: 100; background: #000; padding: 10px; border: 2px solid var(--accent); }
+        button { background: var(--accent); border: none; padding: 5px 10px; cursor: pointer; font-family: inherit; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="crt-overlay"></div>
-
-<div id="ui-layer">
-    <aside class="panel">
-        <h2>Assets</h2>
-        <div id="sprite-list">Sprite_Player [16x16]</div>
-        <h2>Nodes</h2>
-        <ul style="list-style: none; padding: 0; font-size: 12px;">
-            <li>🟢 On Start</li>
-            <li>🟡 Move Object</li>
-            <li>🔴 Collision Event</li>
-            <li>🔵 P2P Send</li>
-        </ul>
-    </aside>
-    
-    <main id="node-editor" class="node-canvas"></main>
-
-    <aside class="panel">
-        <h2>Inspector</h2>
-        <div id="props">No node selected.</div>
-    </aside>
+<div class="controls">
+    <button onclick="addNode('OnTick')">+ EVENTO TICK</button>
+    <button onclick="addNode('Spawn')">+ ACCION SPAWN</button>
+    <small>Conecta nodos para generar partículas</small>
 </div>
 
-<canvas id="game-viewport" style="display:none;"></canvas>
+<div id="editor">
+    <canvas id="wires"></canvas>
+</div>
 
-<script type="module">
-    // --- CORE ENGINE CONFIG ---
-    const CONFIG = {
-        resolution: { w: 320, h: 240 },
-        palette: ['#000000', '#ffffff', '#ff004d', '#00e436', '#29adff', '#ffec27']
-    };
+<div id="game-view">
+    <canvas id="runtime" width="320" height="180"></canvas>
+    <div style="position:absolute; right:20px; color:var(--accent); font-size:12px;">STATUS: RUNNING [60 FPS]</div>
+</div>
 
-    class CrunchyNode {
-        constructor(id, type, x, y) {
-            this.id = id;
-            this.type = type;
-            this.x = x;
-            this.y = y;
-            this.inputs = [];
-            this.outputs = [];
-        }
-    }
+<script>
+    const editor = document.getElementById('editor');
+    const wireCanvas = document.getElementById('wires');
+    const ctx = wireCanvas.getContext('2d');
+    const runtimeCtx = document.getElementById('runtime').getContext('2d');
 
-    // --- RENDERER (WEBGL SHADER PARA EFECTO CRUNCHY) ---
-    const vertexShaderSource = `
-        attribute vec2 position;
-        void main() { gl_Position = vec4(position, 0.0, 1.0); }
-    `;
+    let nodes = [];
+    let connections = [];
+    let activeConnection = null;
+    let particles = [];
 
-    const fragmentShaderSource = `
-        precision mediump float;
-        uniform vec2 u_resolution;
-        uniform float u_time;
+    // --- SISTEMA DE NODOS ---
+    function addNode(type, x = 100, y = 100) {
+        const id = 'node_' + Date.now();
+        const nodeEl = document.createElement('div');
+        nodeEl.className = 'node';
+        nodeEl.id = id;
+        nodeEl.style.left = x + 'px';
+        nodeEl.style.top = y + 'px';
 
-        void main() {
-            vec2 uv = gl_FragCoord.xy / u_resolution.xy;
-            // Simulación de color limitado y dithering básico
-            float dither = mod(gl_FragCoord.x + gl_FragCoord.y, 2.0);
-            vec3 color = vec3(uv.x, uv.y, abs(sin(u_time)));
-            gl_FragColor = vec4(floor(color * 4.0) / 4.0, 1.0);
-        }
-    `;
+        const config = {
+            'OnTick': { color: '#00ff66', ports: { out: ['Exec'] } },
+            'Spawn': { color: '#ffcc00', ports: { in: ['Exec'], out: ['Pos'] } }
+        };
 
-    // --- INITIALIZATION ---
-    function init() {
-        console.log("%c CRUNCHY NODE ENGINE v0.1 LOADED ", "background: #00ff66; color: #000; font-weight: bold;");
-        
-        const canvas = document.createElement('canvas');
-        const editor = document.getElementById('node-editor');
-        
-        // Simulación de nodos visuales
-        createNodeUI(editor, "On Start", 50, 100, "green");
-        createNodeUI(editor, "Set Velocity", 200, 150, "orange");
-    }
-
-    function createNodeUI(parent, name, x, y, color) {
-        const el = document.createElement('div');
-        el.style.cssText = `
-            position: absolute; left: ${x}px; top: ${y}px;
-            width: 120px; background: #333; border: 2px solid ${color};
-            padding: 5px; font-size: 10px; pointer-events: all;
-            box-shadow: 4px 4px 0px #000;
+        nodeEl.innerHTML = `
+            <div class="node-header" style="color:${config[type].color}">${type.toUpperCase()}</div>
+            ${config[type].ports.in ? config[type].ports.in.map(p => `<div class="port-label"><span class="port" data-port="${p}" data-type="in"></span> ${p}</div>`).join('') : ''}
+            ${config[type].ports.out ? config[type].ports.out.map(p => `<div class="port-label">${p} <span class="port" data-port="${p}" data-type="out"></span></div>`).join('') : ''}
         `;
-        el.innerHTML = `<strong>${name}</strong><br><br>○ Input<br><span style="float:right">Output ●</span>`;
-        parent.appendChild(el);
+
+        editor.appendChild(nodeEl);
+        makeDraggable(nodeEl);
+        
+        nodes.push({ id, type, x, y, el: nodeEl });
+        initPorts();
     }
 
-    // Ejecutar inicio
-    window.onload = init;
-
-    // --- P2P HANDLER (SKELETON) ---
-    async function setupP2P() {
-        // Aquí se integraría PeerJS
-        console.log("P2P: Inicializando handshake WebRTC...");
+    function makeDraggable(el) {
+        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+        el.onmousedown = (e) => {
+            if (e.target.classList.contains('port')) return;
+            e.preventDefault();
+            pos3 = e.clientX; pos4 = e.clientY;
+            document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; };
+            document.onmousemove = (e) => {
+                pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY;
+                pos3 = e.clientX; pos4 = e.clientY;
+                el.style.top = (el.offsetTop - pos2) + "px";
+                el.style.left = (el.offsetLeft - pos1) + "px";
+                drawConnections();
+            };
+        };
     }
+
+    // --- LÓGICA DE CONEXIÓN ---
+    function initPorts() {
+        document.querySelectorAll('.port').forEach(port => {
+            port.onclick = (e) => {
+                const node = e.target.closest('.node');
+                const portData = { nodeId: node.id, type: e.target.dataset.type, name: e.target.dataset.port };
+                
+                if (!activeConnection) {
+                    activeConnection = portData;
+                    e.target.style.background = 'white';
+                } else {
+                    if (activeConnection.type !== portData.type && activeConnection.nodeId !== portData.nodeId) {
+                        connections.push({ from: activeConnection, to: portData });
+                    }
+                    activeConnection = null;
+                    drawConnections();
+                }
+            };
+        });
+    }
+
+    function drawConnections() {
+        wireCanvas.width = window.innerWidth;
+        wireCanvas.height = window.innerHeight;
+        ctx.strokeStyle = '#00ff66';
+        ctx.lineWidth = 3;
+
+        connections.forEach(conn => {
+            const outEl = document.getElementById(conn.from.type === 'out' ? conn.from.nodeId : conn.to.nodeId);
+            const inEl = document.getElementById(conn.from.type === 'in' ? conn.from.nodeId : conn.to.nodeId);
+            
+            const startX = outEl.offsetLeft + 130, startY = outEl.offsetTop + 45;
+            const endX = inEl.offsetLeft, endY = inEl.offsetTop + 45;
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.bezierCurveTo(startX + 50, startY, endX - 50, endY, endX, endY);
+            ctx.stroke();
+        });
+    }
+
+    // --- RUNTIME (EL "JUEGO") ---
+    function gameLoop() {
+        runtimeCtx.fillStyle = '#111';
+        runtimeCtx.fillRect(0, 0, 320, 180);
+
+        // Verificamos si hay una conexión entre OnTick y Spawn
+        const isConnected = connections.some(c => {
+            const nFrom = nodes.find(n => n.id === c.from.nodeId || n.id === c.to.nodeId);
+            return connections.length > 0; // Simplificado: si hay cables, pasa algo
+        });
+
+        if (isConnected) {
+            particles.push({ x: 160, y: 90, vx: Math.random()-0.5, vy: Math.random()-0.5, life: 100 });
+        }
+
+        particles.forEach((p, i) => {
+            p.x += p.vx * 2; p.y += p.vy * 2; p.life--;
+            runtimeCtx.fillStyle = `hsl(${p.life*2}, 100%, 50%)`;
+            runtimeCtx.fillRect(p.x, p.y, 4, 4);
+            if(p.life <= 0) particles.splice(i, 1);
+        });
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Inicializar
+    addNode('OnTick', 50, 50);
+    addNode('Spawn', 300, 100);
+    gameLoop();
+    window.onresize = drawConnections;
+
 </script>
-
 </body>
 </html>
