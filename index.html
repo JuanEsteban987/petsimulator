@@ -2,35 +2,326 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>BlockStrike P2P</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Sandbox P2P</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        #crosshair { 
-            position: absolute; top: 50%; left: 50%; 
-            width: 20px; height: 20px; border: 2px solid white;
-            border-radius: 50%; transform: translate(-50%, -50%);
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #1a1a1a;
+            font-family: 'Courier New', Courier, monospace;
+            color: white;
+        }
+
+        /* Paso 1: Efecto de pixelación mediante CSS */
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            image-rendering: pixelated; /* Crucial para pixel art */
+        }
+
+        canvas {
+            background: #222;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            /* Escalado para simular baja resolución */
+            width: 100%;
+            height: 100%;
+            max-width: 1280px;
+            max-height: 720px;
+        }
+
+        /* Paso 6: Menús y UI */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             pointer-events: none;
         }
-        #ui { position: absolute; bottom: 20px; left: 20px; color: white; text-shadow: 2px 2px black; }
-        #shop { 
-            display: none; position: absolute; top: 50%; left: 50%; 
-            transform: translate(-50%, -50%); background: rgba(0,0,0,0.8);
-            padding: 20px; color: white; border-radius: 10px;
+
+        .menu {
+            position: absolute;
+            background: rgba(0,0,0,0.85);
+            border: 2px solid #555;
+            padding: 20px;
+            pointer-events: auto;
+            display: none;
         }
+
+        #main-menu { display: block; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+        #spawn-menu { bottom: 20px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; gap: 10px; }
+        #hud { top: 20px; left: 20px; display: block; background: none; border: none; }
+
+        button {
+            background: #444;
+            color: white;
+            border: 1px solid #777;
+            padding: 10px 20px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        button:hover { background: #666; }
+        
+        .status-pill { font-size: 12px; margin-bottom: 5px; }
     </style>
 </head>
 <body>
-    <div id="crosshair"></div>
-    <div id="ui">Dinero: $<span id="money">0</span> | Arma: <span id="weapon">Cuchillo</span></div>
-    
-    <div id="shop">
-        <h2>Tienda de Armas</h2>
-        <button onclick="buyWeapon('AK-47', 2500)">AK-47 ($2500)</button>
-        <button onclick="buyWeapon('Sniper', 4500)">Sniper ($4500)</button>
-        <button onclick="closeShop()">Cerrar (B)</button>
+
+    <div id="game-container">
+        <canvas id="renderCanvas"></canvas>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
-    </body>
+    <div class="ui-layer">
+        <div id="hud" class="menu">
+            <div class="status-pill">VIDA: <span id="hp">100</span></div>
+            <div id="peer-id-display">MI ID: ...</div>
+        </div>
+
+        <div id="main-menu" class="menu">
+            <h1>PIXEL SANDBOX</h1>
+            <button onclick="startGame()">JUGAR SOLO</button><br><br>
+            <input type="text" id="remote-id" placeholder="ID del Amigo">
+            <button onclick="connectToPeer()">CONECTAR P2P</button>
+        </div>
+
+        <div id="spawn-menu" class="menu">
+            <button onclick="spawnEntity('box')">CAJA</button>
+            <button onclick="spawnEntity('circle')">ESFERA</button>
+            <button onclick="spawnEntity('enemy')">ENEMIGO</button>
+        </div>
+    </div>
+
+<script>
+/** * CONFIGURACIÓN Y VARIABLES GLOBALES
+ */
+const config = {
+    pixelScale: 4, // Nivel de pixelación (1 = nativo, 4 = muy pixelado)
+    width: 800,
+    height: 600,
+    playerSpeed: 0.005,
+    jumpForce: 0.15
+};
+
+let engine, render, runner;
+let player, ground;
+let entities = [];
+let keys = {};
+let peer, conn;
+let isHost = true;
+
+const canvas = document.getElementById('renderCanvas');
+const ctx = canvas.getContext('2d');
+
+/**
+ * PASO 1 & 2: INICIALIZACIÓN DEL MOTOR
+ */
+function initEngine() {
+    // Ajuste de resolución para pixelación
+    canvas.width = config.width / config.pixelScale;
+    canvas.height = config.height / config.pixelScale;
+    ctx.imageSmoothingEnabled = false;
+
+    engine = Matter.Engine.create();
+    
+    // Suelo y Paredes (Objetos estáticos)
+    ground = Matter.Bodies.rectangle(canvas.width/2, canvas.height - 10, canvas.width, 20, { isStatic: true });
+    const leftWall = Matter.Bodies.rectangle(0, canvas.height/2, 20, canvas.height, { isStatic: true });
+    const rightWall = Matter.Bodies.rectangle(canvas.width, canvas.height/2, 20, canvas.height, { isStatic: true });
+    
+    // Jugador (Paso 3)
+    player = Matter.Bodies.rectangle(100, 100, 12, 20, { 
+        inertia: Infinity, // Evita que el jugador rote
+        friction: 0.1,
+        label: 'player'
+    });
+    player.hp = 100;
+
+    Matter.Composite.add(engine.world, [ground, leftWall, rightWall, player]);
+
+    // Bucle de renderizado manual para controlar la pixelación
+    requestAnimationFrame(gameLoop);
+}
+
+/**
+ * PASO 3 & 4: INTERACCIÓN Y ARMAS
+ */
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => {
+    keys[e.code] = false;
+    if(e.code === 'KeyQ') toggleMenu('spawn-menu');
+});
+
+canvas.addEventListener('mousedown', e => {
+    if(e.button === 0) fireWeapon(e);
+});
+
+function fireWeapon(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = (e.clientX - rect.left) / (rect.width / canvas.width);
+    const mouseY = (e.clientY - rect.top) / (rect.height / canvas.height);
+    
+    const angle = Math.atan2(mouseY - player.position.y, mouseX - player.position.x);
+    
+    const bullet = Matter.Bodies.circle(player.position.x, player.position.y, 2, {
+        frictionAir: 0,
+        label: 'bullet'
+    });
+    
+    Matter.Body.setVelocity(bullet, { 
+        x: Math.cos(angle) * 5, 
+        y: Math.sin(angle) * 5 
+    });
+    
+    Matter.Composite.add(engine.world, bullet);
+    entities.push({ body: bullet, type: 'bullet', life: 100 });
+    
+    sendData({ type: 'fire', x: player.position.x, y: player.position.y, angle });
+}
+
+/**
+ * PASO 5: ENEMIGOS E IA BÁSICA
+ */
+function spawnEntity(type) {
+    let newBody;
+    const x = player.position.x + 50;
+    const y = player.position.y - 50;
+
+    if(type === 'box') newBody = Matter.Bodies.rectangle(x, y, 15, 15);
+    if(type === 'circle') newBody = Matter.Bodies.circle(x, y, 8);
+    if(type === 'enemy') {
+        newBody = Matter.Bodies.rectangle(x, y, 12, 20, { render: { fillStyle: 'red' }});
+        newBody.isEnemy = true;
+        newBody.hp = 50;
+    }
+
+    Matter.Composite.add(engine.world, newBody);
+    entities.push({ body: newBody, type: type });
+}
+
+/**
+ * LÓGICA DE JUEGO Y RENDERIZADO
+ */
+function gameLoop() {
+    Matter.Engine.update(engine, 1000/60);
+
+    // Movimiento Jugador
+    if(keys['KeyA']) Matter.Body.translate(player, {x: -2, y: 0});
+    if(keys['KeyD']) Matter.Body.translate(player, {x: 2, y: 0});
+    if(keys['Space'] && Math.abs(player.velocity.y) < 0.1) {
+        Matter.Body.applyForce(player, player.position, {x: 0, y: -config.jumpForce});
+    }
+
+    // IA Enemigos y Colisiones simples
+    entities.forEach((ent, index) => {
+        if(ent.body.isEnemy) {
+            const dist = player.position.x - ent.body.position.x;
+            Matter.Body.translate(ent.body, { x: Math.sign(dist) * 0.5, y: 0 });
+        }
+        // Limpieza de balas
+        if(ent.type === 'bullet') {
+            ent.life--;
+            if(ent.life <= 0) {
+                Matter.Composite.remove(engine.world, ent.body);
+                entities.splice(index, 1);
+            }
+        }
+    });
+
+    draw();
+    if(conn) syncMultiplayer();
+    requestAnimationFrame(gameLoop);
+}
+
+function draw() {
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const bodies = Matter.Composite.allBodies(engine.world);
+    
+    bodies.forEach(body => {
+        ctx.beginPath();
+        const vertices = body.vertices;
+        ctx.moveTo(vertices[0].x, vertices[0].y);
+        for (let i = 1; i < vertices.length; i++) {
+            ctx.lineTo(vertices[i].x, vertices[i].y);
+        }
+        ctx.closePath();
+        
+        ctx.fillStyle = body.isStatic ? '#555' : (body === player ? '#4a9eff' : (body.isEnemy ? '#ff4a4a' : '#fff'));
+        ctx.fill();
+    });
+}
+
+/**
+ * PASO 7: MULTIJUGADOR P2P (PeerJS)
+ */
+function initP2P() {
+    peer = new Peer();
+    peer.on('open', id => {
+        document.getElementById('peer-id-display').innerText = "MI ID: " + id;
+    });
+
+    peer.on('connection', c => {
+        conn = c;
+        setupConnection();
+        isHost = true;
+    });
+}
+
+function connectToPeer() {
+    const remoteId = document.getElementById('remote-id').value;
+    conn = peer.connect(remoteId);
+    setupConnection();
+    isHost = false;
+    startGame();
+}
+
+function setupConnection() {
+    conn.on('data', data => {
+        if(data.type === 'sync') {
+            // Sincronización básica de posiciones (solo el host debería mandar la verdad física)
+            if(!isHost) {
+                Matter.Body.setPosition(player, data.playerPos);
+                // Aquí se sincronizarían el resto de entidades
+            }
+        }
+    });
+}
+
+function syncMultiplayer() {
+    if(isHost) {
+        sendData({
+            type: 'sync',
+            playerPos: player.position
+        });
+    }
+}
+
+function sendData(data) {
+    if(conn && conn.open) conn.send(data);
+}
+
+/**
+ * CONTROL DE INTERFAZ
+ */
+function startGame() {
+    document.getElementById('main-menu').style.display = 'none';
+    initEngine();
+    initP2P();
+}
+
+function toggleMenu(id) {
+    const el = document.getElementById(id);
+    el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+}
+
+</script>
+</body>
 </html>
