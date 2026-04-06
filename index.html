@@ -3,76 +3,232 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Doom Player</title>
+    <title>Arcade Cloud - Play & Search</title>
     <script src="https://js-dos.com/v7/build/releases/latest/js-dos.js"></script>
     <style>
+        :root {
+            --bg: #0a0a0a;
+            --panel: #151515;
+            --accent: #ff4500; /* Color naranja vibrante */
+            --text: #ffffff;
+            --secondary-text: #888;
+        }
+
         body {
             margin: 0;
-            padding: 0;
-            background-color: #1a1a1a;
-            color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            display: grid;
+            grid-template-columns: 200px 1fr 200px;
             height: 100vh;
             overflow: hidden;
         }
 
-        #game-container {
-            width: 800px;
+        /* --- Espacios de Monetización --- */
+        .ad-zone {
+            background-color: var(--panel);
+            border: 1px solid #222;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+        }
+
+        .ad-placeholder {
+            width: 160px;
             height: 600px;
-            max-width: 95vw;
-            max-height: 80vh;
-            border: 4px solid #333;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-            background-color: #000;
-        }
-
-        .controls-info {
-            margin-top: 20px;
+            background: #222;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #444;
+            font-size: 11px;
             text-align: center;
-            color: #888;
-            font-size: 0.9em;
+            border: 1px dashed #333;
         }
 
-        kbd {
-            background: #444;
-            padding: 2px 6px;
-            border-radius: 4px;
-            color: #fff;
+        /* --- Contenedor Central --- */
+        main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            overflow-y: auto;
         }
 
-        h1 {
-            margin-bottom: 10px;
-            font-size: 1.5rem;
-            letter-spacing: 2px;
-            color: #e74c3c;
+        .search-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 20px;
+        }
+
+        #game-search {
+            width: 100%;
+            padding: 12px 20px;
+            background: var(--panel);
+            border: 1px solid #333;
+            border-radius: 25px;
+            color: white;
+            font-size: 16px;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        #game-search:focus {
+            border-color: var(--accent);
+        }
+
+        /* --- Autocompletado --- */
+        .autocomplete-results {
+            position: absolute;
+            top: 50px;
+            left: 0;
+            right: 0;
+            background: #1a1a1a;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            z-index: 100;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .result-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #222;
+        }
+
+        .result-item:hover {
+            background: var(--accent);
+            color: black;
+        }
+
+        /* --- Pantalla de Juego --- */
+        #game-wrapper {
+            width: 100%;
+            max-width: 800px;
+            background: #000;
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+
+        #dos-container {
+            width: 100%;
+            aspect-ratio: 4/3;
+        }
+
+        .game-info {
+            margin-top: 15px;
+            text-align: center;
+            color: var(--secondary-text);
         }
     </style>
 </head>
 <body>
 
-    <h1>DOOM WEB PLAYER</h1>
+    <aside class="ad-zone">
+        <div class="ad-placeholder">
+            SKYSCRAPER AD<br>(Insertar Código)
+        </div>
+    </aside>
 
-    <div id="game-container"></div>
+    <main>
+        <h2 style="letter-spacing: 3px; color: var(--accent);">ARCADE CLOUD</h2>
 
-    <div class="controls-info">
-        <p>Usa las <b>Flechas</b> para moverte, <kbd>Ctrl</kbd> para disparar y <kbd>Espacio</kbd> para abrir puertas.</p>
-        <p><i>Nota: La primera carga puede tardar unos segundos mientras se descarga el motor.</i></p>
-    </div>
+        <div class="search-container">
+            <input type="text" id="game-search" placeholder="Buscar juego (ej: Doom, Duke Nukem...)" autocomplete="off">
+            <div id="results" class="autocomplete-results"></div>
+        </div>
+
+        <div id="game-wrapper">
+            <div id="dos-container"></div>
+        </div>
+
+        <div class="game-info">
+            <p id="current-title">Selecciona un juego para empezar</p>
+            <small>Controles: Flechas (Movimiento), Ctrl (Fuego), Espacio (Acción)</small>
+        </div>
+    </main>
+
+    <aside class="ad-zone">
+        <div class="ad-placeholder">
+            SKYSCRAPER AD<br>(Insertar Código)
+        </div>
+    </aside>
 
     <script>
-        // Configuración del contenedor
-        const container = document.getElementById("game-container");
-        
-        // Ejecución del emulador
-        // Cargamos la versión shareware oficial desde el repositorio de js-dos
-        Dos(container, {
-            style: "hidden" // Oculta la interfaz por defecto del emulador para una estética limpia
-        }).run("https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/2/24b00b14f11dec35557837452790af57485b0d01.jsdos");
-    </script>
+        // Base de Datos de Juegos
+        const gameLibrary = [
+            { name: "Doom (Shareware)", id: "doom", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/2/24b00b14f11dec35557837452790af57485b0d01.jsdos" },
+            { name: "Heretic", id: "heretic", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/6/695955038c92a628f804566c39b3438e3e4f7a55.jsdos" },
+            { name: "Hexen", id: "hexen", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/d/d44f77c3a0675239e246995646f9037944062035.jsdos" },
+            { name: "Wolfenstein 3D", id: "wolf3d", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/1/192f58e4618e7e13d96ef40507300c3b3130283c.jsdos" },
+            { name: "Duke Nukem 3D", id: "duke3d", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/0/0733a41285223c914e6e69315354964177d463b1.jsdos" },
+            { name: "Prince of Persia", id: "pop", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/d/d39a36a31c5188365287515a815a510529d33b5d.jsdos" }
+        ];
 
+        const searchInput = document.getElementById('game-search');
+        const resultsDiv = document.getElementById('results');
+        const container = document.getElementById("dos-container");
+        const titleText = document.getElementById("current-title");
+        let currentCi = null;
+
+        // --- Lógica del Buscador ---
+        searchInput.addEventListener('input', () => {
+            const val = searchInput.value.toLowerCase();
+            resultsDiv.innerHTML = '';
+            
+            if (val.length < 1) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            const filtered = gameLibrary.filter(g => g.name.toLowerCase().includes(val));
+            
+            if (filtered.length > 0) {
+                filtered.forEach(game => {
+                    const div = document.createElement('div');
+                    div.className = 'result-item';
+                    div.textContent = game.name;
+                    div.onclick = () => selectGame(game);
+                    resultsDiv.appendChild(div);
+                });
+                resultsDiv.style.display = 'block';
+            } else {
+                resultsDiv.style.display = 'none';
+            }
+        });
+
+        // --- Lógica del Emulador ---
+        function selectGame(game) {
+            searchInput.value = '';
+            resultsDiv.style.display = 'none';
+            titleText.textContent = "Cargando: " + game.name + "...";
+            
+            // Limpiar contenedor
+            container.innerHTML = '';
+            
+            Dos(container, {
+                style: "hidden"
+            }).run(game.url).then(ci => {
+                currentCi = ci;
+                titleText.textContent = "Jugando: " + game.name;
+            });
+        }
+
+        // Cerrar resultados al hacer click fuera
+        document.addEventListener('click', (e) => {
+            if (e.target !== searchInput) resultsDiv.style.display = 'none';
+        });
+
+        // Cargar Doom por defecto
+        selectGame(gameLibrary[0]);
+
+    </script>
 </body>
 </html>
