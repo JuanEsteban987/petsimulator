@@ -1,46 +1,410 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Retro_Quest_2008.exe</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro RPG - 2008 Aero Engine</title>
     <style>
-        /* Windows 2008 Aero Styling */
-        #taskbar { position: fixed; bottom: 0; width: 100%; height: 40px; background: linear-gradient(#0058e3, #0030ad); }
-        .window { background: rgba(255,255,255,0.8); border: 2px solid #0058e3; border-radius: 5px 5px 0 0; backdrop-filter: blur(10px); }
+        /* =========================================
+           UI: ESTILO WINDOWS AERO (2008 VIBE)
+           ========================================= */
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #000; user-select: none; }
+        #game-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        
+        /* Taskbar estilo Windows Vista/7 */
+        #taskbar { position: absolute; bottom: 0; width: 100%; height: 40px; background: linear-gradient(to bottom, rgba(169,203,235,0.8) 0%, rgba(85,142,209,0.8) 50%, rgba(38,103,184,0.8) 51%, rgba(67,143,219,0.8) 100%); backdrop-filter: blur(5px); border-top: 1px solid rgba(255,255,255,0.5); z-index: 100; display: flex; align-items: center; padding: 0 10px; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); }
+        .start-btn { width: 36px; height: 36px; background: radial-gradient(circle, #3b88e8 0%, #1742a8 100%); border-radius: 50%; border: 2px solid #fff; box-shadow: inset 0 2px 5px rgba(255,255,255,0.7), 0 2px 5px rgba(0,0,0,0.5); cursor: pointer; transition: transform 0.1s; }
+        .start-btn:active { transform: scale(0.95); }
+        
+        /* Ventanas Aero Glass */
+        .window { position: absolute; top: 50px; left: 50px; width: 300px; background: rgba(255, 255, 255, 0.7); border: 1px solid rgba(255, 255, 255, 0.9); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 50; display: flex; flex-direction: column; overflow: hidden; border-color: rgba(90, 150, 220, 0.5); }
+        .window-header { height: 30px; background: linear-gradient(to bottom, rgba(255,255,255,0.6) 0%, rgba(200,220,240,0.6) 100%); border-bottom: 1px solid rgba(255,255,255,0.5); display: flex; align-items: center; padding: 0 10px; cursor: move; justify-content: space-between; font-weight: bold; color: #111; text-shadow: 0 1px 2px rgba(255,255,255,0.8); }
+        .window-content { padding: 15px; background: rgba(255,255,255,0.85); flex-grow: 1; font-size: 14px; color: #333; }
+        .btn-close { width: 45px; height: 20px; background: linear-gradient(to bottom, #f09090 0%, #e04040 50%, #c02020 51%, #f06060 100%); border: 1px solid #701010; border-radius: 3px; cursor: pointer; color: white; font-weight: bold; line-height: 18px; text-align: center; font-size: 12px; }
+        .btn-close:hover { background: linear-gradient(to bottom, #f0a0a0 0%, #f05050 50%, #d03030 51%, #f07070 100%); }
+        
+        /* Controles de UI y Botones genéricos */
+        input, button { padding: 5px; margin-top: 5px; font-family: inherit; border: 1px solid #999; border-radius: 3px; }
+        button { background: linear-gradient(to bottom, #f9f9f9 0%, #e0e0e0 100%); cursor: pointer; }
+        button:hover { background: linear-gradient(to bottom, #e0e0e0 0%, #cccccc 100%); }
+        
+        /* Desktop Icons */
+        .icon-container { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 15px; z-index: 10; }
+        .desktop-icon { width: 64px; text-align: center; color: white; text-shadow: 1px 1px 2px black; font-size: 12px; cursor: pointer; }
+        .desktop-icon:hover { background: rgba(255,255,255,0.2); border-radius: 5px; }
+        .icon-img { width: 48px; height: 48px; background: #ddd; border-radius: 5px; margin: 0 auto 5px auto; border: 2px solid #aaa; }
+        
+        /* Ocultar elementos iniciales */
+        #game-ui { display: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.8); z-index: 10; pointer-events: none; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="game-container"></div>
-    <div id="desktop">
-        <div class="icon" onclick="openInventory()">My_Items.lnk</div>
+
+    <div id="game-canvas"></div>
+
+    <div class="icon-container">
+        <div class="desktop-icon" onclick="UIManager.toggleWindow('multiplayer-window')">
+            <div class="icon-img" style="background: #4CAF50;"></div>Network.exe
+        </div>
+        <div class="desktop-icon" onclick="UIManager.toggleWindow('inventory-window')">
+            <div class="icon-img" style="background: #FFC107;"></div>My_Loot.ini
+        </div>
+    </div>
+
+    <div id="multiplayer-window" class="window" style="top: 50px; left: 100px;">
+        <div class="window-header">
+            <span>Network Manager P2P</span>
+            <div class="btn-close" onclick="UIManager.toggleWindow('multiplayer-window')">X</div>
+        </div>
+        <div class="window-content">
+            <p><strong>Tu ID (Host):</strong> <span id="my-id">Generando...</span></p>
+            <hr style="border-top: 1px solid #ccc; margin: 10px 0;">
+            <p><strong>Unirse a un amigo:</strong></p>
+            <input type="text" id="friend-id" placeholder="Pega el ID aquí..." style="width: 90%;">
+            <button onclick="NetworkManager.connectToPeer()">Conectar</button>
+            <p id="connection-status" style="color: #666; font-size: 12px; margin-top: 10px;">Estado: Desconectado</p>
+        </div>
+    </div>
+
+    <div id="inventory-window" class="window" style="top: 100px; left: 450px; display: none;">
+        <div class="window-header">
+            <span>Inventory</span>
+            <div class="btn-close" onclick="UIManager.toggleWindow('inventory-window')">X</div>
+        </div>
+        <div class="window-content">
+            <p>Arma actual: <strong id="current-weapon">Espada de Madera</strong></p>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px;">
+                <div style="width: 100%; height: 50px; background: #ddd; border: 1px inset #fff;"></div>
+                <div style="width: 100%; height: 50px; background: #ddd; border: 1px inset #fff;"></div>
+                <div style="width: 100%; height: 50px; background: #ddd; border: 1px inset #fff;"></div>
+                <div style="width: 100%; height: 50px; background: #ddd; border: 1px inset #fff;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="taskbar">
+        <div class="start-btn" onclick="alert('Start Menu (Implementar lista de juegos aquí)')"></div>
+        <div style="color: white; font-weight: bold; text-shadow: 1px 1px 2px black; margin-left: 15px;">Retro Engine v1.0</div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 
     <script>
-        // 1. GAME ENGINE CLASS
-        class Engine {
-            constructor() {
-                this.scene = new THREE.Scene();
-                this.camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
-                // Initialize Renderer, Map, and Lighting...
-            }
-        }
+        /**
+         * ============================================================================
+         * NÚCLEO DEL MOTOR (AQUÍ ES DONDE PUEDES EXPANDIR A 9000+ LÍNEAS)
+         * ============================================================================
+         */
 
-        // 2. P2P NETWORK MANAGER
-        class Network {
-            constructor() {
+        // --- 1. GESTOR DE INTERFAZ (UI) ---
+        const UIManager = {
+            toggleWindow: function(id) {
+                const el = document.getElementById(id);
+                if(el.style.display === "none" || el.style.display === "") {
+                    el.style.display = "flex";
+                } else {
+                    el.style.display = "none";
+                }
+            },
+            updateStatus: function(msg, color="#333") {
+                const statusEl = document.getElementById('connection-status');
+                statusEl.innerText = "Estado: " + msg;
+                statusEl.style.color = color;
+            }
+        };
+
+        // --- 2. GESTOR MULTIJUGADOR (PeerJS WebRTC) ---
+        const NetworkManager = {
+            peer: null,
+            connections: [],
+            isHost: true,
+            
+            init: function() {
+                // Instanciar nodo Peer (usa servidores públicos por defecto para el handshake)
                 this.peer = new Peer(); 
-                this.connections = [];
-                // Handle logic: OnDataReceived -> UpdateGameState
-            }
-        }
+                
+                this.peer.on('open', (id) => {
+                    document.getElementById('my-id').innerText = id;
+                    console.log("Sistema P2P Iniciado. Mi ID:", id);
+                });
 
-        // 3. GAME LOOP
-        function animate() {
-            requestAnimationFrame(animate);
-            // Update Physics -> Sync Network -> Render Scene
-        }
+                // Si alguien se conecta a nosotros (Somos Host)
+                this.peer.on('connection', (conn) => {
+                    UIManager.updateStatus("Cliente Conectado!", "green");
+                    this.setupConnection(conn);
+                });
+            },
+
+            connectToPeer: function() {
+                const friendId = document.getElementById('friend-id').value;
+                if(!friendId) return alert("Ingresa un ID");
+                
+                UIManager.updateStatus("Conectando...", "blue");
+                this.isHost = false; // Nos convertimos en cliente
+                const conn = this.peer.connect(friendId);
+                
+                conn.on('open', () => {
+                    UIManager.updateStatus("Conectado al Host!", "green");
+                    this.setupConnection(conn);
+                });
+            },
+
+            setupConnection: function(conn) {
+                this.connections.push(conn);
+                
+                conn.on('data', (data) => {
+                    // LÓGICA DE SINCRONIZACIÓN (Aquí expandes para inventario, chat, combate)
+                    if(data.type === 'move') {
+                        GameEngine.updateRemotePlayer(data.id, data.position);
+                    }
+                });
+
+                // Enviar estado inicial
+                setInterval(() => {
+                    if(GameEngine.player) {
+                        conn.send({
+                            type: 'move',
+                            id: this.peer.id,
+                            position: GameEngine.player.position
+                        });
+                    }
+                }, 50); // Tickrate de 20hz
+            }
+        };
+
+        // --- 3. MOTOR GRÁFICO Y LÓGICA 3D (Three.js) ---
+        const GameEngine = {
+            scene: null,
+            camera: null,
+            renderer: null,
+            player: null,
+            remotePlayers: {}, // Diccionario de otros jugadores
+            clock: new THREE.Clock(),
+            keys: { w: false, a: false, s: false, d: false },
+            
+            init: function() {
+                const container = document.getElementById('game-canvas');
+                
+                // Escena
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x111111); // Fondo oscuro
+                this.scene.fog = new THREE.Fog(0x111111, 20, 100);
+
+                // Cámara Ortográfica (Estilo Isométrico 2008)
+                const aspect = window.innerWidth / window.innerHeight;
+                const d = 20; // Tamaño de la vista
+                this.camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+                
+                // Posición isométrica: Mirando hacia abajo en ángulo
+                this.camera.position.set(20, 20, 20);
+                this.camera.lookAt(this.scene.position);
+
+                // Renderizador optimizado
+                this.renderer = new THREE.WebGLRenderer({ antialias: false }); // Antialias false para look retro
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                container.appendChild(this.renderer.domElement);
+
+                // Luces
+                const ambientLight = new THREE.AmbientLight(0x404040, 1.5); // Luz general
+                this.scene.add(ambientLight);
+                
+                const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+                dirLight.position.set(-10, 20, -10);
+                dirLight.castShadow = true;
+                dirLight.shadow.camera.left = -30;
+                dirLight.shadow.camera.right = 30;
+                dirLight.shadow.camera.top = 30;
+                dirLight.shadow.camera.bottom = -30;
+                this.scene.add(dirLight);
+
+                // Generar Mundo
+                this.generateWorld();
+
+                // Crear Jugador Local
+                this.createPlayer();
+
+                // Eventos
+                window.addEventListener('resize', () => this.onWindowResize(), false);
+                this.setupControls();
+
+                // Iniciar Bucle
+                this.animate();
+            },
+
+            generateWorld: function() {
+                // MAPA PROCEDURAL BÁSICO (Grilla de cubos)
+                // Para llegar a 9000 líneas, aquí implementarías Cellular Automata o Ruido Perlin
+                const mapSize = 20;
+                const geometry = new THREE.BoxGeometry(1, 1, 1);
+                const materialFloor = new THREE.MeshLambertMaterial({ color: 0x2d4c1e }); // Verde pasto
+                const materialWall = new THREE.MeshLambertMaterial({ color: 0x555555 }); // Gris piedra
+
+                // Usamos InstancedMesh para optimizar rendimiento masivo
+                const floorMesh = new THREE.InstancedMesh(geometry, materialFloor, mapSize * mapSize);
+                let i = 0;
+                const matrix = new THREE.Matrix4();
+
+                for(let x = -mapSize/2; x < mapSize/2; x++) {
+                    for(let z = -mapSize/2; z < mapSize/2; z++) {
+                        // Posicionar piso
+                        matrix.setPosition(x, -0.5, z);
+                        floorMesh.setMatrixAt(i, matrix);
+                        
+                        // Generar obstáculos aleatorios (30% de probabilidad)
+                        if(Math.random() > 0.7 && (x !== 0 && z !== 0)) {
+                            const wall = new THREE.Mesh(geometry, materialWall);
+                            wall.position.set(x, 0.5, z);
+                            wall.castShadow = true;
+                            wall.receiveShadow = true;
+                            this.scene.add(wall);
+                        }
+                        i++;
+                    }
+                }
+                floorMesh.receiveShadow = true;
+                this.scene.add(floorMesh);
+            },
+
+            createPlayer: function() {
+                // El jugador es un simple cubo rojo por ahora
+                const geo = new THREE.BoxGeometry(0.8, 1.5, 0.8);
+                const mat = new THREE.MeshLambertMaterial({ color: 0xcc0000 });
+                this.player = new THREE.Mesh(geo, mat);
+                this.player.position.set(0, 0.75, 0);
+                this.player.castShadow = true;
+                this.scene.add(this.player);
+            },
+
+            updateRemotePlayer: function(id, pos) {
+                // Si el jugador remoto no existe, lo creamos (cubo azul)
+                if(!this.remotePlayers[id]) {
+                    const geo = new THREE.BoxGeometry(0.8, 1.5, 0.8);
+                    const mat = new THREE.MeshLambertMaterial({ color: 0x0000cc });
+                    const remoteMesh = new THREE.Mesh(geo, mat);
+                    remoteMesh.castShadow = true;
+                    this.scene.add(remoteMesh);
+                    this.remotePlayers[id] = remoteMesh;
+                }
+                
+                // Interpolar suavemente hacia la posición recibida
+                // (En un motor completo aquí usas LERP)
+                this.remotePlayers[id].position.copy(pos);
+            },
+
+            setupControls: function() {
+                document.addEventListener('keydown', (e) => {
+                    const key = e.key.toLowerCase();
+                    if(this.keys.hasOwnProperty(key)) this.keys[key] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    const key = e.key.toLowerCase();
+                    if(this.keys.hasOwnProperty(key)) this.keys[key] = false;
+                });
+            },
+
+            updateLogic: function(delta) {
+                if(!this.player) return;
+
+                const speed = 5 * delta;
+                
+                // Lógica Isométrica: Moverse en X/Z relativo a la cámara
+                let dirX = 0;
+                let dirZ = 0;
+
+                if(this.keys.w) { dirX -= 1; dirZ -= 1; }
+                if(this.keys.s) { dirX += 1; dirZ += 1; }
+                if(this.keys.a) { dirX -= 1; dirZ += 1; }
+                if(this.keys.d) { dirX += 1; dirZ -= 1; }
+
+                // Normalizar vector para evitar movimiento diagonal más rápido
+                if(dirX !== 0 || dirZ !== 0) {
+                    const length = Math.sqrt(dirX*dirX + dirZ*dirZ);
+                    dirX /= length;
+                    dirZ /= length;
+                    
+                    this.player.position.x += dirX * speed;
+                    this.player.position.z += dirZ * speed;
+
+                    // La cámara sigue al jugador
+                    this.camera.position.x = this.player.position.x + 20;
+                    this.camera.position.z = this.player.position.z + 20;
+                    this.camera.lookAt(this.player.position);
+                }
+            },
+
+            onWindowResize: function() {
+                const aspect = window.innerWidth / window.innerHeight;
+                const d = 20;
+                this.camera.left = -d * aspect;
+                this.camera.right = d * aspect;
+                this.camera.top = d;
+                this.camera.bottom = -d;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            },
+
+            animate: function() {
+                requestAnimationFrame(() => this.animate());
+                
+                const delta = this.clock.getDelta();
+                this.updateLogic(delta);
+                
+                this.renderer.render(this.scene, this.camera);
+            }
+        };
+
+        // --- 4. ARRANQUE DEL SISTEMA ---
+        window.onload = () => {
+            NetworkManager.init();
+            GameEngine.init();
+            
+            // Permitir mover las ventanas de UI (Draggable)
+            document.querySelectorAll('.window').forEach(win => {
+                const header = win.querySelector('.window-header');
+                let isDragging = false, offsetX, offsetY;
+                
+                header.addEventListener('mousedown', (e) => {
+                    if(e.target.classList.contains('btn-close')) return;
+                    isDragging = true;
+                    offsetX = e.clientX - win.offsetLeft;
+                    offsetY = e.clientY - win.offsetTop;
+                });
+                
+                document.addEventListener('mousemove', (e) => {
+                    if(!isDragging) return;
+                    win.style.left = (e.clientX - offsetX) + 'px';
+                    win.style.top = (e.clientY - offsetY) + 'px';
+                });
+                
+                document.addEventListener('mouseup', () => isDragging = false);
+            });
+        };
+
+        /**
+         * ============================================================================
+         * GUÍA PARA EXPANDIR ESTE CÓDIGO A +9000 LÍNEAS (PARA TI, EL DESARROLLADOR):
+         * ============================================================================
+         * 1. SISTEMA DE ENTIDADES (1000+ líneas): Crea una clase base `Entity`, y 
+         * extiende `Enemy`, `NPC`, `Boss`. Implementa máquinas de estados (FSM) 
+         * para la IA de los enemigos (Idle, Chase, Attack).
+         * 2. SISTEMA DE INVENTARIO Y OBJETOS (1500+ líneas): Define una base de datos 
+         * JSON dentro del archivo con cientos de IDs de objetos (armas, pociones).
+         * Implementa la lógica de Drag & Drop en el DOM para la ventana de inventario.
+         * 3. GENERACIÓN DE MAPAS AVANZADA (2000+ líneas): Sustituye `generateWorld` 
+         * por un algoritmo BSP (Binary Space Partitioning) para crear habitaciones 
+         * y pasillos de mazmorras. Añade texturas personalizadas generadas por canvas.
+         * 4. SISTEMA DE COMBATE (1000+ líneas): Detección de colisiones complejas 
+         * (AABB o esferas), cálculo de daño, estadísticas (Fuerza, Destreza), 
+         * y partículas visuales (MeshLine para estelas de espadas).
+         * 5. SINCRONIZACIÓN P2P (1000+ líneas): Implementa interpolación real (LERP), 
+         * predicción del lado del cliente, compensación de latencia (Lag Compensation)
+         * y sincronización segura de inventarios y daños.
+         * ============================================================================
+         */
     </script>
 </body>
 </html>
