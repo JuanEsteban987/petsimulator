@@ -3,232 +3,246 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arcade Cloud - Play & Search</title>
+    <title>Retro OS - Gaming Portal</title>
     <script src="https://js-dos.com/v7/build/releases/latest/js-dos.js"></script>
     <style>
         :root {
-            --bg: #0a0a0a;
-            --panel: #151515;
-            --accent: #ff4500; /* Color naranja vibrante */
-            --text: #ffffff;
-            --secondary-text: #888;
+            --xp-blue: #245edb;
+            --xp-orange: #ff8a00;
+            --xp-silver: #ebeadb;
         }
 
         body {
             margin: 0;
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: 'Inter', sans-serif;
-            display: grid;
-            grid-template-columns: 200px 1fr 200px;
+            padding: 0;
+            background: url('https://wallpapercave.com/wp/wp4320953.jpg') no-repeat center center fixed;
+            background-size: cover;
+            font-family: 'Tahoma', 'Segoe UI', sans-serif;
             height: 100vh;
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
         }
 
-        /* --- Espacios de Monetización --- */
-        .ad-zone {
-            background-color: var(--panel);
-            border: 1px solid #222;
+        /* --- Barra de Tareas XP --- */
+        .taskbar {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            height: 30px;
+            background: linear-gradient(to bottom, #245edb 0%, #3f8cf3 9%, #245edb 18%, #245edb 92%, #1941a5 100%);
             display: flex;
-            flex-direction: column;
             align-items: center;
-            padding-top: 20px;
+            z-index: 1000;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.3);
         }
 
-        .ad-placeholder {
-            width: 160px;
+        .start-button {
+            height: 100%;
+            padding: 0 15px;
+            background: linear-gradient(to bottom, #388e3c 0%, #4caf50 100%);
+            color: white;
+            font-style: italic;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            border-top-right-radius: 10px;
+            border-bottom-right-radius: 10px;
+            cursor: pointer;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+        }
+
+        /* --- Ventana de Juego Estilo XP --- */
+        .window {
+            width: 820px;
+            background: var(--xp-silver);
+            border: 3px solid var(--xp-blue);
+            border-radius: 8px 8px 0 0;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -55%);
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+        }
+
+        .window-header {
+            background: linear-gradient(to right, #245edb 0%, #3f8cf3 100%);
+            padding: 5px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .window-controls div {
+            width: 21px;
+            height: 21px;
+            background: var(--xp-silver);
+            border: 1px solid #fff;
+            display: inline-block;
+            margin-left: 2px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        /* --- Pantalla de Inicio (Video Style) --- */
+        #game-view {
+            width: 800px;
             height: 600px;
-            background: #222;
+            background: #000;
+            margin: 10px;
+            position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #444;
-            font-size: 11px;
-            text-align: center;
-            border: 1px dashed #333;
         }
 
-        /* --- Contenedor Central --- */
-        main {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 10px;
-            overflow-y: auto;
-        }
-
-        .search-container {
-            position: relative;
-            width: 100%;
-            max-width: 500px;
-            margin-bottom: 20px;
-        }
-
-        #game-search {
-            width: 100%;
-            padding: 12px 20px;
-            background: var(--panel);
-            border: 1px solid #333;
-            border-radius: 25px;
-            color: white;
-            font-size: 16px;
-            outline: none;
-            transition: border 0.3s;
-        }
-
-        #game-search:focus {
-            border-color: var(--accent);
-        }
-
-        /* --- Autocompletado --- */
-        .autocomplete-results {
+        .thumbnail {
             position: absolute;
-            top: 50px;
-            left: 0;
-            right: 0;
-            background: #1a1a1a;
-            border-radius: 10px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            z-index: 100;
-            max-height: 300px;
-            overflow-y: auto;
-            display: none;
-        }
-
-        .result-item {
-            padding: 12px 20px;
+            width: 100%;
+            height: 100%;
+            background: url('https://images.stopgame.ru/games/logos/259/doom-23.jpg') no-repeat center;
+            background-size: cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            border-bottom: 1px solid #222;
+            z-index: 10;
         }
 
-        .result-item:hover {
-            background: var(--accent);
-            color: black;
+        .play-button {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 0, 0, 0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
         }
 
-        /* --- Pantalla de Juego --- */
-        #game-wrapper {
-            width: 100%;
-            max-width: 800px;
-            background: #000;
-            position: relative;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        .play-button::after {
+            content: '';
+            border-style: solid;
+            border-width: 15px 0 15px 30px;
+            border-color: transparent transparent transparent white;
+            margin-left: 5px;
         }
 
-        #dos-container {
-            width: 100%;
-            aspect-ratio: 4/3;
+        .thumbnail:hover .play-button {
+            transform: scale(1.1);
+            background: red;
         }
 
-        .game-info {
-            margin-top: 15px;
+        /* --- Buscador en la ventana --- */
+        .toolbar {
+            padding: 5px 10px;
+            background: var(--xp-silver);
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            gap: 10px;
+        }
+
+        #search-input {
+            flex-grow: 1;
+            padding: 3px;
+            font-size: 12px;
+        }
+
+        /* --- Publicidad --- */
+        .ad-banner {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 160px;
+            height: 600px;
+            background: rgba(255,255,255,0.8);
+            border: 1px solid #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             text-align: center;
-            color: var(--secondary-text);
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
 
-    <aside class="ad-zone">
-        <div class="ad-placeholder">
-            SKYSCRAPER AD<br>(Insertar Código)
-        </div>
-    </aside>
-
-    <main>
-        <h2 style="letter-spacing: 3px; color: var(--accent);">ARCADE CLOUD</h2>
-
-        <div class="search-container">
-            <input type="text" id="game-search" placeholder="Buscar juego (ej: Doom, Duke Nukem...)" autocomplete="off">
-            <div id="results" class="autocomplete-results"></div>
+    <div class="window">
+        <div class="window-header">
+            <span>Doom Player - Windows Internet Explorer</span>
+            <div class="window-controls">
+                <div style="background: #3e88e5;"></div>
+                <div style="background: #3e88e5;"></div>
+                <div style="background: #e91e1e;"></div>
+            </div>
         </div>
 
-        <div id="game-wrapper">
-            <div id="dos-container"></div>
+        <div class="toolbar">
+            <span style="font-size: 12px;">Buscar Juego:</span>
+            <input type="text" id="search-input" placeholder="Escribe el nombre del juego..." list="games-list">
+            <datalist id="games-list">
+                <option value="Doom (Shareware)">
+                <option value="Wolfenstein 3D">
+                <option value="Duke Nukem 3D">
+                <option value="Heretic">
+            </datalist>
         </div>
 
-        <div class="game-info">
-            <p id="current-title">Selecciona un juego para empezar</p>
-            <small>Controles: Flechas (Movimiento), Ctrl (Fuego), Espacio (Acción)</small>
+        <div id="game-view">
+            <div id="launcher" class="thumbnail" onclick="startEmulator()">
+                <div class="play-button"></div>
+            </div>
+            <div id="dos-container" style="width: 100%; height: 100%;"></div>
         </div>
-    </main>
+    </div>
 
-    <aside class="ad-zone">
-        <div class="ad-placeholder">
-            SKYSCRAPER AD<br>(Insertar Código)
-        </div>
-    </aside>
+    <div class="ad-banner" style="left: 20px;">ESPACIO PUBLICITARIO<br>(AdSense)</div>
+    <div class="ad-banner">ESPACIO PUBLICITARIO<br>(AdSense)</div>
+
+    <div class="taskbar">
+        <div class="start-button">inicio</div>
+        <div style="color: white; margin-left: auto; padding-right: 15px; font-size: 12px;" id="clock"></div>
+    </div>
 
     <script>
-        // Base de Datos de Juegos
-        const gameLibrary = [
-            { name: "Doom (Shareware)", id: "doom", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/2/24b00b14f11dec35557837452790af57485b0d01.jsdos" },
-            { name: "Heretic", id: "heretic", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/6/695955038c92a628f804566c39b3438e3e4f7a55.jsdos" },
-            { name: "Hexen", id: "hexen", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/d/d44f77c3a0675239e246995646f9037944062035.jsdos" },
-            { name: "Wolfenstein 3D", id: "wolf3d", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/1/192f58e4618e7e13d96ef40507300c3b3130283c.jsdos" },
-            { name: "Duke Nukem 3D", id: "duke3d", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/0/0733a41285223c914e6e69315354964177d463b1.jsdos" },
-            { name: "Prince of Persia", id: "pop", url: "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/d/d39a36a31c5188365287515a815a510529d33b5d.jsdos" }
-        ];
+        const gameLibrary = {
+            "Doom (Shareware)": "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/2/24b00b14f11dec35557837452790af57485b0d01.jsdos",
+            "Wolfenstein 3D": "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/1/192f58e4618e7e13d96ef40507300c3b3130283c.jsdos",
+            "Duke Nukem 3D": "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/0/0733a41285223c914e6e69315354964177d463b1.jsdos",
+            "Heretic": "https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/original/2X/6/695955038c92a628f804566c39b3438e3e4f7a55.jsdos"
+        };
 
-        const searchInput = document.getElementById('game-search');
-        const resultsDiv = document.getElementById('results');
-        const container = document.getElementById("dos-container");
-        const titleText = document.getElementById("current-title");
-        let currentCi = null;
+        let currentURL = gameLibrary["Doom (Shareware)"];
 
-        // --- Lógica del Buscador ---
-        searchInput.addEventListener('input', () => {
-            const val = searchInput.value.toLowerCase();
-            resultsDiv.innerHTML = '';
-            
-            if (val.length < 1) {
-                resultsDiv.style.display = 'none';
-                return;
-            }
-
-            const filtered = gameLibrary.filter(g => g.name.toLowerCase().includes(val));
-            
-            if (filtered.length > 0) {
-                filtered.forEach(game => {
-                    const div = document.createElement('div');
-                    div.className = 'result-item';
-                    div.textContent = game.name;
-                    div.onclick = () => selectGame(game);
-                    resultsDiv.appendChild(div);
-                });
-                resultsDiv.style.display = 'block';
-            } else {
-                resultsDiv.style.display = 'none';
+        // Actualizar URL según el buscador
+        document.getElementById('search-input').addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (gameLibrary[val]) {
+                currentURL = gameLibrary[val];
+                // Si ya hay un juego corriendo, reiniciamos la vista previa
+                document.getElementById('launcher').style.display = 'flex';
+                document.getElementById('dos-container').innerHTML = '';
             }
         });
 
-        // --- Lógica del Emulador ---
-        function selectGame(game) {
-            searchInput.value = '';
-            resultsDiv.style.display = 'none';
-            titleText.textContent = "Cargando: " + game.name + "...";
+        function startEmulator() {
+            // Ocultar la miniatura
+            document.getElementById('launcher').style.display = 'none';
             
-            // Limpiar contenedor
-            container.innerHTML = '';
-            
-            Dos(container, {
+            // Iniciar emulador
+            Dos(document.getElementById("dos-container"), {
                 style: "hidden"
-            }).run(game.url).then(ci => {
-                currentCi = ci;
-                titleText.textContent = "Jugando: " + game.name;
-            });
+            }).run(currentURL);
         }
 
-        // Cerrar resultados al hacer click fuera
-        document.addEventListener('click', (e) => {
-            if (e.target !== searchInput) resultsDiv.style.display = 'none';
-        });
-
-        // Cargar Doom por defecto
-        selectGame(gameLibrary[0]);
-
+        // Reloj de la barra de tareas
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }, 1000);
     </script>
 </body>
 </html>
