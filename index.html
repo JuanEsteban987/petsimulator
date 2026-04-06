@@ -1,29 +1,28 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Custom Dev Environment</title>
+    <meta charset="UTF-8">
+    <title>Custom Programming Language IDE</title>
     <style>
-        body { background: #0f0f0f; color: #e0e0e0; font-family: 'Consolas', monospace; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        #editor-container { width: 45%; border-right: 2px solid #333; display: flex; flex-direction: column; }
-        #code-editor { flex-grow: 1; background: #1a1a1a; color: #d4d4d4; padding: 15px; border: none; resize: none; font-size: 14px; outline: none; }
-        #preview-container { width: 55%; background: #000; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        canvas { background: #050505; border: 2px solid #444; width: 90%; image-rendering: pixelated; }
-        .toolbar { background: #252526; padding: 10px; display: flex; gap: 10px; }
-        button { background: #0e639c; color: white; border: none; padding: 5px 15px; cursor: pointer; }
-        button:hover { background: #1177bb; }
-        .autocomplete { position: absolute; background: #2d2d2d; border: 1px solid #444; display: none; z-index: 100; }
-        .autocomplete div { padding: 5px 10px; cursor: pointer; }
-        .autocomplete div:hover { background: #094771; }
+        body { background: #0c0c0c; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; display: flex; height: 100vh; }
+        #left-panel { width: 40%; border-right: 2px solid #00ff41; display: flex; flex-direction: column; }
+        #right-panel { width: 60%; background: #000; position: relative; }
+        
+        textarea { flex-grow: 1; background: #000; color: #00ff41; border: none; padding: 20px; font-size: 16px; outline: none; resize: none; }
+        .btn-run { background: #00ff41; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn-run:hover { background: #008f11; }
+        
+        canvas { width: 100%; height: 70%; image-rendering: pixelated; }
+        #console { height: 30%; background: #050505; border-top: 1px solid #333; padding: 10px; font-size: 12px; color: #888; overflow-y: auto; }
+        
+        .label { background: #333; padding: 5px; font-size: 10px; color: #ccc; }
     </style>
 </head>
 <body>
 
-<div id="editor-container">
-    <div class="toolbar">
-        <button onclick="runCode()">▶ COMPILAR Y CORRER</button>
-        <span style="font-size: 12px; color: #888;">Tips: scene:, asset:, asset.edit:</span>
-    </div>
-    <textarea id="code-editor" spellcheck="false">
+<div id="left-panel">
+    <div class="label">EDITOR DE CÓDIGO PERSONALIZADO</div>
+    <textarea id="code-input" spellcheck="false">
 scene:
 	OOOOO
 	O+O-O
@@ -32,15 +31,15 @@ scene:
 	OOOOO
 
 asset:
-	"O" = "entity/player/object/tileset"
+	O = entity/player/object/tileset
 
-asset.edit:"E"
+asset.edit:E
 	life:100
 	damage:20
-	atacktype:"melee"
-	speed:1.0
+	atacktype:melee/range
+	speed:1
 
-asset.edit:"O"
+asset.edit:O
 	texture:
 	########
 	##R##R##
@@ -51,101 +50,99 @@ asset.edit:"O"
 	##R##R##
 	########
     </textarea>
+    <button class="btn-run" onclick="compileAndRun()">EJECUTAR CÓDIGO (COMPILAR)</button>
 </div>
 
-<div id="preview-container">
-    <canvas id="doomCanvas" width="320" height="200"></canvas>
-    <div id="hud" style="color: #00ff00; margin-top: 10px;">STATUS: STANDBY</div>
-    <div id="ac-menu" class="autocomplete"></div>
+<div id="right-panel">
+    <div class="label">RENDERIZADO DOOM 3D</div>
+    <canvas id="view" width="320" height="200"></canvas>
+    <div id="console">Sistema listo. Esperando compilación...</div>
 </div>
 
 <script>
-const editor = document.getElementById('code-editor');
-const acMenu = document.getElementById('ac-menu');
-const canvas = document.getElementById('doomCanvas');
+const log = (msg) => document.getElementById('console').innerHTML += `> ${msg}<br>`;
+const canvas = document.getElementById('view');
 const ctx = canvas.getContext('2d');
 
-// --- AUTOCOMPLETADO ---
-const keywords = ["scene:", "asset:", "asset.edit:", "life:", "damage:", "atacktype:", "texture:", "speed:"];
+function compileAndRun() {
+    const rawCode = document.getElementById('code-input').value;
+    log("Iniciando análisis sintáctico...");
 
-editor.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.code === 'Space') {
-        e.preventDefault();
-        const { offsetLeft, offsetTop } = editor;
-        acMenu.style.left = `50px`;
-        acMenu.style.top = `100px`;
-        acMenu.style.display = 'block';
-        acMenu.innerHTML = '';
-        keywords.forEach(kw => {
-            let div = document.createElement('div');
-            div.innerText = kw;
-            div.onclick = () => {
-                editor.setRangeText(kw);
-                acMenu.style.display = 'none';
-            };
-            acMenu.appendChild(div);
-        });
-    } else {
-        acMenu.style.display = 'none';
-    }
-});
+    // 1. PARSER DE TU LENGUAJE
+    const lines = rawCode.split('\n').map(l => l.trim());
+    let currentMap = [];
+    let currentTexture = [];
+    let isReadingScene = false;
+    let isReadingTexture = false;
 
-// --- MOTOR DE RENDERIZADO (RAYCASTING) ---
-let gameData = { map: [], texture: [] };
-
-function runCode() {
-    const code = editor.value;
-    // Parser simple para extraer la escena y textura
-    try {
-        const scenePart = code.split('scene:')[1].split('asset:')[0].trim().split('\n');
-        gameData.map = scenePart.map(line => line.trim().split(''));
+    lines.forEach(line => {
+        if (line.startsWith('scene:')) { isReadingScene = true; return; }
+        if (line.startsWith('asset:')) { isReadingScene = false; return; }
+        if (line.startsWith('texture:')) { isReadingTexture = true; return; }
         
-        const texturePart = code.split('texture:')[1].trim().split('\n').slice(0,8);
-        gameData.texture = texturePart.map(line => line.trim());
-        
-        startEngine();
-    } catch(e) {
-        alert("Error en la sintaxis de tu código personalizado");
-    }
+        if (isReadingScene && line.length > 0) {
+            currentMap.push(line.split(''));
+        }
+        if (isReadingTexture && line.length === 8) {
+            currentTexture.push(line);
+        }
+    });
+
+    if(currentTexture.length > 8) currentTexture = currentTexture.slice(0,8);
+
+    log("Escena detectada: " + currentMap.length + " líneas.");
+    log("Textura 'O' cargada correctamente.");
+    
+    startDoomEngine(currentMap, currentTexture);
 }
 
-function startEngine() {
-    let pX = 2.5, pY = 2.5, pA = 0;
-    const colors = { 'R': '#ff0000', 'Y': '#ffff00', '#': '#111' };
+function startDoomEngine(map, texture) {
+    let px = 2.5, py = 2.5, pa = 0; // Jugador
+    const colors = { 'R': '#ff0000', 'Y': '#ffff00', '#': 'transparent', 'G': '#00ff00', 'A': '#0000ff', 'N': '#000', 'B': '#fff' };
 
-    function draw() {
-        ctx.fillStyle = "#111"; ctx.fillRect(0,0,320,100); // Techo
-        ctx.fillStyle = "#333"; ctx.fillRect(0,100,320,100); // Suelo
+    function render() {
+        // Limpiar pantalla (Cielo y Suelo)
+        ctx.fillStyle = "#111"; ctx.fillRect(0,0,320,100); 
+        ctx.fillStyle = "#222"; ctx.fillRect(0,100,320,100);
 
-        for(let x=0; x<320; x++) {
-            let rayA = (pA - 0.6) + (x/320)*1.2;
-            let dist = 0;
+        // Raycasting
+        for(let x = 0; x < 320; x++) {
+            let rayAngle = (pa - 0.6) + (x / 320) * 1.2;
+            let distance = 0;
             let hit = false;
-            let tX = 0;
+            let hitX = 0;
 
-            while(!hit && dist < 10) {
-                dist += 0.05;
-                let testX = Math.floor(pX + Math.cos(rayA)*dist);
-                let testY = Math.floor(pY + Math.sin(rayA)*dist);
-                
-                if(gameData.map[testY] && gameData.map[testY][testX] === 'O') {
+            while(!hit && distance < 15) {
+                distance += 0.05;
+                let tx = Math.floor(px + Math.cos(rayAngle) * distance);
+                let ty = Math.floor(py + Math.sin(rayAngle) * distance);
+
+                if(map[ty] && map[ty][tx] === 'O') {
                     hit = true;
-                    tX = Math.floor(((pX + Math.cos(rayA)*dist)%1 + (pY + Math.sin(rayA)*dist)%1) * 8) % 8;
+                    // Calcular posición exacta del impacto para la textura
+                    let exactX = px + Math.cos(rayAngle) * distance;
+                    let exactY = py + Math.sin(rayAngle) * distance;
+                    hitX = Math.floor(((exactX % 1) + (exactY % 1)) * 8) % 8;
                 }
             }
 
-            let h = 200/dist;
-            // Dibujar textura personalizada píxel a píxel
-            for(let py=0; py<8; py++){
-                let char = gameData.texture[py][tX];
-                ctx.fillStyle = colors[char] || '#000';
-                ctx.fillRect(x, 100-h/2 + (py*(h/8)), 1, h/8 + 1);
+            let wallHeight = 200 / distance;
+            
+            // Dibujar columna de la textura "O" definida en tu código
+            for(let ty = 0; ty < 8; ty++) {
+                let pixel = texture[ty] ? texture[ty][hitX] : '#';
+                let color = colors[pixel];
+                if(color !== 'transparent') {
+                    ctx.fillStyle = color;
+                    let segH = wallHeight / 8;
+                    ctx.fillRect(x, (100 - wallHeight/2) + (ty * segH), 1, segH + 1);
+                }
             }
         }
-        pA += 0.01;
-        requestAnimationFrame(draw);
+        pa += 0.02; // Rotación de cámara
+        requestAnimationFrame(render);
     }
-    draw();
+    render();
 }
 </script>
 </body>
