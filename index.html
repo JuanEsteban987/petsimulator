@@ -2,148 +2,137 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Custom Programming Language IDE</title>
+    <title>Custom Language Engine - DOOM Style</title>
     <style>
-        body { background: #0c0c0c; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; display: flex; height: 100vh; }
-        #left-panel { width: 40%; border-right: 2px solid #00ff41; display: flex; flex-direction: column; }
-        #right-panel { width: 60%; background: #000; position: relative; }
-        
-        textarea { flex-grow: 1; background: #000; color: #00ff41; border: none; padding: 20px; font-size: 16px; outline: none; resize: none; }
-        .btn-run { background: #00ff41; color: #000; border: none; padding: 10px; font-weight: bold; cursor: pointer; text-align: center; }
-        .btn-run:hover { background: #008f11; }
-        
-        canvas { width: 100%; height: 70%; image-rendering: pixelated; }
-        #console { height: 30%; background: #050505; border-top: 1px solid #333; padding: 10px; font-size: 12px; color: #888; overflow-y: auto; }
-        
-        .label { background: #333; padding: 5px; font-size: 10px; color: #ccc; }
+        body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        #header { background: #111; width: 100%; padding: 10px; border-bottom: 2px solid #00ff41; text-align: center; font-size: 14px; }
+        canvas { background: #000; border: 4px solid #222; image-rendering: pixelated; margin-top: 20px; }
+        .hud { width: 640px; height: 80px; background: #1a1a1a; border: 2px solid #555; display: flex; justify-content: space-around; align-items: center; margin-top: 10px; }
+        .stat-box { text-align: center; border: 1px solid #333; padding: 5px 20px; }
+        .controls { color: #888; font-size: 12px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-<div id="left-panel">
-    <div class="label">EDITOR DE CÓDIGO PERSONALIZADO</div>
-    <textarea id="code-input" spellcheck="false">
-scene:
-	OOOOO
-	O+O-O
-	O O O
-	O E O
-	OOOOO
+<div id="header">EMULADOR DE LENGUAJE CUSTOM C++ | STATUS: RUNNING</div>
 
-asset:
-	O = entity/player/object/tileset
+<canvas id="doomScreen" width="640" height="320"></canvas>
 
-asset.edit:E
-	life:100
-	damage:20
-	atacktype:melee/range
-	speed:1
-
-asset.edit:O
-	texture:
-	########
-	##R##R##
-	#RYRRYR#
-	#RRRRRR#
-	###RR###
-	###RR###
-	##R##R##
-	########
-    </textarea>
-    <button class="btn-run" onclick="compileAndRun()">EJECUTAR CÓDIGO (COMPILAR)</button>
+<div class="hud">
+    <div class="stat-box"> <div style="font-size: 10px;">LIFE</div> <div id="hp-val" style="color: #ff0000; font-size: 24px; font-weight: bold;">100</div> </div>
+    <div class="stat-box"> <div style="font-size: 10px;">SPEED</div> <div id="spd-val" style="color: #ffff00; font-size: 24px;">1.0</div> </div>
+    <div class="stat-box"> <div style="font-size: 10px;">ENTITY E</div> <div style="color: #00ff41; font-size: 12px;">DMG: 20 | TYPE: MELEE</div> </div>
 </div>
 
-<div id="right-panel">
-    <div class="label">RENDERIZADO DOOM 3D</div>
-    <canvas id="view" width="320" height="200"></canvas>
-    <div id="console">Sistema listo. Esperando compilación...</div>
-</div>
+<div class="controls">Usa las flechas o WASD para moverte por la escene</div>
 
 <script>
-const log = (msg) => document.getElementById('console').innerHTML += `> ${msg}<br>`;
-const canvas = document.getElementById('view');
+/**
+ * INTERPRETACIÓN DEL CÓDIGO CUSTOM
+ */
+const config = {
+    colors: { 'R': '#ff0000', 'Y': '#ffff00', '#': 'transparent', 'G': '#00ff00', 'A': '#0000ff', 'N': '#000000', 'B': '#ffffff' },
+    scene: [
+        ['O', 'O', 'O', 'O', 'O'],
+        ['O', '+', 'O', '-', 'O'],
+        ['O', ' ', 'O', ' ', 'O'],
+        ['O', ' ', 'E', ' ', 'O'],
+        ['O', 'O', 'O', 'O', 'O']
+    ],
+    assets: {
+        'E': {
+            type: "entity",
+            life: 100,
+            damage: 20,
+            atacktype: "melee",
+            speed: 1,
+            texture: ["########","##R##R##","#RYRRYR#","#RRRRRR#","###RR###","###RR###","##R##R##","########"]
+        },
+        'O': {
+            type: "tileset",
+            texture: ["RRRRRRRR","RRRRRRRR","RRRRRRRR","RRRRRRRR","RRRRRRRR","RRRRRRRR","RRRRRRRR","RRRRRRRR"]
+        },
+        '+': {
+            type: "player",
+            life: 100,
+            speed: 1,
+            texture: ["########","##B##B##","#RYRRYR#","#BBBBBB#","###RR###","###RR###","##N##N##","########"]
+        },
+        '-': { // El símbolo "-" en tu escena como la meta/finish
+            type: "finish",
+            texture: ["########","###BNBNB","###NBNBN","###BNBNB","###N####","####N###","####N###","########"]
+        }
+    }
+};
+
+const canvas = document.getElementById('doomScreen');
 const ctx = canvas.getContext('2d');
 
-function compileAndRun() {
-    const rawCode = document.getElementById('code-input').value;
-    log("Iniciando análisis sintáctico...");
+let player = { x: 1.5, y: 1.5, dir: 0, speed: 0.05 };
+const keys = {};
 
-    // 1. PARSER DE TU LENGUAJE
-    const lines = rawCode.split('\n').map(l => l.trim());
-    let currentMap = [];
-    let currentTexture = [];
-    let isReadingScene = false;
-    let isReadingTexture = false;
+window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
+window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
 
-    lines.forEach(line => {
-        if (line.startsWith('scene:')) { isReadingScene = true; return; }
-        if (line.startsWith('asset:')) { isReadingScene = false; return; }
-        if (line.startsWith('texture:')) { isReadingTexture = true; return; }
-        
-        if (isReadingScene && line.length > 0) {
-            currentMap.push(line.split(''));
-        }
-        if (isReadingTexture && line.length === 8) {
-            currentTexture.push(line);
-        }
-    });
-
-    if(currentTexture.length > 8) currentTexture = currentTexture.slice(0,8);
-
-    log("Escena detectada: " + currentMap.length + " líneas.");
-    log("Textura 'O' cargada correctamente.");
-    
-    startDoomEngine(currentMap, currentTexture);
-}
-
-function startDoomEngine(map, texture) {
-    let px = 2.5, py = 2.5, pa = 0; // Jugador
-    const colors = { 'R': '#ff0000', 'Y': '#ffff00', '#': 'transparent', 'G': '#00ff00', 'A': '#0000ff', 'N': '#000', 'B': '#fff' };
-
-    function render() {
-        // Limpiar pantalla (Cielo y Suelo)
-        ctx.fillStyle = "#111"; ctx.fillRect(0,0,320,100); 
-        ctx.fillStyle = "#222"; ctx.fillRect(0,100,320,100);
-
-        // Raycasting
-        for(let x = 0; x < 320; x++) {
-            let rayAngle = (pa - 0.6) + (x / 320) * 1.2;
-            let distance = 0;
-            let hit = false;
-            let hitX = 0;
-
-            while(!hit && distance < 15) {
-                distance += 0.05;
-                let tx = Math.floor(px + Math.cos(rayAngle) * distance);
-                let ty = Math.floor(py + Math.sin(rayAngle) * distance);
-
-                if(map[ty] && map[ty][tx] === 'O') {
-                    hit = true;
-                    // Calcular posición exacta del impacto para la textura
-                    let exactX = px + Math.cos(rayAngle) * distance;
-                    let exactY = py + Math.sin(rayAngle) * distance;
-                    hitX = Math.floor(((exactX % 1) + (exactY % 1)) * 8) % 8;
-                }
-            }
-
-            let wallHeight = 200 / distance;
-            
-            // Dibujar columna de la textura "O" definida en tu código
-            for(let ty = 0; ty < 8; ty++) {
-                let pixel = texture[ty] ? texture[ty][hitX] : '#';
-                let color = colors[pixel];
-                if(color !== 'transparent') {
-                    ctx.fillStyle = color;
-                    let segH = wallHeight / 8;
-                    ctx.fillRect(x, (100 - wallHeight/2) + (ty * segH), 1, segH + 1);
-                }
-            }
-        }
-        pa += 0.02; // Rotación de cámara
-        requestAnimationFrame(render);
+function render() {
+    // Movimiento
+    if (keys['w'] || keys['arrowup']) {
+        let nx = player.x + Math.cos(player.dir) * player.speed;
+        let ny = player.y + Math.sin(player.dir) * player.speed;
+        if (config.scene[Math.floor(ny)][Math.floor(nx)] !== 'O') { player.x = nx; player.y = ny; }
     }
-    render();
+    if (keys['s'] || keys['arrowdown']) {
+        let nx = player.x - Math.cos(player.dir) * player.speed;
+        let ny = player.y - Math.sin(player.dir) * player.speed;
+        if (config.scene[Math.floor(ny)][Math.floor(nx)] !== 'O') { player.x = nx; player.y = ny; }
+    }
+    if (keys['a'] || keys['arrowleft']) player.dir -= 0.05;
+    if (keys['d'] || keys['arrowright']) player.dir += 0.05;
+
+    // Dibujar Fondo
+    ctx.fillStyle = "#111"; ctx.fillRect(0, 0, 640, 160); // Techo
+    ctx.fillStyle = "#222"; ctx.fillRect(0, 160, 640, 160); // Suelo
+
+    // Raycasting para Renderizar la Escena
+    for (let x = 0; x < 160; x++) {
+        let rayAngle = (player.dir - 0.5) + (x / 160);
+        let dist = 0;
+        let hit = false;
+        let hitType = '';
+        let hitX = 0;
+
+        while (!hit && dist < 10) {
+            dist += 0.02;
+            let tx = Math.floor(player.x + Math.cos(rayAngle) * dist);
+            let ty = Math.floor(player.y + Math.sin(rayAngle) * dist);
+
+            if (config.scene[ty] && config.scene[ty][tx] !== ' ' && config.scene[ty][tx] !== '+') {
+                hit = true;
+                hitType = config.scene[ty][tx];
+                let exactX = player.x + Math.cos(rayAngle) * dist;
+                let exactY = player.y + Math.sin(rayAngle) * dist;
+                hitX = Math.floor(((exactX % 1) + (exactY % 1)) * 8) % 8;
+            }
+        }
+
+        let h = 320 / dist;
+        let asset = config.assets[hitType];
+
+        if (asset) {
+            for (let py = 0; py < 8; py++) {
+                let char = asset.texture[py][hitX];
+                let color = config.colors[char];
+                if (color !== 'transparent') {
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x * 4, (160 - h / 2) + (py * (h / 8)), 4, (h / 8) + 1);
+                }
+            }
+        }
+    }
+    requestAnimationFrame(render);
 }
+
+render();
 </script>
 </body>
 </html>
