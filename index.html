@@ -2,173 +2,47 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>TERMINAL_IDE: CUSTOM_C++_ENGINE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom C++ IDE & Engine</title>
     <style>
-        :root {
-            --bg: #0a0a0a;
-            --panel: #161616;
-            --text: #00ff41;
-            --border: #333;
-            --accent: #ff3e3e;
-        }
-
-        body, html {
-            margin: 0; padding: 0;
-            background: var(--bg);
-            color: var(--text);
-            font-family: 'Consolas', 'Courier New', monospace;
-            height: 100vh; overflow: hidden;
-        }
-
-        #app-container {
-            display: flex;
-            height: 100vh;
-            width: 100vw;
-        }
-
-        /* --- SECCIÓN DEL EDITOR (ESTILO PAINT/CODE) --- */
-        #editor-section {
-            width: 450px;
-            display: flex;
-            flex-direction: column;
-            border-right: 2px solid var(--border);
-            background: var(--panel);
-        }
-
-        .header-bar {
-            padding: 10px;
-            background: #222;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .btn-compile {
-            background: var(--text);
-            color: #000;
-            border: none;
-            padding: 8px 20px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        .btn-compile:hover {
-            background: #fff;
-            box-shadow: 0 0 10px var(--text);
-        }
-
-        #code-input {
-            flex-grow: 1;
-            background: transparent;
-            color: #d1d1d1;
-            border: none;
-            padding: 20px;
-            font-size: 13px;
-            line-height: 1.5;
-            resize: none;
-            outline: none;
-            overflow-y: auto;
-        }
-
-        /* --- SECCIÓN DEL VISOR (DOOM ENGINE) --- */
-        #viewport-section {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            background: #000;
-        }
-
-        #canvas-container {
-            flex-grow: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            perspective: 1000px;
-        }
-
-        canvas {
-            width: 90%;
-            height: auto;
-            max-width: 960px;
-            aspect-ratio: 16 / 9;
-            image-rendering: pixelated;
-            border: 5px solid #222;
-            box-shadow: 0 0 50px rgba(0,0,0,1);
-        }
-
-        /* --- INTERFAZ HUD --- */
-        #hud-display {
-            height: 120px;
-            background: #111;
-            border-top: 2px solid var(--border);
-            display: flex;
-            padding: 0 40px;
-            align-items: center;
-            gap: 50px;
-        }
-
-        .stat-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .stat-label {
-            font-size: 10px;
-            color: #666;
-            letter-spacing: 2px;
-            margin-bottom: 5px;
-        }
-
-        .stat-value {
-            font-size: 28px;
-            color: var(--text);
-            text-shadow: 0 0 5px var(--text);
-        }
-
-        .stat-value.alt { color: var(--accent); text-shadow: 0 0 5px var(--accent); }
-
-        /* --- CONSOLA DE ERRORES --- */
-        #debug-console {
-            position: absolute;
-            bottom: 130px;
-            left: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.8);
-            padding: 10px;
-            font-size: 11px;
-            color: #aaa;
-            max-height: 100px;
-            overflow-y: auto;
-            border-left: 3px solid var(--text);
-            pointer-events: none;
-        }
-
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #111; }
-        ::-webkit-scrollbar-thumb { background: #333; }
+        :root { --bg: #0d0d0d; --green: #00ff41; --panel: #1a1a1a; --border: #333; }
+        body { background: var(--bg); color: #ccc; font-family: 'Consolas', monospace; margin: 0; overflow: hidden; display: flex; height: 100vh; }
+        
+        /* Layout */
+        #editor-side { width: 40%; display: flex; flex-direction: column; border-right: 2px solid var(--border); background: var(--panel); }
+        #game-side { width: 60%; position: relative; display: flex; flex-direction: column; background: #000; }
+        
+        /* UI Elements */
+        .toolbar { padding: 10px; background: #222; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+        .btn-run { background: var(--green); color: #000; border: none; padding: 8px 15px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .btn-run:hover { filter: brightness(1.2); box-shadow: 0 0 10px var(--green); }
+        
+        textarea { flex-grow: 1; background: transparent; color: #00ff41; border: none; padding: 20px; font-size: 14px; outline: none; resize: none; line-height: 1.5; }
+        
+        canvas { width: 100%; height: 70%; image-rendering: pixelated; background: #050505; }
+        
+        #hud { height: 30%; background: #111; border-top: 2px solid var(--border); padding: 20px; display: grid; grid-template-columns: repeat(3, 1fr); }
+        .stat { border: 1px solid #333; padding: 10px; text-align: center; }
+        .stat-val { font-size: 24px; color: var(--green); display: block; }
+        
+        .console { position: absolute; bottom: 32%; left: 10px; font-size: 12px; color: #666; pointer-events: none; }
     </style>
 </head>
 <body>
 
-<div id="app-container">
-    <section id="editor-section">
-        <div class="header-bar">
-            <span>ENGINE_IDE_V1.0</span>
-            <button class="btn-compile" onclick="Core.compile()">RUN_PROJECT</button>
-        </div>
-        <textarea id="code-input" spellcheck="false">
+<div id="editor-side">
+    <div class="toolbar">
+        <button class="btn-run" onclick="Engine.init()">▶ INITIALIZE_PROJECT</button>
+        <span style="font-size: 10px; color: #888;">LANGUAGE: CUSTOM_CPP_V1</span>
+    </div>
+    <textarea id="code-input" spellcheck="false">
 escene:
-	OOOOOOOOOO
-	O+       O
-	O  O  O  O
-	O  O E O  O
-	O  OOOO  O
-	O        O
-	O  E  -  O
-	OOOOOOOOOO
+	OOOOOOO
+	O+    O
+	O O O O
+	O E   O
+	O  -  O
+	OOOOOOO
 
 asset.make:
 	O = entity/player/object/tileset/other
@@ -177,7 +51,7 @@ asset.edit:E
 	<entity>
 	life:100
 	damage:20
-	atacktype:melee/range
+	atacktype:melee
 	speed:1
 	texture:
 	########
@@ -204,7 +78,7 @@ asset.edit:O
 asset.edit:+
 	<player>
 	life:100
-	speed:1
+	speed:1.2
 	texture:
 	########
 	##B##B##
@@ -226,294 +100,152 @@ asset.edit:-
 	####N###
 	####N###
 	########
+    </textarea>
+</div>
 
-///// R=rojo #=Nada G=verde A=azul Y=amarillo N=negro B=blanco
-        </textarea>
-    </section>
-
-    <section id="viewport-section">
-        <div id="canvas-container">
-            <canvas id="main-render" width="640" height="360"></canvas>
-        </div>
-
-        <div id="debug-console" id="log-output">
-            [SYSTEM] Ingrese código y presione RUN_PROJECT...
-        </div>
-
-        <div id="hud-display">
-            <div class="stat-group">
-                <div class="stat-label">VIT_PULSE</div>
-                <div id="ui-life" class="stat-value">100</div>
-            </div>
-            <div class="stat-group">
-                <div class="stat-label">VELOCITY_IDX</div>
-                <div id="ui-speed" class="stat-value">1.0</div>
-            </div>
-            <div class="stat-group">
-                <div class="stat-label">COORD_MATRIX</div>
-                <div id="ui-pos" class="stat-value" style="font-size: 14px;">X: 0.00 Y: 0.00</div>
-            </div>
-            <div class="stat-group" style="margin-left: auto;">
-                <div class="stat-label">TARGET_TYPE</div>
-                <div class="stat-value alt">STABLE</div>
-            </div>
-        </div>
-    </section>
+<div id="game-side">
+    <canvas id="render"></canvas>
+    <div class="console" id="log">> System ready...</div>
+    <div id="hud">
+        <div class="stat"><span>VITALITY</span><span id="ui-hp" class="stat-val">100</span></div>
+        <div class="stat"><span>VELOCITY</span><span id="ui-speed" class="stat-val">1.0</span></div>
+        <div class="stat"><span>STATUS</span><span id="ui-status" class="stat-val" style="font-size: 14px;">STANDBY</span></div>
+    </div>
 </div>
 
 <script>
 /**
- * OMNI-ENGINE CORE
- * Motor desarrollado para procesar sintaxis personalizada y renderizado Raycasting 3D.
+ * ENGINE CORE
+ * Implementación de Raycasting y Compilador de Sintaxis
  */
-
-const Core = {
-    canvas: null,
+const Engine = {
     ctx: null,
-    frame: 0,
-    isRunning: false,
-    
-    // Almacenamiento de Datos del Compilador
-    config: {
-        map: [],
-        assets: {},
-        colors: { 
-            'R': '#ff0000', 'G': '#00ff00', 'A': '#0000ff', 
-            'Y': '#ffff00', 'N': '#000000', 'B': '#ffffff', '#': 'transparent' 
-        }
-    },
-
-    // Estado del Jugador
-    player: {
-        x: 2, y: 2, dir: 0, 
-        life: 100, speed: 0.06,
-        fov: Math.PI / 3
-    },
-
+    canvas: null,
+    map: [],
+    assets: {},
+    player: { x: 0, y: 0, dir: 0, life: 100, spd: 0.05 },
+    colors: { 'R':'#f00','G':'#0f0','A':'#00f','Y':'#ff0','N':'#000','B':'#fff','#':'transparent' },
     keys: {},
 
     init() {
-        this.canvas = document.getElementById('main-render');
-        this.ctx = this.canvas.getContext('2d', { alpha: false });
+        this.canvas = document.getElementById('render');
+        this.ctx = this.canvas.getContext('2d');
+        this.canvas.width = 640;
+        this.canvas.height = 360;
         
-        window.addEventListener('keydown', e => this.keys[e.key.toLowerCase()] = true);
-        window.addEventListener('keyup', e => this.keys[e.key.toLowerCase()] = false);
-        
-        this.log("Motor inicializado.");
-        this.compile(); // Primera ejecución
-        this.loop();
+        window.onkeydown = (e) => this.keys[e.key.toLowerCase()] = true;
+        window.onkeyup = (e) => this.keys[e.key.toLowerCase()] = false;
+
+        this.compile();
+        document.getElementById('ui-status').innerText = "RUNNING";
+        requestAnimationFrame(() => this.loop());
     },
 
-    log(msg) {
-        const console = document.getElementById('debug-console');
-        console.innerHTML += `<div>[LOG_${this.frame}] ${msg}</div>`;
-        console.scrollTop = console.scrollHeight;
-    },
-
-    /**
-     * COMPILADOR DE LENGUAJE PERSONALIZADO
-     * Analiza el texto del área de edición y construye el mundo.
-     */
     compile() {
-        const source = document.getElementById('code-input').value;
-        const lines = source.split('\n');
-        
-        this.config.map = [];
-        this.config.assets = {};
-        
-        let section = null;
-        let currentAssetId = null;
-        let isReadingTexture = false;
+        const code = document.getElementById('code-input').value;
+        const lines = code.split('\n');
+        let section = "";
+        let currentAsset = "";
+        let readingTex = false;
 
-        this.log("Iniciando compilación de scripts...");
+        this.map = [];
+        this.assets = {};
 
         lines.forEach(line => {
-            const cleanLine = line.trim();
-            if(!cleanLine || cleanLine.startsWith('//')) return;
+            const l = line.trim();
+            if(!l || l.startsWith('//')) return;
 
-            // Detección de Secciones
-            if(cleanLine.startsWith('escene:')) { section = 'SCENE'; return; }
-            if(cleanLine.startsWith('asset.make:')) { section = 'MAKE'; return; }
-            if(cleanLine.startsWith('asset.edit:')) { 
-                section = 'EDIT'; 
-                currentAssetId = cleanLine.split(':')[1];
-                this.config.assets[currentAssetId] = { texture: [], life: 100, damage: 0, speed: 1 };
-                isReadingTexture = false;
-                return;
+            if(l.startsWith('escene:')) { section = "MAP"; return; }
+            if(l.startsWith('asset.edit:')) { 
+                section = "EDIT"; 
+                currentAsset = l.split(':')[1];
+                this.assets[currentAsset] = { texture: [], life: 100 };
+                readingTex = false;
+                return; 
             }
 
-            // Procesar Escena
-            if(section === 'SCENE') {
-                this.config.map.push(line.replace('\t', '').split(''));
-            }
-
-            // Procesar Edición de Assets
-            if(section === 'EDIT' && currentAssetId) {
-                if(cleanLine.includes('life:')) this.config.assets[currentAssetId].life = parseInt(cleanLine.split(':')[1]);
-                if(cleanLine.includes('speed:')) this.config.assets[currentAssetId].speed = parseFloat(cleanLine.split(':')[1]);
-                if(cleanLine.includes('texture:')) { isReadingTexture = true; return; }
-
-                if(isReadingTexture && cleanLine.length === 8) {
-                    this.config.assets[currentAssetId].texture.push(cleanLine);
-                }
+            if(section === "MAP") this.map.push(l.split(''));
+            
+            if(section === "EDIT") {
+                if(l.includes('life:')) this.assets[currentAsset].life = parseInt(l.split(':')[1]);
+                if(l.includes('speed:')) this.player.spd = parseFloat(l.split(':')[1]) * 0.05;
+                if(l.startsWith('texture:')) { readingTex = true; return; }
+                if(readingTex && l.length === 8) this.assets[currentAsset].texture.push(l);
             }
         });
 
-        // Posicionar jugador
-        this.config.map.forEach((row, y) => {
-            row.forEach((cell, x) => {
-                if(cell === '+') { this.player.x = x + 0.5; this.player.y = y + 0.5; }
-            });
-        });
-
-        // Actualizar UI
-        document.getElementById('ui-life').innerText = this.config.assets['+']?.life || 100;
-        document.getElementById('ui-speed').innerText = (this.config.assets['+']?.speed || 1).toFixed(1);
+        // Spawn Player
+        this.map.forEach((row, y) => row.forEach((cell, x) => {
+            if(cell === '+') { this.player.x = x + 0.5; this.player.y = y + 0.5; }
+        }));
         
-        this.log("Compilación exitosa. Mapa generado.");
+        document.getElementById('ui-hp').innerText = this.assets['+']?.life || 100;
+        document.getElementById('ui-speed').innerText = (this.player.spd * 20).toFixed(1);
     },
 
     update() {
-        const moveSpeed = this.player.speed;
-        const rotSpeed = 0.04;
-
-        let nextX = this.player.x;
-        let nextY = this.player.y;
+        let moveX = Math.cos(this.player.dir) * this.player.spd;
+        let moveY = Math.sin(this.player.dir) * this.player.spd;
 
         if(this.keys['w']) {
-            nextX += Math.cos(this.player.dir) * moveSpeed;
-            nextY += Math.sin(this.player.dir) * moveSpeed;
+            if(this.map[Math.floor(this.player.y)][Math.floor(this.player.x + moveX)] !== 'O') this.player.x += moveX;
+            if(this.map[Math.floor(this.player.y + moveY)][Math.floor(this.player.x)] !== 'O') this.player.y += moveY;
         }
         if(this.keys['s']) {
-            nextX -= Math.cos(this.player.dir) * moveSpeed;
-            nextY -= Math.sin(this.player.dir) * moveSpeed;
+            if(this.map[Math.floor(this.player.y)][Math.floor(this.player.x - moveX)] !== 'O') this.player.x -= moveX;
+            if(this.map[Math.floor(this.player.y - moveY)][Math.floor(this.player.x)] !== 'O') this.player.y -= moveY;
         }
-        if(this.keys['a']) this.player.dir -= rotSpeed;
-        if(this.keys['d']) this.player.dir += rotSpeed;
-
-        // Colisión básica con 'O'
-        const gridX = Math.floor(nextX);
-        const gridY = Math.floor(nextY);
-        
-        if(this.config.map[gridY] && this.config.map[gridY][gridX] !== 'O') {
-            this.player.x = nextX;
-            this.player.y = nextY;
-        }
-
-        document.getElementById('ui-pos').innerText = `X: ${this.player.x.toFixed(2)} Y: ${this.player.y.toFixed(2)}`;
+        if(this.keys['a']) this.player.dir -= 0.04;
+        if(this.keys['d']) this.player.dir += 0.04;
     },
 
-    /**
-     * MOTOR DE RENDERIZADO RAYCASTING
-     */
     draw() {
-        const ctx = this.ctx;
-        const w = this.canvas.width;
-        const h = this.canvas.height;
+        const {ctx, canvas} = this;
+        // Background
+        ctx.fillStyle = "#1a1a1a"; ctx.fillRect(0,0,640,180);
+        ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0,180,640,180);
 
-        // Limpiar pantalla (Cielo y Tierra)
-        const grad = ctx.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, '#050505');
-        grad.addColorStop(0.5, '#111');
-        grad.addColorStop(0.5, '#0a0a0a');
-        grad.addColorStop(1, '#000');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, w, h);
-
-        const numRays = w / 2; // Resolución de hilos
-        const rayStep = this.player.fov / numRays;
-
-        for(let i = 0; i < numRays; i++) {
-            const rayAngle = (this.player.dir - this.player.fov / 2) + (i * rayStep);
-            
-            let distance = 0;
+        // Raycasting
+        for(let i=0; i<160; i++) {
+            let rayA = (this.player.dir - 0.5) + (i / 160);
+            let dist = 0;
             let hit = null;
             let hitX = 0;
-            let stepSize = 0.02;
 
-            // DDA Simplificado
-            while(distance < 15) {
-                distance += stepSize;
-                const tx = Math.floor(this.player.x + Math.cos(rayAngle) * distance);
-                const ty = Math.floor(this.player.y + Math.sin(rayAngle) * distance);
-
-                if(this.config.map[ty] && this.config.map[ty][tx] && this.config.map[ty][tx] !== ' ' && this.config.map[ty][tx] !== '+') {
-                    hit = this.config.map[ty][tx];
-                    
-                    // Calcular impacto exacto en la cara del bloque para textura
-                    const xHit = this.player.x + Math.cos(rayAngle) * distance;
-                    const yHit = this.player.y + Math.sin(rayAngle) * distance;
-                    hitX = Math.floor(((xHit % 1) + (yHit % 1)) * 8) % 8;
+            while(dist < 12) {
+                dist += 0.05;
+                let tx = Math.floor(this.player.x + Math.cos(rayA)*dist);
+                let ty = Math.floor(this.player.y + Math.sin(rayA)*dist);
+                if(this.map[ty] && this.map[ty][tx] && this.map[ty][tx] !== ' ' && this.map[ty][tx] !== '+') {
+                    hit = this.map[ty][tx];
+                    hitX = Math.floor(((this.player.x + Math.cos(rayA)*dist)%1 + (this.player.y + Math.sin(rayA)*dist)%1)*8)%8;
                     break;
                 }
             }
 
-            if(hit && this.config.assets[hit]) {
-                // Corregir efecto ojo de pez
-                const correctedDist = distance * Math.cos(rayAngle - this.player.dir);
-                const wallHeight = (h / correctedDist) * 0.8;
-                
-                const asset = this.config.assets[hit];
-                const tex = asset.texture;
-                const columnWidth = w / numRays;
-
-                // Dibujar la columna de píxeles estirada
-                for(let py = 0; py < 8; py++) {
+            if(hit && this.assets[hit]) {
+                let h = 400 / (dist * Math.cos(rayA - this.player.dir));
+                let tex = this.assets[hit].texture;
+                for(let py=0; py<8; py++) {
                     if(!tex[py]) continue;
-                    const pixelChar = tex[py][hitX];
-                    const color = this.config.colors[pixelChar];
-
+                    let color = this.colors[tex[py][hitX]];
                     if(color !== 'transparent') {
                         ctx.fillStyle = color;
-                        
-                        // Aplicar sombreado por distancia (Niebla)
-                        const brightness = Math.max(0, 1 - (distance / 12));
-                        ctx.globalAlpha = brightness;
-                        
-                        const segmentH = wallHeight / 8;
-                        ctx.fillRect(
-                            i * columnWidth, 
-                            (h / 2 - wallHeight / 2) + (py * segmentH), 
-                            columnWidth + 0.5, 
-                            segmentH + 1
-                        );
-                        ctx.globalAlpha = 1;
+                        ctx.globalAlpha = Math.min(1, 4/dist); // Sombras por distancia
+                        ctx.fillRect(i*4, 180-h/2 + (py*(h/8)), 4, h/8 + 1);
                     }
                 }
+                ctx.globalAlpha = 1;
             }
         }
-
-        this.drawMinimap();
-    },
-
-    drawMinimap() {
-        const size = 5;
-        const ctx = this.ctx;
-        ctx.strokeStyle = '#333';
-        this.config.map.forEach((row, y) => {
-            row.forEach((cell, x) => {
-                if(cell === 'O') ctx.fillStyle = '#ff0000';
-                else if(cell === 'E') ctx.fillStyle = '#ffff00';
-                else if(cell === '-') ctx.fillStyle = '#ffffff';
-                else ctx.fillStyle = '#111';
-                ctx.fillRect(10 + x * size, 10 + y * size, size, size);
-            });
-        });
-        // Punto jugador
-        ctx.fillStyle = '#00ff00';
-        ctx.fillRect(10 + this.player.x * size - 1, 10 + this.player.y * size - 1, 3, 3);
     },
 
     loop() {
-        this.frame++;
         this.update();
         this.draw();
         requestAnimationFrame(() => this.loop());
     }
 };
-
-// Arrancar motor al cargar
-window.onload = () => Core.init();
 </script>
 </body>
 </html>
