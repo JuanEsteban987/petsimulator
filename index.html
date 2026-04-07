@@ -2,137 +2,245 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Custom Language Engine - DOOM Style</title>
+    <title>Custom Engine IDE - Paint Style</title>
     <style>
-        body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
-        #header { background: #111; width: 100%; padding: 10px; border-bottom: 2px solid #00ff41; text-align: center; font-size: 14px; }
-        canvas { background: #000; border: 4px solid #222; image-rendering: pixelated; margin-top: 20px; }
-        .hud { width: 640px; height: 80px; background: #1a1a1a; border: 2px solid #555; display: flex; justify-content: space-around; align-items: center; margin-top: 10px; }
-        .stat-box { text-align: center; border: 1px solid #333; padding: 5px 20px; }
-        .controls { color: #888; font-size: 12px; margin-top: 10px; }
+        :root { --main-bg: #1e1e1e; --accent: #00ff41; --panel-border: #444; }
+        body { background: #121212; color: #eee; font-family: 'Segoe UI', monospace; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Interfaz tipo Paint / IDE */
+        #editor-panel { width: 400px; border-right: 2px solid var(--panel-border); display: flex; flex-direction: column; background: #252526; }
+        #viewer-panel { flex-grow: 1; display: flex; flex-direction: column; background: #000; align-items: center; justify-content: center; }
+        
+        .toolbar { background: #333; padding: 8px; display: flex; gap: 10px; border-bottom: 1px solid var(--panel-border); }
+        button { background: var(--accent); color: #000; border: none; padding: 8px 15px; cursor: pointer; font-weight: bold; border-radius: 2px; }
+        button:hover { background: #00cc33; }
+
+        textarea { flex-grow: 1; background: #1e1e1e; color: #d4d4d4; border: none; padding: 15px; font-size: 13px; line-height: 1.4; outline: none; resize: none; font-family: 'Consolas', monospace; }
+        
+        /* Pantalla de Juego */
+        canvas { background: #000; border: 2px solid #555; box-shadow: 0 0 20px rgba(0,0,0,0.5); width: 90%; max-width: 800px; image-rendering: pixelated; }
+        
+        .hud-mini { width: 90%; max-width: 800px; background: #111; border: 1px solid #333; margin-top: 10px; display: flex; padding: 10px; gap: 20px; color: var(--accent); font-family: monospace; }
+        .label-id { color: #888; font-size: 10px; margin-bottom: 5px; }
     </style>
 </head>
 <body>
 
-<div id="header">EMULADOR DE LENGUAJE CUSTOM C++ | STATUS: RUNNING</div>
+<div id="editor-panel">
+    <div class="toolbar">
+        <button onclick="compileAndRun()">▶ COMPILAR JUEGO</button>
+        <div style="margin-left:auto; font-size: 11px; color: #aaa;">Lenguaje: Custom C++</div>
+    </div>
+    <textarea id="code-input" spellcheck="false">
+escene:
+	OOOOO
+	O+O-O
+	O O O
+	O E O
+	OOOOO
 
-<canvas id="doomScreen" width="640" height="320"></canvas>
+asset.make:
+	O = entity/player/object/tileset/other
 
-<div class="hud">
-    <div class="stat-box"> <div style="font-size: 10px;">LIFE</div> <div id="hp-val" style="color: #ff0000; font-size: 24px; font-weight: bold;">100</div> </div>
-    <div class="stat-box"> <div style="font-size: 10px;">SPEED</div> <div id="spd-val" style="color: #ffff00; font-size: 24px;">1.0</div> </div>
-    <div class="stat-box"> <div style="font-size: 10px;">ENTITY E</div> <div style="color: #00ff41; font-size: 12px;">DMG: 20 | TYPE: MELEE</div> </div>
+asset.edit:E
+	<entity>
+	life:100
+	damage:20
+	atacktype:melee/range
+	speed:1
+	texture:
+	########
+	##R##R##
+	#RYRRYR#
+	#RRRRRR#
+	###RR###
+	###RR###
+	##R##R##
+	########
+
+asset.edit:O
+	<tileset>
+	texture:
+	RRRRRRRR
+	RRRRRRRR
+	RRRRRRRR
+	RRRRRRRR
+	RRRRRRRR
+	RRRRRRRR
+	RRRRRRRR
+	RRRRRRRR
+
+asset.edit:+
+	<player>
+	life:100
+	speed:1
+	texture:
+	########
+	##B##B##
+	#RYRRYR#
+	#BBBBBB#
+	###RR###
+	###RR###
+	##N##N##
+	########
+
+asset.edit:-
+	<other><finish>
+	texture:
+	########
+	###BNBNB
+	###NBNBN
+	###BNBNB
+	###N####
+	####N###
+	####N###
+	########
+
+///// R=rojo #=Nada G=verde A=azul Y=amarillo N=negro B=blanco
+    </textarea>
 </div>
 
-<div class="controls">Usa las flechas o WASD para moverte por la escene</div>
+<div id="viewer-panel">
+    <div class="label-id">SCREEN_OUTPUT: 640x320_RAYCAST_ENGINE</div>
+    <canvas id="gameCanvas" width="640" height="320"></canvas>
+    
+    <div class="hud-mini">
+        <div>HP: <span id="ui-hp">100</span></div>
+        <div>SPD: <span id="ui-spd">1.0</span></div>
+        <div>STATUS: <span id="ui-msg" style="color:white">READY</span></div>
+    </div>
+    <div style="color: #666; font-size: 11px; margin-top: 10px;">WASD para caminar | Compila para aplicar cambios de textura</div>
+</div>
 
 <script>
-/**
- * INTERPRETACIÓN DEL CÓDIGO CUSTOM
- */
-const config = {
-    colors: { 'R': '#ff0000', 'Y': '#ffff00', '#': 'transparent', 'G': '#00ff00', 'A': '#0000ff', 'N': '#000000', 'B': '#ffffff' },
-    scene: [
-        ['O', 'O', 'O', 'O', 'O'],
-        ['O', '+', 'O', '-', 'O'],
-        ['O', ' ', 'O', ' ', 'O'],
-        ['O', ' ', 'E', ' ', 'O'],
-        ['O', 'O', 'O', 'O', 'O']
-    ],
-    assets: {
-        'E': {
-            type: "entity",
-            life: 100,
-            damage: 20,
-            atacktype: "melee",
-            speed: 1,
-            texture: ["########","##R##R##","#RYRRYR#","#RRRRRR#","###RR###","###RR###","##R##R##","########"]
-        },
-        'O': {
-            type: "tileset",
-            texture: ["RRRRRRRR","RRRRRRRR","RRRRRRRR","RRRRRRRR","RRRRRRRR","RRRRRRRR","RRRRRRRR","RRRRRRRR"]
-        },
-        '+': {
-            type: "player",
-            life: 100,
-            speed: 1,
-            texture: ["########","##B##B##","#RYRRYR#","#BBBBBB#","###RR###","###RR###","##N##N##","########"]
-        },
-        '-': { // El símbolo "-" en tu escena como la meta/finish
-            type: "finish",
-            texture: ["########","###BNBNB","###NBNBN","###BNBNB","###N####","####N###","####N###","########"]
-        }
-    }
-};
-
-const canvas = document.getElementById('doomScreen');
+const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-
-let player = { x: 1.5, y: 1.5, dir: 0, speed: 0.05 };
+let player = { x: 1.5, y: 1.5, dir: 0, life: 100 };
+let worldMap = [];
+let assetsData = {};
+const colors = { 'R': '#ff0000', 'Y': '#ffff00', '#': 'transparent', 'G': '#00ff00', 'A': '#0000ff', 'N': '#000000', 'B': '#ffffff' };
 const keys = {};
 
-window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
-window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
+window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-function render() {
-    // Movimiento
-    if (keys['w'] || keys['arrowup']) {
-        let nx = player.x + Math.cos(player.dir) * player.speed;
-        let ny = player.y + Math.sin(player.dir) * player.speed;
-        if (config.scene[Math.floor(ny)][Math.floor(nx)] !== 'O') { player.x = nx; player.y = ny; }
+function compileAndRun() {
+    const code = document.getElementById('code-input').value;
+    const lines = code.split('\n').map(l => l.trim());
+    
+    worldMap = [];
+    assetsData = {};
+    let currentAsset = null;
+    let readingScene = false;
+    let readingTexture = false;
+
+    // Parser del lenguaje custom
+    lines.forEach(line => {
+        if(line.startsWith('escene:')) { readingScene = true; return; }
+        if(line.startsWith('asset.')) { readingScene = false; readingTexture = false; }
+        
+        if(readingScene && line.length > 0 && !line.startsWith('//')) {
+            worldMap.push(line.split(''));
+        }
+
+        if(line.startsWith('asset.edit:')) {
+            currentAsset = line.split(':')[1];
+            assetsData[currentAsset] = { texture: [] };
+        }
+
+        if(currentAsset && line.includes('life:')) assetsData[currentAsset].life = parseInt(line.split(':')[1]);
+        if(currentAsset && line.includes('speed:')) assetsData[currentAsset].speed = parseFloat(line.split(':')[1]);
+        if(currentAsset && line.startsWith('texture:')) { readingTexture = true; return; }
+
+        if(readingTexture && line.length === 8 && currentAsset) {
+            assetsData[currentAsset].texture.push(line);
+        }
+    });
+
+    document.getElementById('ui-msg').innerText = "COMPILED OK";
+    document.getElementById('ui-hp').innerText = assetsData['+']?.life || 100;
+    document.getElementById('ui-spd').innerText = assetsData['+']?.speed || 1;
+    
+    // Reset player position to '+' symbol in map
+    worldMap.forEach((row, y) => row.forEach((cell, x) => {
+        if(cell === '+') { player.x = x + 0.5; player.y = y + 0.5; }
+    }));
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+function update() {
+    let moveSpeed = 0.05;
+    let rotSpeed = 0.04;
+    
+    if(keys['w']) {
+        let nx = player.x + Math.cos(player.dir) * moveSpeed;
+        let ny = player.y + Math.sin(player.dir) * moveSpeed;
+        if(worldMap[Math.floor(ny)] && worldMap[Math.floor(ny)][Math.floor(nx)] !== 'O') {
+            player.x = nx; player.y = ny;
+        }
     }
-    if (keys['s'] || keys['arrowdown']) {
-        let nx = player.x - Math.cos(player.dir) * player.speed;
-        let ny = player.y - Math.sin(player.dir) * player.speed;
-        if (config.scene[Math.floor(ny)][Math.floor(nx)] !== 'O') { player.x = nx; player.y = ny; }
+    if(keys['s']) {
+        let nx = player.x - Math.cos(player.dir) * moveSpeed;
+        let ny = player.y - Math.sin(player.dir) * moveSpeed;
+        if(worldMap[Math.floor(ny)] && worldMap[Math.floor(ny)][Math.floor(nx)] !== 'O') {
+            player.x = nx; player.y = ny;
+        }
     }
-    if (keys['a'] || keys['arrowleft']) player.dir -= 0.05;
-    if (keys['d'] || keys['arrowright']) player.dir += 0.05;
+    if(keys['a']) player.dir -= rotSpeed;
+    if(keys['d']) player.dir += rotSpeed;
+}
 
-    // Dibujar Fondo
-    ctx.fillStyle = "#111"; ctx.fillRect(0, 0, 640, 160); // Techo
-    ctx.fillStyle = "#222"; ctx.fillRect(0, 160, 640, 160); // Suelo
+function draw() {
+    // Cielo y Suelo
+    ctx.fillStyle = "#1a1a1a"; ctx.fillRect(0,0,640,160);
+    ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0,160,640,160);
 
-    // Raycasting para Renderizar la Escena
-    for (let x = 0; x < 160; x++) {
-        let rayAngle = (player.dir - 0.5) + (x / 160);
+    if(worldMap.length === 0) return;
+
+    // Raycasting
+    for(let i=0; i<160; i++) {
+        let angle = (player.dir - 0.5) + (i / 160);
         let dist = 0;
-        let hit = false;
-        let hitType = '';
+        let hit = null;
         let hitX = 0;
 
-        while (!hit && dist < 10) {
-            dist += 0.02;
-            let tx = Math.floor(player.x + Math.cos(rayAngle) * dist);
-            let ty = Math.floor(player.y + Math.sin(rayAngle) * dist);
-
-            if (config.scene[ty] && config.scene[ty][tx] !== ' ' && config.scene[ty][tx] !== '+') {
-                hit = true;
-                hitType = config.scene[ty][tx];
-                let exactX = player.x + Math.cos(rayAngle) * dist;
-                let exactY = player.y + Math.sin(rayAngle) * dist;
-                hitX = Math.floor(((exactX % 1) + (exactY % 1)) * 8) % 8;
+        while(dist < 12) {
+            dist += 0.05;
+            let tx = Math.floor(player.x + Math.cos(angle) * dist);
+            let ty = Math.floor(player.y + Math.sin(angle) * dist);
+            
+            if(worldMap[ty] && worldMap[ty][tx] && worldMap[ty][tx] !== ' ' && worldMap[ty][tx] !== '+') {
+                hit = worldMap[ty][tx];
+                let xHit = player.x + Math.cos(angle) * dist;
+                let yHit = player.y + Math.sin(angle) * dist;
+                hitX = Math.floor(((xHit % 1) + (yHit % 1)) * 8) % 8;
+                break;
             }
         }
 
-        let h = 320 / dist;
-        let asset = config.assets[hitType];
-
-        if (asset) {
-            for (let py = 0; py < 8; py++) {
-                let char = asset.texture[py][hitX];
-                let color = config.colors[char];
-                if (color !== 'transparent') {
+        if(hit && assetsData[hit]) {
+            let h = 320 / dist;
+            let tex = assetsData[hit].texture;
+            for(let py=0; py<8; py++) {
+                if(!tex[py]) continue;
+                let color = colors[tex[py][hitX]];
+                if(color !== 'transparent') {
                     ctx.fillStyle = color;
-                    ctx.fillRect(x * 4, (160 - h / 2) + (py * (h / 8)), 4, (h / 8) + 1);
+                    ctx.fillRect(i*4, 160-h/2 + (py*(h/8)), 4, h/8 + 1);
                 }
             }
         }
     }
-    requestAnimationFrame(render);
 }
 
-render();
+// Primera compilación automática al cargar
+compileAndRun();
+gameLoop();
 </script>
 </body>
 </html>
