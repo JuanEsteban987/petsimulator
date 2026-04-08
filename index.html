@@ -2,250 +2,156 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom C++ IDE & Engine</title>
+    <title>Ragdoll Fighters '26</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
-        :root { --bg: #0d0d0d; --green: #00ff41; --panel: #1a1a1a; --border: #333; }
-        body { background: var(--bg); color: #ccc; font-family: 'Consolas', monospace; margin: 0; overflow: hidden; display: flex; height: 100vh; }
-        
-        /* Layout */
-        #editor-side { width: 40%; display: flex; flex-direction: column; border-right: 2px solid var(--border); background: var(--panel); }
-        #game-side { width: 60%; position: relative; display: flex; flex-direction: column; background: #000; }
-        
-        /* UI Elements */
-        .toolbar { padding: 10px; background: #222; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
-        .btn-run { background: var(--green); color: #000; border: none; padding: 8px 15px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-        .btn-run:hover { filter: brightness(1.2); box-shadow: 0 0 10px var(--green); }
-        
-        textarea { flex-grow: 1; background: transparent; color: #00ff41; border: none; padding: 20px; font-size: 14px; outline: none; resize: none; line-height: 1.5; }
-        
-        canvas { width: 100%; height: 70%; image-rendering: pixelated; background: #050505; }
-        
-        #hud { height: 30%; background: #111; border-top: 2px solid var(--border); padding: 20px; display: grid; grid-template-columns: repeat(3, 1fr); }
-        .stat { border: 1px solid #333; padding: 10px; text-align: center; }
-        .stat-val { font-size: 24px; color: var(--green); display: block; }
-        
-        .console { position: absolute; bottom: 32%; left: 10px; font-size: 12px; color: #666; pointer-events: none; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
+        canvas { display: block; margin: auto; border: 4px solid #555; }
+        #ui {
+            position: absolute; top: 20px; width: 100%; display: flex;
+            justify-content: space-around; pointer-events: none;
+        }
+        .health-bar {
+            width: 400px; height: 30px; background: #444; border: 2px solid #fff;
+            position: relative; overflow: hidden;
+        }
+        .health-fill {
+            width: 100%; height: 100%; background: linear-gradient(to bottom, #ff0, #f00);
+            transition: width 0.2s;
+        }
+        .name { color: white; font-weight: bold; text-shadow: 2px 2px #000; margin-bottom: 5px; }
+        #timer { color: #fff; font-size: 40px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="editor-side">
-    <div class="toolbar">
-        <button class="btn-run" onclick="Engine.init()">▶ INITIALIZE_PROJECT</button>
-        <span style="font-size: 10px; color: #888;">LANGUAGE: CUSTOM_CPP_V1</span>
+<div id="ui">
+    <div>
+        <div class="name">P1: KYO RAGDOLL</div>
+        <div class="health-bar"><div id="p1-health" class="health-fill"></div></div>
     </div>
-    <textarea id="code-input" spellcheck="false">
-escene:
-	OOOOOOO
-	O+    O
-	O O O O
-	O E   O
-	O  -  O
-	OOOOOOO
-
-asset.make:
-	O = entity/player/object/tileset/other
-
-asset.edit:E
-	<entity>
-	life:100
-	damage:20
-	atacktype:melee
-	speed:1
-	texture:
-	########
-	##R##R##
-	#RYRRYR#
-	#RRRRRR#
-	###RR###
-	###RR###
-	##R##R##
-	########
-
-asset.edit:O
-	<tileset>
-	texture:
-	RRRRRRRR
-	RRRRRRRR
-	RRRRRRRR
-	RRRRRRRR
-	RRRRRRRR
-	RRRRRRRR
-	RRRRRRRR
-	RRRRRRRR
-
-asset.edit:+
-	<player>
-	life:100
-	speed:1.2
-	texture:
-	########
-	##B##B##
-	#RYRRYR#
-	#BBBBBB#
-	###RR###
-	###RR###
-	##N##N##
-	########
-
-asset.edit:-
-	<other><finish>
-	texture:
-	########
-	###BNBNB
-	###NBNBN
-	###BNBNB
-	###N####
-	####N###
-	####N###
-	########
-    </textarea>
-</div>
-
-<div id="game-side">
-    <canvas id="render"></canvas>
-    <div class="console" id="log">> System ready...</div>
-    <div id="hud">
-        <div class="stat"><span>VITALITY</span><span id="ui-hp" class="stat-val">100</span></div>
-        <div class="stat"><span>VELOCITY</span><span id="ui-speed" class="stat-val">1.0</span></div>
-        <div class="stat"><span>STATUS</span><span id="ui-status" class="stat-val" style="font-size: 14px;">STANDBY</span></div>
+    <div id="timer">99</div>
+    <div>
+        <div class="name" style="text-align: right;">P2: IORI DOLL</div>
+        <div class="health-bar"><div id="p2-health" class="health-fill"></div></div>
     </div>
 </div>
 
 <script>
-/**
- * ENGINE CORE
- * Implementación de Raycasting y Compilador de Sintaxis
- */
-const Engine = {
-    ctx: null,
-    canvas: null,
-    map: [],
-    assets: {},
-    player: { x: 0, y: 0, dir: 0, life: 100, spd: 0.05 },
-    colors: { 'R':'#f00','G':'#0f0','A':'#00f','Y':'#ff0','N':'#000','B':'#fff','#':'transparent' },
-    keys: {},
+const { Engine, Render, Runner, Bodies, Composite, Constraint, Vector, Body } = Matter;
 
-    init() {
-        this.canvas = document.getElementById('render');
-        this.ctx = this.canvas.getContext('2d');
-        this.canvas.width = 640;
-        this.canvas.height = 360;
-        
-        window.onkeydown = (e) => this.keys[e.key.toLowerCase()] = true;
-        window.onkeyup = (e) => this.keys[e.key.toLowerCase()] = false;
+// --- Configuración ---
+const engine = Engine.create();
+const world = engine.world;
+const canvasWidth = 1000;
+const canvasHeight = 600;
 
-        this.compile();
-        document.getElementById('ui-status').innerText = "RUNNING";
-        requestAnimationFrame(() => this.loop());
-    },
-
-    compile() {
-        const code = document.getElementById('code-input').value;
-        const lines = code.split('\n');
-        let section = "";
-        let currentAsset = "";
-        let readingTex = false;
-
-        this.map = [];
-        this.assets = {};
-
-        lines.forEach(line => {
-            const l = line.trim();
-            if(!l || l.startsWith('//')) return;
-
-            if(l.startsWith('escene:')) { section = "MAP"; return; }
-            if(l.startsWith('asset.edit:')) { 
-                section = "EDIT"; 
-                currentAsset = l.split(':')[1];
-                this.assets[currentAsset] = { texture: [], life: 100 };
-                readingTex = false;
-                return; 
-            }
-
-            if(section === "MAP") this.map.push(l.split(''));
-            
-            if(section === "EDIT") {
-                if(l.includes('life:')) this.assets[currentAsset].life = parseInt(l.split(':')[1]);
-                if(l.includes('speed:')) this.player.spd = parseFloat(l.split(':')[1]) * 0.05;
-                if(l.startsWith('texture:')) { readingTex = true; return; }
-                if(readingTex && l.length === 8) this.assets[currentAsset].texture.push(l);
-            }
-        });
-
-        // Spawn Player
-        this.map.forEach((row, y) => row.forEach((cell, x) => {
-            if(cell === '+') { this.player.x = x + 0.5; this.player.y = y + 0.5; }
-        }));
-        
-        document.getElementById('ui-hp').innerText = this.assets['+']?.life || 100;
-        document.getElementById('ui-speed').innerText = (this.player.spd * 20).toFixed(1);
-    },
-
-    update() {
-        let moveX = Math.cos(this.player.dir) * this.player.spd;
-        let moveY = Math.sin(this.player.dir) * this.player.spd;
-
-        if(this.keys['w']) {
-            if(this.map[Math.floor(this.player.y)][Math.floor(this.player.x + moveX)] !== 'O') this.player.x += moveX;
-            if(this.map[Math.floor(this.player.y + moveY)][Math.floor(this.player.x)] !== 'O') this.player.y += moveY;
-        }
-        if(this.keys['s']) {
-            if(this.map[Math.floor(this.player.y)][Math.floor(this.player.x - moveX)] !== 'O') this.player.x -= moveX;
-            if(this.map[Math.floor(this.player.y - moveY)][Math.floor(this.player.x)] !== 'O') this.player.y -= moveY;
-        }
-        if(this.keys['a']) this.player.dir -= 0.04;
-        if(this.keys['d']) this.player.dir += 0.04;
-    },
-
-    draw() {
-        const {ctx, canvas} = this;
-        // Background
-        ctx.fillStyle = "#1a1a1a"; ctx.fillRect(0,0,640,180);
-        ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0,180,640,180);
-
-        // Raycasting
-        for(let i=0; i<160; i++) {
-            let rayA = (this.player.dir - 0.5) + (i / 160);
-            let dist = 0;
-            let hit = null;
-            let hitX = 0;
-
-            while(dist < 12) {
-                dist += 0.05;
-                let tx = Math.floor(this.player.x + Math.cos(rayA)*dist);
-                let ty = Math.floor(this.player.y + Math.sin(rayA)*dist);
-                if(this.map[ty] && this.map[ty][tx] && this.map[ty][tx] !== ' ' && this.map[ty][tx] !== '+') {
-                    hit = this.map[ty][tx];
-                    hitX = Math.floor(((this.player.x + Math.cos(rayA)*dist)%1 + (this.player.y + Math.sin(rayA)*dist)%1)*8)%8;
-                    break;
-                }
-            }
-
-            if(hit && this.assets[hit]) {
-                let h = 400 / (dist * Math.cos(rayA - this.player.dir));
-                let tex = this.assets[hit].texture;
-                for(let py=0; py<8; py++) {
-                    if(!tex[py]) continue;
-                    let color = this.colors[tex[py][hitX]];
-                    if(color !== 'transparent') {
-                        ctx.fillStyle = color;
-                        ctx.globalAlpha = Math.min(1, 4/dist); // Sombras por distancia
-                        ctx.fillRect(i*4, 180-h/2 + (py*(h/8)), 4, h/8 + 1);
-                    }
-                }
-                ctx.globalAlpha = 1;
-            }
-        }
-    },
-
-    loop() {
-        this.update();
-        this.draw();
-        requestAnimationFrame(() => this.loop());
+const render = Render.create({
+    element: document.body,
+    engine: engine,
+    options: {
+        width: canvasWidth,
+        height: canvasHeight,
+        wireframes: false,
+        background: '#222'
     }
-};
+});
+
+// --- Escenario ---
+const ground = Bodies.rectangle(canvasWidth/2, canvasHeight - 20, canvasWidth, 40, { isStatic: true, render: { fillStyle: '#333' } });
+const wallL = Bodies.rectangle(-10, 300, 20, 600, { isStatic: true });
+const wallR = Bodies.rectangle(canvasWidth+10, 300, 20, 600, { isStatic: true });
+Composite.add(world, [ground, wallL, wallR]);
+
+// --- Constructor de Ragdoll ---
+function createRagdoll(x, y, color, label) {
+    const group = Body.nextGroup(true);
+    
+    // Partes del cuerpo
+    const head = Bodies.circle(x, y - 80, 15, { collisionFilter: { group: group }, render: { fillStyle: color } });
+    const torso = Bodies.rectangle(x, y - 40, 30, 50, { collisionFilter: { group: group }, render: { fillStyle: color } });
+    const armL = Bodies.rectangle(x - 25, y - 40, 10, 40, { collisionFilter: { group: group }, render: { fillStyle: color } });
+    const armR = Bodies.rectangle(x + 25, y - 40, 10, 40, { collisionFilter: { group: group }, render: { fillStyle: color } });
+    const legL = Bodies.rectangle(x - 10, y + 10, 12, 45, { collisionFilter: { group: group }, render: { fillStyle: color } });
+    const legR = Bodies.rectangle(x + 10, y + 10, 12, 45, { collisionFilter: { group: group }, render: { fillStyle: color } });
+
+    // Restricciones (Uniones)
+    const neck = Constraint.create({ bodyA: head, bodyB: torso, pointA: { x: 0, y: 15 }, pointB: { x: 0, y: -25 }, stiffness: 0.6, length: 2 });
+    const shoulderL = Constraint.create({ bodyA: torso, bodyB: armL, pointA: { x: -15, y: -20 }, pointB: { x: 0, y: -15 }, stiffness: 0.6 });
+    const shoulderR = Constraint.create({ bodyA: torso, bodyB: armR, pointA: { x: 15, y: -20 }, pointB: { x: 0, y: -15 }, stiffness: 0.6 });
+    const hipL = Constraint.create({ bodyA: torso, bodyB: legL, pointA: { x: -10, y: 25 }, pointB: { x: 0, y: -20 }, stiffness: 0.6 });
+    const hipR = Constraint.create({ bodyA: torso, bodyB: legR, pointA: { x: 10, y: 25 }, pointB: { x: 0, y: -20 }, stiffness: 0.6 });
+
+    const player = Composite.create({ label: label });
+    Composite.add(player, [head, torso, armL, armR, legL, legR, neck, shoulderL, shoulderR, hipL, hipR]);
+    
+    return { composite: player, torso: torso, head: head, armR: armR, armL: armL, health: 100 };
+}
+
+const p1 = createRagdoll(300, 400, '#3498db', 'p1');
+const p2 = createRagdoll(700, 400, '#e74c3c', 'p2');
+Composite.add(world, [p1.composite, p2.composite]);
+
+// --- Lógica de Control ---
+const keys = {};
+document.addEventListener('keydown', e => keys[e.code] = true);
+document.addEventListener('keyup', e => keys[e.code] = false);
+
+function applyMovement(p, left, right, up, punch, kick, isP1) {
+    const force = 0.015;
+    if (keys[left]) Body.applyForce(p.torso, p.torso.position, { x: -force, y: 0 });
+    if (keys[right]) Body.applyForce(p.torso, p.torso.position, { x: force, y: 0 });
+    if (keys[up] && Math.abs(p.torso.velocity.y) < 0.1) Body.applyForce(p.torso, p.torso.position, { x: 0, y: -0.15 });
+
+    // Ataques (Fuerza hacia el oponente)
+    const direction = isP1 ? 1 : -1;
+    if (keys[punch]) {
+        Body.applyForce(p.armR, p.armR.position, { x: 0.05 * direction, y: -0.02 });
+    }
+    if (keys[kick]) {
+        Body.applyForce(p.torso, p.torso.position, { x: 0.02 * direction, y: -0.05 });
+    }
+}
+
+// --- Daño y Colisiones ---
+Matter.Events.on(engine, 'collisionStart', event => {
+    event.pairs.forEach(pair => {
+        const labels = [pair.bodyA.parent.label, pair.bodyB.parent.label];
+        if (labels.includes('p1') && labels.includes('p2')) {
+            // Verificar velocidad de impacto para daño
+            const impact = Math.abs(pair.bodyA.velocity.x) + Math.abs(pair.bodyB.velocity.x);
+            if (impact > 5) {
+                if (pair.bodyA.parent.label === 'p1') p1.health -= 2;
+                else p2.health -= 2;
+            }
+        }
+    });
+});
+
+// --- Game Loop ---
+let timeLeft = 99;
+setInterval(() => { if(timeLeft > 0) timeLeft--; document.getElementById('timer').innerText = timeLeft; }, 1000);
+
+(function update() {
+    applyMovement(p1, 'KeyA', 'KeyD', 'KeyW', 'KeyF', 'KeyG', true);
+    applyMovement(p2, 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'KeyK', 'KeyL', false);
+
+    // Actualizar UI
+    document.getElementById('p1-health').style.width = Math.max(0, p1.health) + '%';
+    document.getElementById('p2-health').style.width = Math.max(0, p2.health) + '%';
+
+    // Mantener los cuerpos erguidos (Torque correctivo)
+    [p1, p2].forEach(p => {
+        Body.setAngle(p.torso, p.torso.angle * 0.9);
+    });
+
+    Engine.update(engine);
+    requestAnimationFrame(update);
+})();
+
+Render.run(render);
+Runner.run(Runner.create(), engine);
 </script>
+
 </body>
 </html>
