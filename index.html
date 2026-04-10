@@ -3,218 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Totally Accurate Battle Simulator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>TABS 2D - Ragdoll Battle Simulator</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Roboto:wght@400;700&display=swap');
-        
         body {
             margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: 'Roboto', sans-serif;
+            color: white;
         }
         
         #gameCanvas {
             display: block;
-            border: 4px solid #333;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            border: 3px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
             cursor: crosshair;
         }
         
-        .ui-panel {
+        #ui {
             position: absolute;
-            background: rgba(0,0,0,0.85);
-            border: 3px solid #ffd700;
-            border-radius: 15px;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
             padding: 15px;
-            color: white;
-            font-family: 'Bangers', cursive;
-            letter-spacing: 1px;
-        }
-        
-        .unit-btn {
-            width: 80px;
-            height: 80px;
-            margin: 5px;
-            border: 3px solid #444;
             border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: #2a2a2a;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            position: relative;
-            overflow: hidden;
+            border: 2px solid #fff;
         }
         
-        .unit-btn:hover {
-            transform: scale(1.1);
-            border-color: #ffd700;
-            box-shadow: 0 0 20px rgba(255,215,0,0.5);
-        }
-        
-        .unit-btn.selected {
-            border-color: #00ff00;
-            box-shadow: 0 0 20px rgba(0,255,0,0.5);
-            background: #1a4a1a;
-        }
-        
-        .unit-cost {
-            position: absolute;
-            bottom: 2px;
-            right: 5px;
-            font-size: 12px;
-            color: #ffd700;
-            font-family: 'Roboto', sans-serif;
-            font-weight: bold;
-        }
-        
-        #controls {
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        
-        #budget {
-            top: 20px;
-            left: 20px;
-            font-size: 32px;
-            color: #ffd700;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-        }
-        
-        .btn-action {
-            padding: 15px 30px;
-            font-size: 24px;
-            font-family: 'Bangers', cursive;
+        button {
+            background: #4CAF50;
+            color: white;
             border: none;
-            border-radius: 10px;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
             cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
             transition: all 0.3s;
-            text-transform: uppercase;
         }
         
-        .btn-start {
-            background: linear-gradient(45deg, #22c55e, #16a34a);
-            color: white;
-            box-shadow: 0 4px 0 #15803d;
+        button:hover {
+            background: #45a049;
+            transform: scale(1.05);
         }
         
-        .btn-start:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 0 #15803d;
-        }
+        button.red { background: #f44336; }
+        button.red:hover { background: #da190b; }
         
-        .btn-start:active {
-            transform: translateY(4px);
-            box-shadow: 0 0 0 #15803d;
-        }
+        button.blue { background: #2196F3; }
+        button.blue:hover { background: #0b7dda; }
         
-        .btn-clear {
-            background: linear-gradient(45deg, #ef4444, #dc2626);
-            color: white;
-            box-shadow: 0 4px 0 #b91c1c;
-        }
-        
-        #winner {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 80px;
-            font-family: 'Bangers', cursive;
-            text-align: center;
-            display: none;
-            text-shadow: 4px 4px 0 #000;
-            z-index: 1000;
-            animation: bounce 1s infinite;
-        }
-        
-        @keyframes bounce {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); }
-            50% { transform: translate(-50%, -50%) scale(1.2); }
-        }
-        
-        .instructions {
-            top: 20px;
-            right: 20px;
-            max-width: 300px;
-            font-family: 'Roboto', sans-serif;
+        #stats {
+            margin-top: 10px;
             font-size: 14px;
-            line-height: 1.5;
         }
         
         .health-bar {
-            position: absolute;
-            width: 40px;
-            height: 6px;
-            background: red;
-            border: 1px solid #000;
-            transform: translateX(-50%);
+            width: 200px;
+            height: 20px;
+            background: #333;
+            border: 2px solid #fff;
+            margin: 5px 0;
+            position: relative;
         }
         
         .health-fill {
             height: 100%;
-            background: #22c55e;
-            transition: width 0.2s;
+            transition: width 0.3s;
         }
+        
+        .red-team { background: #f44336; }
+        .blue-team { background: #2196F3; }
     </style>
 </head>
 <body>
-
+    <div id="ui">
+        <h2>🎮 TABS 2D Simulator</h2>
+        <button onclick="game.spawnTeam('red')">+ Rojo</button>
+        <button onclick="game.spawnTeam('blue')">+ Azul</button>
+        <button onclick="game.reset()">🔄 Reset</button>
+        <button onclick="game.toggleGravity()">⚖️ Gravedad</button>
+        <div id="stats">
+            <div>🔴 Rojos: <span id="redCount">0</span></div>
+            <div>🔵 Azules: <span id="blueCount">0</span></div>
+            <div>FPS: <span id="fps">60</span></div>
+        </div>
+    </div>
+    
     <canvas id="gameCanvas"></canvas>
-    
-    <div id="budget" class="ui-panel">
-        💰 <span id="money">1000</span>
-    </div>
-    
-    <div class="ui-panel instructions">
-        <h3 style="margin-top:0; color:#ffd700;">🎮 Cómo Jugar:</h3>
-        <p>1. Selecciona una unidad</p>
-        <p>2. Haz clic izquierdo en tu lado (izquierda) para colocarla</p>
-        <p>3. Click derecho para eliminar</p>
-        <p>4. Presiona INICIAR para ver la batalla caótica</p>
-        <p style="color:#aaa; margin-top:10px;">Las tropas azules son tuyas, las rojas del enemigo</p>
-    </div>
-    
-    <div id="controls" class="ui-panel">
-        <div class="unit-btn selected" data-type="peasant" data-cost="10">
-            👨‍🌾
-            <span class="unit-cost">10$</span>
-        </div>
-        <div class="unit-btn" data-type="warrior" data-cost="50">
-            ⚔️
-            <span class="unit-cost">50$</span>
-        </div>
-        <div class="unit-btn" data-type="archer" data-cost="80">
-            🏹
-            <span class="unit-cost">80$</span>
-        </div>
-        <div class="unit-btn" data-type="knight" data-cost="150">
-            🛡️
-            <span class="unit-cost">150$</span>
-        </div>
-        <div class="unit-btn" data-type="giant" data-cost="300">
-            👹
-            <span class="unit-cost">300$</span>
-        </div>
-        <div class="unit-btn" data-type="mage" data-cost="200">
-            🧙‍♂️
-            <span class="unit-cost">200$</span>
-        </div>
-        
-        <button class="btn-action btn-clear" onclick="clearUnits()">🗑️ Limpiar</button>
-        <button class="btn-action btn-start" onclick="startBattle()">⚔️ ¡INICIAR!</button>
-    </div>
-    
-    <div id="winner"></div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -223,570 +101,577 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         
-        // Configuración
-        let budget = 1000;
-        let selectedUnit = 'peasant';
-        let battleStarted = false;
-        let units = [];
-        let projectiles = [];
-        let particles = [];
-        let camera = { x: 0, y: 0, zoom: 1 };
+        // Constantes físicas
+        const GRAVITY = 0.4;
+        const FRICTION = 0.95;
+        const GROUND_Y = canvas.height - 50;
         
-        // Tipos de unidades
-        const unitTypes = {
-            peasant: { cost: 10, hp: 50, dmg: 10, speed: 2, range: 30, color: '#8B4513', size: 15, ragdoll: 'basic' },
-            warrior: { cost: 50, hp: 150, dmg: 25, speed: 2.5, range: 35, color: '#4682B4', size: 20, ragdoll: 'basic' },
-            archer: { cost: 80, hp: 80, dmg: 40, speed: 3, range: 250, color: '#228B22', size: 18, ragdoll: 'basic', ranged: true },
-            knight: { cost: 150, hp: 300, dmg: 45, speed: 4, range: 40, color: '#FFD700', size: 22, ragdoll: 'heavy' },
-            giant: { cost: 300, hp: 800, dmg: 100, speed: 1.5, range: 60, color: '#8B0000', size: 35, ragdoll: 'giant' },
-            mage: { cost: 200, hp: 100, dmg: 60, speed: 2, range: 200, color: '#9932CC', size: 20, ragdoll: 'basic', ranged: true, splash: true }
-        };
-        
-        // Clase Ragdoll
-        class Ragdoll {
-            constructor(x, y, team, type) {
+        // Clase Vector2
+        class Vector2 {
+            constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.team = team; // 0 = jugador (azul), 1 = enemigo (rojo)
-                this.type = type;
-                this.stats = { ...unitTypes[type] };
-                this.hp = this.stats.hp;
-                this.maxHp = this.stats.hp;
-                this.dead = false;
-                this.vx = 0;
-                this.vy = 0;
-                this.target = null;
-                this.attackCooldown = 0;
-                this.facing = team === 0 ? 1 : -1;
-                
-                // Crear partes del cuerpo (física simple)
-                this.parts = this.createRagdoll();
-                this.limbs = [];
             }
             
-            createRagdoll() {
-                const size = this.stats.size;
-                const parts = {
-                    head: { x: this.x, y: this.y - size*1.5, r: size/2, angle: 0 },
-                    torso: { x: this.x, y: this.y, w: size, h: size*1.5 },
-                    armL: { x: this.x - size*0.8, y: this.y - size*0.2, w: size*0.3, h: size*1.2, angle: 0 },
-                    armR: { x: this.x + size*0.8, y: this.y - size*0.2, w: size*0.3, h: size*1.2, angle: 0 },
-                    legL: { x: this.x - size*0.3, y: this.y + size*1.2, w: size*0.4, h: size*1.5, angle: 0 },
-                    legR: { x: this.x + size*0.3, y: this.y + size*1.2, w: size*0.4, h: size*1.5, angle: 0 }
-                };
-                return parts;
+            add(v) { return new Vector2(this.x + v.x, this.y + v.y); }
+            sub(v) { return new Vector2(this.x - v.x, this.y - v.y); }
+            mult(s) { return new Vector2(this.x * s, this.y * s); }
+            mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
+            normalize() {
+                const m = this.mag();
+                return m > 0 ? new Vector2(this.x/m, this.y/m) : new Vector2(0,0);
+            }
+            dist(v) { return Math.sqrt((this.x-v.x)**2 + (this.y-v.y)**2); }
+        }
+        
+        // Clase Partícula (para física Verlet)
+        class Particle {
+            constructor(x, y, pinned = false) {
+                this.pos = new Vector2(x, y);
+                this.oldPos = new Vector2(x, y);
+                this.acc = new Vector2(0, 0);
+                this.pinned = pinned;
+                this.radius = 5;
             }
             
             update() {
-                if (this.dead) {
-                    // Física de caída libre para ragdoll
-                    this.vy += 0.5;
-                    this.x += this.vx;
-                    this.y += this.vy;
-                    
-                    // Rotar partes caóticamente
-                    for (let part in this.parts) {
-                        this.parts[part].angle += (Math.random() - 0.5) * 0.2;
-                        this.parts[part].x += this.vx + (Math.random() - 0.5) * 2;
-                        this.parts[part].y += this.vy + (Math.random() - 0.5) * 2;
-                    }
-                    
-                    if (this.y > canvas.height + 100) this.cleanup = true;
-                    return;
+                if (this.pinned) return;
+                
+                const vel = this.pos.sub(this.oldPos).mult(FRICTION);
+                this.oldPos = new Vector2(this.pos.x, this.pos.y);
+                this.pos = this.pos.add(vel).add(this.acc);
+                this.acc = new Vector2(0, 0);
+                
+                // Gravedad
+                this.acc.y += GRAVITY;
+                
+                // Suelo
+                if (this.pos.y > GROUND_Y) {
+                    this.pos.y = GROUND_Y;
+                    this.oldPos.y = this.pos.y + (this.pos.y - this.oldPos.y) * 0.5;
                 }
                 
-                // IA básica
-                if (!this.target || this.target.dead) {
-                    this.findTarget();
-                }
-                
-                if (this.target) {
-                    const dx = this.target.x - this.x;
-                    const dy = this.target.y - this.y;
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    
-                    if (dist > this.stats.range) {
-                        // Mover hacia el objetivo
-                        const speed = this.stats.speed * 0.5;
-                        this.vx = (dx / dist) * speed;
-                        this.vy = (dy / dist) * speed * 0.3; // Menos movimiento vertical
-                        this.facing = this.vx > 0 ? 1 : -1;
-                    } else {
-                        // Atacar
-                        this.vx *= 0.5;
-                        this.vy *= 0.5;
-                        if (this.attackCooldown <= 0) {
-                            this.attack();
-                            this.attackCooldown = 60;
-                        }
-                    }
-                }
-                
-                // Aplicar velocidad
-                this.x += this.vx;
-                this.y += this.vy;
-                
-                // Gravedad suave
-                if (this.y < canvas.height - 100) {
-                    this.vy += 0.3;
-                } else {
-                    this.y = canvas.height - 100;
-                    this.vy = 0;
-                }
-                
-                // Fricción
-                this.vx *= 0.95;
-                
-                // Actualizar partes del cuerpo (animación procedural)
-                this.animateParts();
-                
-                if (this.attackCooldown > 0) this.attackCooldown--;
+                // Paredes
+                if (this.pos.x < 0) this.pos.x = 0;
+                if (this.pos.x > canvas.width) this.pos.x = canvas.width;
             }
             
-            animateParts() {
-                const time = Date.now() * 0.01;
-                const walkCycle = Math.sin(time * this.stats.speed) * 0.3;
+            applyForce(force) {
+                this.acc = this.acc.add(force);
+            }
+            
+            constrain(other, distance) {
+                const delta = other.pos.sub(this.pos);
+                const dist = delta.mag();
+                const diff = (dist - distance) / dist;
                 
-                this.parts.head.x = this.x;
-                this.parts.head.y = this.y - this.stats.size * 1.5 + Math.abs(walkCycle) * 2;
+                if (!this.pinned) {
+                    this.pos = this.pos.add(delta.mult(0.5 * diff));
+                }
+                if (!other.pinned) {
+                    other.pos = other.pos.sub(delta.mult(0.5 * diff));
+                }
+            }
+        }
+        
+        // Clase Ragdoll (Unidad)
+        class Ragdoll {
+            constructor(x, y, team) {
+                this.team = team; // 'red' o 'blue'
+                this.health = 100;
+                this.maxHealth = 100;
+                this.alive = true;
+                this.target = null;
+                this.attackCooldown = 0;
+                this.walkCycle = 0;
+                this.facing = team === 'red' ? 1 : -1; // 1 derecha, -1 izquierda
                 
-                this.parts.torso.x = this.x;
-                this.parts.torso.y = this.y;
+                // Colores
+                this.color = team === 'red' ? '#ff4444' : '#4444ff';
+                this.darkColor = team === 'red' ? '#cc0000' : '#0000cc';
                 
-                // Brazos balanceándose
-                this.parts.armL.x = this.x - this.stats.size * 0.8 + walkCycle * 5;
-                this.parts.armL.y = this.y - this.stats.size * 0.2;
-                this.parts.armL.angle = walkCycle;
+                // Crear cuerpo
+                this.createBody(x, y);
+            }
+            
+            createBody(x, y) {
+                // Torso (centro)
+                this.torso = new Particle(x, y);
+                this.torso.radius = 12;
                 
-                this.parts.armR.x = this.x + this.stats.size * 0.8 - walkCycle * 5;
-                this.parts.armR.y = this.y - this.stats.size * 0.2;
-                this.parts.armR.angle = -walkCycle;
+                // Cabeza
+                this.head = new Particle(x, y - 25);
+                this.head.radius = 10;
+                
+                // Brazos
+                this.armL = new Particle(x - 15, y - 10);
+                this.armR = new Particle(x + 15, y - 10);
+                this.handL = new Particle(x - 25, y + 10);
+                this.handR = new Particle(x + 25, y + 10);
                 
                 // Piernas
-                this.parts.legL.x = this.x - this.stats.size * 0.3 - walkCycle * 3;
-                this.parts.legL.y = this.y + this.stats.size * 1.2;
+                this.legL = new Particle(x - 8, y + 20);
+                this.legR = new Particle(x + 8, y + 20);
+                this.footL = new Particle(x - 8, y + 45);
+                this.footR = new Particle(x + 8, y + 45);
                 
-                this.parts.legR.x = this.x + this.stats.size * 0.3 + walkCycle * 3;
-                this.parts.legR.y = this.y + this.stats.size * 1.2;
+                // Constraints (huesos)
+                this.constraints = [
+                    [this.torso, this.head, 25],
+                    [this.torso, this.armL, 15],
+                    [this.torso, this.armR, 15],
+                    [this.armL, this.handL, 15],
+                    [this.armR, this.handR, 15],
+                    [this.torso, this.legL, 20],
+                    [this.torso, this.legR, 20],
+                    [this.legL, this.footL, 25],
+                    [this.legR, this.footR, 25],
+                    // Estabilidad cruzada
+                    [this.head, this.armL, 30],
+                    [this.head, this.armR, 30],
+                    [this.legL, this.legR, 16]
+                ];
+                
+                this.particles = [this.torso, this.head, this.armL, this.armR, 
+                               this.handL, this.handR, this.legL, this.legR, 
+                               this.footL, this.footR];
             }
             
-            findTarget() {
+            think(enemies) {
+                if (!this.alive) return;
+                
+                // Encontrar objetivo más cercano
                 let closest = null;
                 let minDist = Infinity;
                 
-                for (let unit of units) {
-                    if (unit.team !== this.team && !unit.dead) {
-                        const dist = Math.hypot(unit.x - this.x, unit.y - this.y);
-                        if (dist < minDist) {
-                            minDist = dist;
-                            closest = unit;
-                        }
+                for (let enemy of enemies) {
+                    if (!enemy.alive) continue;
+                    const d = this.torso.pos.dist(enemy.torso.pos);
+                    if (d < minDist) {
+                        minDist = d;
+                        closest = enemy;
                     }
                 }
+                
                 this.target = closest;
+                
+                if (!this.target) return;
+                
+                const dist = minDist;
+                const dir = this.target.torso.pos.sub(this.torso.pos).normalize();
+                
+                // IA de movimiento
+                if (dist > 60) {
+                    // Moverse hacia el objetivo
+                    const speed = 0.8;
+                    this.torso.applyForce(dir.mult(speed));
+                    
+                    // Animación de caminar
+                    this.walkCycle += 0.3;
+                    const walkOffset = Math.sin(this.walkCycle) * 10;
+                    
+                    // Mover piernas alternadas
+                    this.footL.pos.x += (dir.x * speed * 2) + Math.cos(this.walkCycle) * 2;
+                    this.footR.pos.x += (dir.x * speed * 2) + Math.cos(this.walkCycle + Math.PI) * 2;
+                    
+                    // Levantar pies
+                    if (Math.sin(this.walkCycle) > 0) {
+                        this.footL.pos.y -= 2;
+                    } else {
+                        this.footR.pos.y -= 2;
+                    }
+                    
+                    // Balancear brazos
+                    this.handL.pos.y = this.armL.pos.y + Math.sin(this.walkCycle) * 5;
+                    this.handR.pos.y = this.armR.pos.y + Math.sin(this.walkCycle + Math.PI) * 5;
+                    
+                } else if (dist < 40) {
+                    // Atacar!
+                    if (this.attackCooldown <= 0) {
+                        this.attack();
+                    }
+                }
+                
+                if (this.attackCooldown > 0) this.attackCooldown--;
+                
+                // Mirar hacia el objetivo
+                this.facing = dir.x > 0 ? 1 : -1;
             }
             
             attack() {
-                if (this.stats.ranged) {
-                    // Disparar proyectil
-                    projectiles.push(new Projectile(
-                        this.x, 
-                        this.y - this.stats.size, 
-                        this.target, 
-                        this.stats.dmg,
-                        this.team,
-                        this.stats.splash
-                    ));
-                } else {
-                    // Ataque cuerpo a cuerpo
-                    if (this.target && Math.hypot(this.target.x - this.x, this.target.y - this.y) <= this.stats.range) {
-                        this.target.takeDamage(this.stats.dmg);
-                        
-                        // Empujón físico
-                        const knockback = (this.target.x - this.x) / Math.abs(this.target.x - this.x) * 5;
-                        this.target.vx += knockback;
-                        this.target.vy -= 3;
-                    }
-                }
+                this.attackCooldown = 60;
                 
-                // Efecto visual
-                createParticles(this.x + this.stats.size * this.facing, this.y, 5, '#fff');
+                // Empuje hacia adelante
+                const attackDir = new Vector2(this.facing, -0.5);
+                this.torso.applyForce(attackDir.mult(3));
+                this.armR.applyForce(attackDir.mult(5));
+                
+                // Daño al enemigo
+                if (this.target) {
+                    // Empujar al enemigo
+                    const pushDir = this.target.torso.pos.sub(this.torso.pos).normalize();
+                    this.target.takeDamage(10, pushDir.mult(8));
+                    
+                    // Efecto visual de golpe
+                    game.createParticles(this.target.torso.pos.x, this.target.torso.pos.y, 5, '#ffff00');
+                }
             }
             
-            takeDamage(dmg) {
-                this.hp -= dmg;
+            takeDamage(amount, force) {
+                this.health -= amount;
                 
-                // Sangre
-                createParticles(this.x, this.y - this.stats.size, 10, '#ff0000');
+                // Fuerza de impacto (ragdoll)
+                this.head.applyForce(force.mult(1.5));
+                this.torso.applyForce(force);
+                this.armR.applyForce(force.mult(1.2));
                 
-                if (this.hp <= 0) {
+                if (this.health <= 0) {
                     this.die();
                 }
             }
             
             die() {
-                this.dead = true;
-                this.vx = (Math.random() - 0.5) * 10;
-                this.vy = -10;
+                this.alive = false;
+                // Relajar todas las constraints para que caiga como muñeco
+                // pero mantener conexiones débiles
+                for (let i = 0; i < 3; i++) {
+                    this.updateConstraints();
+                }
+            }
+            
+            update() {
+                // Actualizar partículas
+                for (let p of this.particles) {
+                    p.update();
+                }
                 
-                // Separar partes (efecto ragdoll)
-                for (let part in this.parts) {
-                    this.parts[part].vx = (Math.random() - 0.5) * 15;
-                    this.parts[part].vy = -Math.random() * 10;
+                // Resolver constraints múltiples veces para estabilidad
+                for (let i = 0; i < 3; i++) {
+                    this.updateConstraints();
+                }
+            }
+            
+            updateConstraints() {
+                for (let [p1, p2, dist] of this.constraints) {
+                    p1.constrain(p2, dist);
                 }
             }
             
             draw() {
                 ctx.save();
                 
-                // Dibujar partes
-                const color = this.team === 0 ? '#4169E1' : '#DC143C';
-                const baseColor = this.stats.color;
+                // Dibujar huesos/constraints
+                ctx.strokeStyle = this.darkColor;
+                ctx.lineWidth = 6;
+                ctx.lineCap = 'round';
                 
-                // Piernas
-                this.drawLimb(this.parts.legL, baseColor);
-                this.drawLimb(this.parts.legR, baseColor);
-                
-                // Brazos
-                this.drawLimb(this.parts.armL, '#ffdbac');
-                this.drawLimb(this.parts.armR, '#ffdbac');
-                
-                // Torso
-                ctx.fillStyle = this.dead ? '#666' : baseColor;
-                ctx.fillRect(
-                    this.parts.torso.x - this.parts.torso.w/2,
-                    this.parts.torso.y - this.parts.torso.h/2,
-                    this.parts.torso.w,
-                    this.parts.torso.h
-                );
-                
-                // Cabeza
-                ctx.beginPath();
-                ctx.arc(this.parts.head.x, this.parts.head.y, this.parts.head.r, 0, Math.PI * 2);
-                ctx.fillStyle = this.dead ? '#999' : '#ffdbac';
-                ctx.fill();
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 3;
-                ctx.stroke();
-                
-                // Ojos
-                if (!this.dead) {
-                    ctx.fillStyle = 'white';
-                    ctx.fillRect(this.parts.head.x - 4 + this.facing * 2, this.parts.head.y - 2, 3, 3);
-                    ctx.fillRect(this.parts.head.x + 1 + this.facing * 2, this.parts.head.y - 2, 3, 3);
-                    ctx.fillStyle = 'black';
-                    ctx.fillRect(this.parts.head.x - 3 + this.facing * 3, this.parts.head.y - 1, 1, 1);
-                    ctx.fillRect(this.parts.head.x + 2 + this.facing * 3, this.parts.head.y - 1, 1, 1);
+                for (let [p1, p2] of this.constraints) {
+                    ctx.beginPath();
+                    ctx.moveTo(p1.pos.x, p1.pos.y);
+                    ctx.lineTo(p2.pos.x, p2.pos.y);
+                    ctx.stroke();
                 }
                 
-                // Arma
-                if (!this.dead && !this.stats.ranged) {
-                    ctx.save();
-                    ctx.translate(this.parts.armR.x, this.parts.armR.y);
-                    ctx.rotate(this.parts.armR.angle + Math.PI/4);
-                    ctx.fillStyle = '#silver';
-                    ctx.fillRect(0, -5, 25, 6);
-                    ctx.restore();
+                // Dibujar articulaciones (círculos)
+                for (let p of this.particles) {
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Borde
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+                
+                // Cara (ojos)
+                if (this.alive) {
+                    ctx.fillStyle = '#fff';
+                    const eyeOffset = this.facing * 3;
+                    
+                    // Ojo izquierdo
+                    ctx.beginPath();
+                    ctx.arc(this.head.pos.x - 3 + eyeOffset, this.head.pos.y - 2, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Ojo derecho
+                    ctx.beginPath();
+                    ctx.arc(this.head.pos.x + 3 + eyeOffset, this.head.pos.y - 2, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Pupilas
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(this.head.pos.x - 3 + eyeOffset, this.head.pos.y - 2, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(this.head.pos.x + 3 + eyeOffset, this.head.pos.y - 2, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    // X para muerto
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(this.head.pos.x - 4, this.head.pos.y - 4);
+                    ctx.lineTo(this.head.pos.x + 4, this.head.pos.y + 4);
+                    ctx.moveTo(this.head.pos.x + 4, this.head.pos.y - 4);
+                    ctx.lineTo(this.head.pos.x - 4, this.head.pos.y + 4);
+                    ctx.stroke();
                 }
                 
                 // Barra de vida
-                if (!this.dead) {
-                    const hpPercent = this.hp / this.maxHp;
-                    ctx.fillStyle = 'red';
-                    ctx.fillRect(this.x - 20, this.y - this.stats.size * 2.5, 40, 5);
-                    ctx.fillStyle = '#0f0';
-                    ctx.fillRect(this.x - 20, this.y - this.stats.size * 2.5, 40 * hpPercent, 5);
+                if (this.alive && this.health < this.maxHealth) {
+                    const barWidth = 30;
+                    const barHeight = 4;
+                    const x = this.torso.pos.x - barWidth/2;
+                    const y = this.head.pos.y - 20;
+                    
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(x, y, barWidth, barHeight);
+                    
+                    ctx.fillStyle = this.health > 50 ? '#0f0' : '#f00';
+                    ctx.fillRect(x, y, barWidth * (this.health/this.maxHealth), barHeight);
                 }
                 
                 ctx.restore();
             }
-            
-            drawLimb(limb, color) {
-                ctx.save();
-                ctx.translate(limb.x, limb.y);
-                ctx.rotate(limb.angle || 0);
-                ctx.fillStyle = this.dead ? '#666' : color;
-                ctx.fillRect(-limb.w/2, -limb.h/2, limb.w, limb.h);
-                ctx.restore();
-            }
         }
         
-        // Proyectiles
-        class Projectile {
-            constructor(x, y, target, dmg, team, splash) {
-                this.x = x;
-                this.y = y;
-                this.target = target;
-                this.dmg = dmg;
-                this.team = team;
-                this.splash = splash;
-                this.speed = 8;
-                this.active = true;
-                
-                if (target) {
-                    const dx = target.x - x;
-                    const dy = target.y - y - 50;
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    this.vx = (dx / dist) * this.speed;
-                    this.vy = (dy / dist) * this.speed;
-                } else {
-                    this.vx = team === 0 ? this.speed : -this.speed;
-                    this.vy = 0;
-                }
-            }
-            
-            update() {
-                this.x += this.vx;
-                this.y += this.vy;
-                this.vy += 0.1; // Gravedad
-                
-                // Colisión con unidades
-                for (let unit of units) {
-                    if (unit.team !== this.team && !unit.dead) {
-                        const dist = Math.hypot(unit.x - this.x, unit.y - this.y);
-                        if (dist < unit.stats.size + 10) {
-                            this.hit(unit);
-                            return;
-                        }
-                    }
-                }
-                
-                // Fuera de pantalla
-                if (this.x < 0 || this.x > canvas.width || this.y > canvas.height) {
-                    this.active = false;
-                }
-            }
-            
-            hit(target) {
-                this.active = false;
-                
-                if (this.splash) {
-                    // Daño en área
-                    createParticles(this.x, this.y, 20, '#9932CC');
-                    for (let unit of units) {
-                        if (unit.team !== this.team && !unit.dead) {
-                            const dist = Math.hypot(unit.x - this.x, unit.y - this.y);
-                            if (dist < 100) {
-                                unit.takeDamage(this.dmg * (1 - dist/100));
-                                unit.vx += (unit.x - this.x) * 0.1;
-                                unit.vy -= 5;
-                            }
-                        }
-                    }
-                } else {
-                    target.takeDamage(this.dmg);
-                    target.vx += this.vx * 0.5;
-                    target.vy -= 3;
-                }
-            }
-            
-            draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = this.splash ? '#9932CC' : '#000';
-                ctx.fill();
-            }
-        }
-        
-        // Partículas
-        class Particle {
+        // Partículas de efecto
+        class ParticleEffect {
             constructor(x, y, color) {
-                this.x = x;
-                this.y = y;
-                this.vx = (Math.random() - 0.5) * 10;
-                this.vy = (Math.random() - 0.5) * 10;
+                this.pos = new Vector2(x, y);
+                this.vel = new Vector2((Math.random()-0.5)*10, (Math.random()-0.5)*10);
                 this.life = 30;
                 this.color = color;
-                this.size = Math.random() * 4 + 2;
             }
             
             update() {
-                this.x += this.vx;
-                this.y += this.vy;
-                this.vy += 0.5;
+                this.pos = this.pos.add(this.vel);
+                this.vel.y += 0.5; // gravedad
                 this.life--;
-                this.size *= 0.95;
             }
             
             draw() {
                 ctx.globalAlpha = this.life / 30;
                 ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.size, this.size);
+                ctx.beginPath();
+                ctx.arc(this.pos.x, this.pos.y, 3, 0, Math.PI * 2);
+                ctx.fill();
                 ctx.globalAlpha = 1;
             }
         }
         
-        function createParticles(x, y, count, color) {
-            for (let i = 0; i < count; i++) {
-                particles.push(new Particle(x, y, color));
+        // Clase principal del juego
+        class Game {
+            constructor() {
+                this.units = [];
+                this.particles = [];
+                this.gravity = true;
+                this.lastTime = 0;
+                this.fps = 60;
+                
+                this.spawnInitial();
             }
-        }
-        
-        // Input
-        document.querySelectorAll('.unit-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-                selectedUnit = btn.dataset.type;
-            });
-        });
-        
-        canvas.addEventListener('mousedown', (e) => {
-            if (battleStarted) return;
             
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            spawnInitial() {
+                // Spawn inicial: 3 vs 3
+                for (let i = 0; i < 3; i++) {
+                    this.spawnTeam('red', 100 + i * 50);
+                    this.spawnTeam('blue', canvas.width - 100 - i * 50);
+                }
+            }
             
-            if (e.button === 2) {
-                // Click derecho: eliminar unidad
-                units = units.filter(u => {
-                    if (u.team === 0 && Math.hypot(u.x - x, u.y - y) < u.stats.size) {
-                        budget += u.stats.cost;
-                        updateBudget();
-                        return false;
+            spawnTeam(team, x = null) {
+                if (x === null) {
+                    x = team === 'red' ? 100 + Math.random() * 200 : 
+                        canvas.width - 300 + Math.random() * 200;
+                }
+                const y = 200 + Math.random() * 100;
+                this.units.push(new Ragdoll(x, y, team));
+            }
+            
+            createParticles(x, y, count, color) {
+                for (let i = 0; i < count; i++) {
+                    this.particles.push(new ParticleEffect(x, y, color));
+                }
+            }
+            
+            toggleGravity() {
+                // Invertir gravedad temporalmente
+                for (let unit of this.units) {
+                    for (let p of unit.particles) {
+                        p.applyForce(new Vector2(0, -15));
+                    }
+                }
+            }
+            
+            reset() {
+                this.units = [];
+                this.particles = [];
+                this.spawnInitial();
+            }
+            
+            update() {
+                // Separar por equipos para IA
+                const reds = this.units.filter(u => u.team === 'red' && u.alive);
+                const blues = this.units.filter(u => u.team === 'blue' && u.alive);
+                
+                for (let unit of this.units) {
+                    const enemies = unit.team === 'red' ? blues : reds;
+                    unit.think(enemies);
+                    unit.update();
+                }
+                
+                // Colisiones entre unidades
+                for (let i = 0; i < this.units.length; i++) {
+                    for (let j = i + 1; j < this.units.length; j++) {
+                        this.resolveCollision(this.units[i], this.units[j]);
+                    }
+                }
+                
+                // Actualizar partículas
+                this.particles = this.particles.filter(p => {
+                    p.update();
+                    return p.life > 0;
+                });
+                
+                // Limpiar muertos después de un tiempo
+                this.units = this.units.filter(u => {
+                    if (!u.alive) {
+                        u.deathTimer = (u.deathTimer || 0) + 1;
+                        return u.deathTimer < 300; // Desaparecen después de 5 segundos
                     }
                     return true;
                 });
-            } else {
-                // Click izquierdo: colocar unidad (solo en lado izquierdo)
-                if (x < canvas.width / 2 - 50) {
-                    const typeData = unitTypes[selectedUnit];
-                    if (budget >= typeData.cost) {
-                        const unit = new Ragdoll(x, y, 0, selectedUnit);
-                        units.push(unit);
-                        budget -= typeData.cost;
-                        updateBudget();
-                        
-                        // Efecto de spawn
-                        createParticles(x, y, 10, '#4169E1');
+                
+                // Actualizar UI
+                document.getElementById('redCount').textContent = reds.length;
+                document.getElementById('blueCount').textContent = blues.length;
+            }
+            
+            resolveCollision(u1, u2) {
+                // Colisión simple entre torsos
+                const dist = u1.torso.pos.dist(u2.torso.pos);
+                const minDist = u1.torso.radius + u2.torso.radius + 5;
+                
+                if (dist < minDist && dist > 0) {
+                    const push = u2.torso.pos.sub(u1.torso.pos).normalize();
+                    const overlap = minDist - dist;
+                    
+                    if (u1.alive) {
+                        u1.torso.pos = u1.torso.pos.sub(push.mult(overlap * 0.5));
+                        u1.torso.oldPos = u1.torso.oldPos.sub(push.mult(overlap * 0.5));
+                    }
+                    if (u2.alive) {
+                        u2.torso.pos = u2.torso.pos.add(push.mult(overlap * 0.5));
+                        u2.torso.oldPos = u2.torso.oldPos.add(push.mult(overlap * 0.5));
+                    }
+                }
+            }
+            
+            draw() {
+                // Limpiar
+                ctx.fillStyle = '#87CEEB';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Dibujar suelo
+                ctx.fillStyle = '#4a5f3a';
+                ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
+                
+                // Línea de suelo
+                ctx.strokeStyle = '#2d3d23';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(0, GROUND_Y);
+                ctx.lineTo(canvas.width, GROUND_Y);
+                ctx.stroke();
+                
+                // Sombras
+                for (let unit of this.units) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                    const shadowY = GROUND_Y;
+                    const shadowX = unit.torso.pos.x;
+                    const shadowSize = 15 + (GROUND_Y - unit.torso.pos.y) * 0.1;
+                    ctx.beginPath();
+                    ctx.ellipse(shadowX, shadowY, shadowSize, shadowSize * 0.3, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Ordenar por Y para profundidad
+                const sorted = [...this.units].sort((a, b) => a.torso.pos.y - b.torso.pos.y);
+                
+                for (let unit of sorted) {
+                    unit.draw();
+                }
+                
+                for (let p of this.particles) {
+                    p.draw();
+                }
+            }
+            
+            loop(timestamp) {
+                const deltaTime = timestamp - this.lastTime;
+                this.lastTime = timestamp;
+                
+                if (deltaTime > 0) {
+                    this.fps = Math.round(1000 / deltaTime);
+                    document.getElementById('fps').textContent = this.fps;
+                }
+                
+                this.update();
+                this.draw();
+                
+                requestAnimationFrame((t) => this.loop(t));
+            }
+        }
+        
+        // Interacción con mouse
+        let draggedParticle = null;
+        
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouse = new Vector2(e.clientX - rect.left, e.clientY - rect.top);
+            
+            // Buscar partícula cercana para agarrar
+            for (let unit of game.units) {
+                for (let p of unit.particles) {
+                    if (p.pos.dist(mouse) < 20) {
+                        draggedParticle = p;
+                        p.pinned = true;
+                        break;
                     }
                 }
             }
         });
         
-        canvas.addEventListener('contextmenu', e => e.preventDefault());
-        
-        function updateBudget() {
-            document.getElementById('money').textContent = budget;
-        }
-        
-        function clearUnits() {
-            if (battleStarted) return;
-            const playerUnits = units.filter(u => u.team === 0);
-            playerUnits.forEach(u => {
-                budget += u.stats.cost;
-            });
-            units = units.filter(u => u.team !== 0);
-            updateBudget();
-        }
-        
-        function startBattle() {
-            if (battleStarted) return;
-            battleStarted = true;
-            
-            // Generar ejército enemigo automáticamente (balanceado por presupuesto)
-            const enemyBudget = 1000;
-            let currentEnemyBudget = 0;
-            const enemyTypes = Object.keys(unitTypes);
-            
-            while (currentEnemyBudget < enemyBudget) {
-                const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-                const cost = unitTypes[type].cost;
-                
-                if (currentEnemyBudget + cost <= enemyBudget + 50) {
-                    const x = canvas.width / 2 + 100 + Math.random() * (canvas.width / 2 - 150);
-                    const y = 100 + Math.random() * (canvas.height - 200);
-                    units.push(new Ragdoll(x, y, 1, type));
-                    currentEnemyBudget += cost;
-                }
+        canvas.addEventListener('mousemove', (e) => {
+            if (draggedParticle) {
+                const rect = canvas.getBoundingClientRect();
+                draggedParticle.pos.x = e.clientX - rect.left;
+                draggedParticle.pos.y = e.clientY - rect.top;
+                draggedParticle.oldPos.x = draggedParticle.pos.x;
+                draggedParticle.oldPos.y = draggedParticle.pos.y;
             }
-            
-            document.getElementById('controls').style.display = 'none';
-        }
+        });
         
-        function checkWinner() {
-            if (!battleStarted) return;
-            
-            const team0Alive = units.some(u => u.team === 0 && !u.dead);
-            const team1Alive = units.some(u => u.team === 1 && !u.dead);
-            
-            if (!team0Alive || !team1Alive) {
-                const winnerDiv = document.getElementById('winner');
-                if (!team0Alive && !team1Alive) {
-                    winnerDiv.innerHTML = '🤝 EMPATE 🤝<br><button onclick="location.reload()" style="font-size:30px; margin-top:20px; cursor:pointer;">Reintentar</button>';
-                    winnerDiv.style.color = '#FFD700';
-                } else if (team0Alive) {
-                    winnerDiv.innerHTML = '🎉 VICTORIA 🎉<br><button onclick="location.reload()" style="font-size:30px; margin-top:20px; cursor:pointer;">Jugar de nuevo</button>';
-                    winnerDiv.style.color = '#00ff00';
-                } else {
-                    winnerDiv.innerHTML = '💀 DERROTA 💀<br><button onclick="location.reload()" style="font-size:30px; margin-top:20px; cursor:pointer;">Reintentar</button>';
-                    winnerDiv.style.color = '#ff0000';
-                }
-                winnerDiv.style.display = 'block';
-                battleStarted = false;
+        canvas.addEventListener('mouseup', () => {
+            if (draggedParticle) {
+                draggedParticle.pinned = false;
+                draggedParticle = null;
             }
-        }
+        });
         
-        // Loop principal
-        function gameLoop() {
-            ctx.fillStyle = '#87CEEB';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Suelo
-            ctx.fillStyle = '#228B22';
-            ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
-            
-            // Línea divisoria
-            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-            ctx.lineWidth = 4;
-            ctx.setLineDash([20, 20]);
-            ctx.beginPath();
-            ctx.moveTo(canvas.width / 2, 0);
-            ctx.lineTo(canvas.width / 2, canvas.height);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            
-            // Zonas
-            ctx.fillStyle = 'rgba(65,105,225,0.1)';
-            ctx.fillRect(0, 0, canvas.width / 2 - 50, canvas.height);
-            ctx.fillStyle = 'rgba(220,20,60,0.1)';
-            ctx.fillRect(canvas.width / 2 + 50, 0, canvas.width / 2 - 50, canvas.height);
-            
-            // Textos de zona
-            if (!battleStarted) {
-                ctx.fillStyle = 'rgba(255,255,255,0.5)';
-                ctx.font = 'bold 40px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('TU ZONA', canvas.width / 4, 100);
-                ctx.fillText('ENEMIGO', canvas.width * 3 / 4, 100);
+        // Click para spawn aleatorio
+        canvas.addEventListener('click', (e) => {
+            if (!draggedParticle) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const team = Math.random() > 0.5 ? 'red' : 'blue';
+                game.spawnTeam(team, x);
             }
-            
-            // Actualizar y dibujar unidades
-            units = units.filter(u => !u.cleanup);
-            units.forEach(unit => {
-                unit.update();
-                unit.draw();
-            });
-            
-            // Proyectiles
-            projectiles = projectiles.filter(p => p.active);
-            projectiles.forEach(p => {
-                p.update();
-                p.draw();
-            });
-            
-            // Partículas
-            particles = particles.filter(p => p.life > 0);
-            particles.forEach(p => {
-                p.update();
-                p.draw();
-            });
-            
-            checkWinner();
-            
-            requestAnimationFrame(gameLoop);
-        }
+        });
         
         // Redimensionar
         window.addEventListener('resize', () => {
@@ -794,7 +679,9 @@
             canvas.height = window.innerHeight;
         });
         
-        gameLoop();
+        // Iniciar
+        const game = new Game();
+        requestAnimationFrame((t) => game.loop(t));
     </script>
 </body>
 </html>
