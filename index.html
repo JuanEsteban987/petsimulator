@@ -3,866 +3,798 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RPG Battle P2P Arena</title>
+    <title>Totally Accurate Battle Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Roboto:wght@400;700&display=swap');
+        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            min-height: 100vh;
-            color: white;
-            overflow-x: hidden;
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Roboto', sans-serif;
         }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        h1 {
-            text-align: center;
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            background: linear-gradient(45deg, #ffd700, #ff6b6b);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .connection-panel {
-            background: rgba(0,0,0,0.3);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 2px solid rgba(255,255,255,0.1);
-        }
-
-        .room-section {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-
-        input, textarea, button, select {
-            padding: 12px;
-            border-radius: 8px;
-            border: none;
-            font-size: 14px;
-        }
-
-        input, textarea, select {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-
-        input::placeholder, textarea::placeholder {
-            color: rgba(255,255,255,0.5);
-        }
-
-        button {
-            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            cursor: pointer;
-            font-weight: bold;
-            transition: transform 0.2s, box-shadow 0.2s;
-            min-width: 120px;
-        }
-
-        button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .signal-box {
-            display: none;
-            margin-top: 15px;
-            padding: 15px;
-            background: rgba(0,0,0,0.4);
-            border-radius: 10px;
-        }
-
-        .signal-box.active {
+        
+        #gameCanvas {
             display: block;
+            border: 4px solid #333;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            cursor: crosshair;
         }
-
-        textarea {
-            width: 100%;
-            min-height: 100px;
-            font-family: monospace;
-            font-size: 12px;
-            resize: vertical;
+        
+        .ui-panel {
+            position: absolute;
+            background: rgba(0,0,0,0.85);
+            border: 3px solid #ffd700;
+            border-radius: 15px;
+            padding: 15px;
+            color: white;
+            font-family: 'Bangers', cursive;
+            letter-spacing: 1px;
         }
-
-        .battle-arena {
-            display: none;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-top: 20px;
-        }
-
-        .battle-arena.active {
-            display: grid;
-        }
-
-        .character-card {
-            background: rgba(0,0,0,0.4);
-            border-radius: 20px;
-            padding: 25px;
-            position: relative;
-            border: 3px solid rgba(255,255,255,0.1);
+        
+        .unit-btn {
+            width: 80px;
+            height: 80px;
+            margin: 5px;
+            border: 3px solid #444;
+            border-radius: 10px;
+            cursor: pointer;
             transition: all 0.3s;
-        }
-
-        .character-card.local {
-            border-color: #4ade80;
-            box-shadow: 0 0 20px rgba(74, 222, 128, 0.3);
-        }
-
-        .character-card.remote {
-            border-color: #f87171;
-            box-shadow: 0 0 20px rgba(248, 113, 113, 0.3);
-        }
-
-        .character-card.turn-active {
-            animation: pulse 2s infinite;
-            border-color: #ffd700;
-        }
-
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.5); }
-            50% { box-shadow: 0 0 40px rgba(255, 215, 0, 0.8); }
-        }
-
-        .char-header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .char-avatar {
-            width: 100px;
-            height: 100px;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            border-radius: 50%;
-            margin: 0 auto 15px;
+            background: #2a2a2a;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 3em;
-            border: 4px solid rgba(255,255,255,0.3);
+            font-size: 24px;
             position: relative;
-        }
-
-        .char-avatar::after {
-            content: attr(data-class);
-            position: absolute;
-            bottom: -10px;
-            background: rgba(0,0,0,0.7);
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 0.3em;
-            white-space: nowrap;
-        }
-
-        .hp-bar, .mp-bar {
-            background: rgba(0,0,0,0.5);
-            height: 25px;
-            border-radius: 12px;
             overflow: hidden;
-            margin: 10px 0;
-            position: relative;
-            border: 2px solid rgba(255,255,255,0.1);
         }
-
-        .hp-fill {
-            background: linear-gradient(90deg, #ef4444, #dc2626);
-            height: 100%;
-            transition: width 0.5s ease;
+        
+        .unit-btn:hover {
+            transform: scale(1.1);
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255,215,0,0.5);
         }
-
-        .mp-fill {
-            background: linear-gradient(90deg, #3b82f6, #2563eb);
-            height: 100%;
-            transition: width 0.5s ease;
+        
+        .unit-btn.selected {
+            border-color: #00ff00;
+            box-shadow: 0 0 20px rgba(0,255,0,0.5);
+            background: #1a4a1a;
         }
-
-        .bar-text {
+        
+        .unit-cost {
+            position: absolute;
+            bottom: 2px;
+            right: 5px;
+            font-size: 12px;
+            color: #ffd700;
+            font-family: 'Roboto', sans-serif;
+            font-weight: bold;
+        }
+        
+        #controls {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        #budget {
+            top: 20px;
+            left: 20px;
+            font-size: 32px;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        
+        .btn-action {
+            padding: 15px 30px;
+            font-size: 24px;
+            font-family: 'Bangers', cursive;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+        
+        .btn-start {
+            background: linear-gradient(45deg, #22c55e, #16a34a);
+            color: white;
+            box-shadow: 0 4px 0 #15803d;
+        }
+        
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 #15803d;
+        }
+        
+        .btn-start:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #15803d;
+        }
+        
+        .btn-clear {
+            background: linear-gradient(45deg, #ef4444, #dc2626);
+            color: white;
+            box-shadow: 0 4px 0 #b91c1c;
+        }
+        
+        #winner {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-weight: bold;
-            font-size: 12px;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
-        }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin: 15px 0;
-            font-size: 0.9em;
-        }
-
-        .stat {
-            background: rgba(255,255,255,0.1);
-            padding: 8px;
-            border-radius: 8px;
+            font-size: 80px;
+            font-family: 'Bangers', cursive;
             text-align: center;
-        }
-
-        .stat-label {
-            opacity: 0.7;
-            font-size: 0.8em;
-        }
-
-        .stat-value {
-            font-weight: bold;
-            font-size: 1.2em;
-            color: #ffd700;
-        }
-
-        .combat-log {
-            grid-column: 1 / -1;
-            background: rgba(0,0,0,0.6);
-            border-radius: 15px;
-            padding: 20px;
-            height: 200px;
-            overflow-y: auto;
-            border: 2px solid rgba(255,255,255,0.1);
-        }
-
-        .log-entry {
-            padding: 5px;
-            margin: 2px 0;
-            border-left: 3px solid transparent;
-            padding-left: 10px;
-            animation: slideIn 0.3s;
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        .log-entry.damage { border-left-color: #ef4444; }
-        .log-entry.heal { border-left-color: #22c55e; }
-        .log-entry.special { border-left-color: #a855f7; }
-        .log-entry.system { border-left-color: #3b82f6; font-style: italic; }
-
-        .controls {
-            grid-column: 1 / -1;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .action-btn {
-            padding: 15px;
-            font-size: 1em;
-            border-radius: 12px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .action-btn.attack { background: linear-gradient(45deg, #dc2626, #991b1b); }
-        .action-btn.defend { background: linear-gradient(45deg, #2563eb, #1e40af); }
-        .action-btn.special { background: linear-gradient(45deg, #9333ea, #6b21a8); }
-        .action-btn.heal { background: linear-gradient(45deg, #16a34a, #15803d); }
-
-        .action-btn:disabled {
-            background: #4b5563;
-        }
-
-        .damage-number {
-            position: absolute;
-            font-size: 2em;
-            font-weight: bold;
-            animation: floatUp 1.5s forwards;
-            pointer-events: none;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-        }
-
-        @keyframes floatUp {
-            0% { opacity: 1; transform: translateY(0) scale(1); }
-            100% { opacity: 0; transform: translateY(-100px) scale(1.5); }
-        }
-
-        .turn-timer {
-            text-align: center;
-            font-size: 1.5em;
-            margin: 10px 0;
-        }
-
-        .effects {
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-            min-height: 30px;
-        }
-
-        .effect {
-            background: rgba(255,215,0,0.3);
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 0.8em;
-            border: 1px solid rgba(255,215,0,0.5);
-        }
-
-        .status-indicator {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            background: #ef4444;
-        }
-
-        .status-indicator.connected {
-            background: #22c55e;
-            box-shadow: 0 0 10px #22c55e;
-        }
-
-        .class-select {
-            margin-bottom: 15px;
-        }
-
-        .winner-overlay {
             display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.9);
+            text-shadow: 4px 4px 0 #000;
             z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
+            animation: bounce 1s infinite;
         }
-
-        .winner-overlay.active {
-            display: flex;
+        
+        @keyframes bounce {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.2); }
         }
-
-        .winner-text {
-            font-size: 4em;
-            margin-bottom: 20px;
-            text-align: center;
+        
+        .instructions {
+            top: 20px;
+            right: 20px;
+            max-width: 300px;
+            font-family: 'Roboto', sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
         }
-
-        @media (max-width: 768px) {
-            .battle-arena {
-                grid-template-columns: 1fr;
-            }
+        
+        .health-bar {
+            position: absolute;
+            width: 40px;
+            height: 6px;
+            background: red;
+            border: 1px solid #000;
+            transform: translateX(-50%);
+        }
+        
+        .health-fill {
+            height: 100%;
+            background: #22c55e;
+            transition: width 0.2s;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>⚔️ RPG Battle P2P Arena ⚔️</h1>
+
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="budget" class="ui-panel">
+        💰 <span id="money">1000</span>
+    </div>
+    
+    <div class="ui-panel instructions">
+        <h3 style="margin-top:0; color:#ffd700;">🎮 Cómo Jugar:</h3>
+        <p>1. Selecciona una unidad</p>
+        <p>2. Haz clic izquierdo en tu lado (izquierda) para colocarla</p>
+        <p>3. Click derecho para eliminar</p>
+        <p>4. Presiona INICIAR para ver la batalla caótica</p>
+        <p style="color:#aaa; margin-top:10px;">Las tropas azules son tuyas, las rojas del enemigo</p>
+    </div>
+    
+    <div id="controls" class="ui-panel">
+        <div class="unit-btn selected" data-type="peasant" data-cost="10">
+            👨‍🌾
+            <span class="unit-cost">10$</span>
+        </div>
+        <div class="unit-btn" data-type="warrior" data-cost="50">
+            ⚔️
+            <span class="unit-cost">50$</span>
+        </div>
+        <div class="unit-btn" data-type="archer" data-cost="80">
+            🏹
+            <span class="unit-cost">80$</span>
+        </div>
+        <div class="unit-btn" data-type="knight" data-cost="150">
+            🛡️
+            <span class="unit-cost">150$</span>
+        </div>
+        <div class="unit-btn" data-type="giant" data-cost="300">
+            👹
+            <span class="unit-cost">300$</span>
+        </div>
+        <div class="unit-btn" data-type="mage" data-cost="200">
+            🧙‍♂️
+            <span class="unit-cost">200$</span>
+        </div>
         
-        <div class="connection-panel">
-            <div class="status-indicator" id="connectionStatus"></div>
-            
-            <div class="class-select">
-                <label>Selecciona tu clase:</label>
-                <select id="classSelect">
-                    <option value="warrior">⚔️ Guerrero (Alto HP/ATK)</option>
-                    <option value="mage">🔮 Mago (Alto MP/Magia)</option>
-                    <option value="rogue">🗡️ Pícaro (Velocidad/Crítico)</option>
-                    <option value="paladin">🛡️ Paladín (Defensa/Sanación)</option>
-                </select>
-            </div>
-
-            <div class="room-section">
-                <button onclick="createRoom()" id="btnCreate">🏰 Crear Sala</button>
-                <button onclick="joinRoom()" id="btnJoin">🔌 Unirse a Sala</button>
-                <button onclick="resetGame()" id="btnReset" style="display:none;">🔄 Reiniciar</button>
-            </div>
-
-            <div id="createRoomBox" class="signal-box">
-                <h3>1. Copia este código y envíaselo a tu oponente:</h3>
-                <textarea id="offerText" readonly></textarea>
-                <h3>2. Pega aquí el código de respuesta de tu oponente:</h3>
-                <textarea id="answerInput" placeholder="Pega aquí el código de respuesta..."></textarea>
-                <button onclick="completeConnection()">✅ Conectar</button>
-            </div>
-
-            <div id="joinRoomBox" class="signal-box">
-                <h3>1. Pega aquí el código de oferta del host:</h3>
-                <textarea id="offerInput" placeholder="Pega aquí el código de oferta..."></textarea>
-                <button onclick="createAnswer()">⚡ Generar Respuesta</button>
-                <h3>2. Copia este código y envíaselo al host:</h3>
-                <textarea id="answerText" readonly></textarea>
-            </div>
-        </div>
-
-        <div id="battleArena" class="battle-arena">
-            <div class="character-card local" id="localCard">
-                <div class="char-header">
-                    <div class="char-avatar" id="localAvatar">🙂</div>
-                    <h2 id="localName">Tú</h2>
-                </div>
-                <div class="hp-bar">
-                    <div class="hp-fill" id="localHpBar" style="width: 100%"></div>
-                    <div class="bar-text" id="localHpText">100/100</div>
-                </div>
-                <div class="mp-bar">
-                    <div class="mp-fill" id="localMpBar" style="width: 100%"></div>
-                    <div class="bar-text" id="localMpText">50/50</div>
-                </div>
-                <div class="stats" id="localStats"></div>
-                <div class="effects" id="localEffects"></div>
-            </div>
-
-            <div class="character-card remote" id="remoteCard">
-                <div class="char-header">
-                    <div class="char-avatar" id="remoteAvatar">🤖</div>
-                    <h2 id="remoteName">Oponente</h2>
-                </div>
-                <div class="hp-bar">
-                    <div class="hp-fill" id="remoteHpBar" style="width: 100%"></div>
-                    <div class="bar-text" id="remoteHpText">100/100</div>
-                </div>
-                <div class="mp-bar">
-                    <div class="mp-fill" id="remoteMpBar" style="width: 100%"></div>
-                    <div class="bar-text" id="remoteMpText">50/50</div>
-                </div>
-                <div class="stats" id="remoteStats"></div>
-                <div class="effects" id="remoteEffects"></div>
-            </div>
-
-            <div class="combat-log" id="combatLog"></div>
-
-            <div class="controls" id="controls">
-                <button class="action-btn attack" onclick="action('attack')">⚔️ Atacar</button>
-                <button class="action-btn defend" onclick="action('defend')">🛡️ Defender</button>
-                <button class="action-btn special" onclick="action('special')">✨ Especial</button>
-                <button class="action-btn heal" onclick="action('heal')">💚 Curar</button>
-            </div>
-        </div>
+        <button class="btn-action btn-clear" onclick="clearUnits()">🗑️ Limpiar</button>
+        <button class="btn-action btn-start" onclick="startBattle()">⚔️ ¡INICIAR!</button>
     </div>
-
-    <div class="winner-overlay" id="winnerOverlay">
-        <div class="winner-text" id="winnerText"></div>
-        <button onclick="location.reload()">🔄 Nueva Partida</button>
-    </div>
+    
+    <div id="winner"></div>
 
     <script>
-        // Configuración de clases
-        const CLASSES = {
-            warrior: { emoji: '⚔️', hp: 150, mp: 30, atk: 15, def: 10, spd: 8, mag: 3, name: 'Guerrero' },
-            mage: { emoji: '🔮', hp: 80, mp: 120, atk: 5, def: 5, spd: 10, mag: 20, name: 'Mago' },
-            rogue: { emoji: '🗡️', hp: 100, mp: 40, atk: 18, def: 6, spd: 15, mag: 5, name: 'Pícaro' },
-            paladin: { emoji: '🛡️', hp: 130, mp: 60, atk: 10, def: 15, spd: 6, mag: 12, name: 'Paladín' }
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Configuración
+        let budget = 1000;
+        let selectedUnit = 'peasant';
+        let battleStarted = false;
+        let units = [];
+        let projectiles = [];
+        let particles = [];
+        let camera = { x: 0, y: 0, zoom: 1 };
+        
+        // Tipos de unidades
+        const unitTypes = {
+            peasant: { cost: 10, hp: 50, dmg: 10, speed: 2, range: 30, color: '#8B4513', size: 15, ragdoll: 'basic' },
+            warrior: { cost: 50, hp: 150, dmg: 25, speed: 2.5, range: 35, color: '#4682B4', size: 20, ragdoll: 'basic' },
+            archer: { cost: 80, hp: 80, dmg: 40, speed: 3, range: 250, color: '#228B22', size: 18, ragdoll: 'basic', ranged: true },
+            knight: { cost: 150, hp: 300, dmg: 45, speed: 4, range: 40, color: '#FFD700', size: 22, ragdoll: 'heavy' },
+            giant: { cost: 300, hp: 800, dmg: 100, speed: 1.5, range: 60, color: '#8B0000', size: 35, ragdoll: 'giant' },
+            mage: { cost: 200, hp: 100, dmg: 60, speed: 2, range: 200, color: '#9932CC', size: 20, ragdoll: 'basic', ranged: true, splash: true }
         };
-
-        // Variables de WebRTC
-        let localConnection, remoteConnection;
-        let dataChannel;
-        let isHost = false;
-        let isConnected = false;
-
-        // Variables del juego
-        let localPlayer, remotePlayer;
-        let currentTurn = 0; // 0 = local, 1 = remote
-        let turnCount = 1;
-        let gameActive = false;
-
-        // Clase Personaje
-        class Character {
-            constructor(classType, isLocal) {
-                const base = CLASSES[classType];
-                this.class = classType;
-                this.name = base.name;
-                this.emoji = base.emoji;
-                this.maxHp = base.hp;
-                this.hp = base.hp;
-                this.maxMp = base.mp;
-                this.mp = base.mp;
-                this.atk = base.atk;
-                this.def = base.def;
-                this.spd = base.spd;
-                this.mag = base.mag;
-                this.isLocal = isLocal;
-                this.effects = [];
-                this.defending = false;
-            }
-
-            takeDamage(dmg) {
-                let actualDmg = dmg;
-                if (this.defending) {
-                    actualDmg = Math.floor(dmg / 2);
-                    this.defending = false;
-                }
-                this.hp = Math.max(0, this.hp - actualDmg);
-                return actualDmg;
-            }
-
-            heal(amount) {
-                const actualHeal = Math.min(this.maxHp - this.hp, amount);
-                this.hp += actualHeal;
-                return actualHeal;
-            }
-
-            useMp(amount) {
-                if (this.mp >= amount) {
-                    this.mp -= amount;
-                    return true;
-                }
-                return false;
-            }
-
-            restoreMp(amount) {
-                this.mp = Math.min(this.maxMp, this.mp + amount);
-            }
-        }
-
-        // WebRTC Functions
-        async function createRoom() {
-            isHost = true;
-            document.getElementById('createRoomBox').classList.add('active');
-            document.getElementById('btnCreate').disabled = true;
-            document.getElementById('btnJoin').disabled = true;
-
-            localConnection = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-            });
-
-            dataChannel = localConnection.createDataChannel('game');
-            setupDataChannel();
-
-            localConnection.onicecandidate = (e) => {
-                if (e.candidate === null) {
-                    document.getElementById('offerText').value = btoa(JSON.stringify(localConnection.localDescription));
-                }
-            };
-
-            const offer = await localConnection.createOffer();
-            await localConnection.setLocalDescription(offer);
-        }
-
-        async function createAnswer() {
-            const offer = JSON.parse(atob(document.getElementById('offerInput').value));
-            
-            remoteConnection = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-            });
-
-            remoteConnection.ondatachannel = (e) => {
-                dataChannel = e.channel;
-                setupDataChannel();
-            };
-
-            remoteConnection.onicecandidate = (e) => {
-                if (e.candidate === null) {
-                    document.getElementById('answerText').value = btoa(JSON.stringify(remoteConnection.localDescription));
-                }
-            };
-
-            await remoteConnection.setRemoteDescription(offer);
-            const answer = await remoteConnection.createAnswer();
-            await remoteConnection.setLocalDescription(answer);
-        }
-
-        async function completeConnection() {
-            const answer = JSON.parse(atob(document.getElementById('answerInput').value));
-            await localConnection.setRemoteDescription(answer);
-        }
-
-        function setupDataChannel() {
-            dataChannel.onopen = () => {
-                isConnected = true;
-                document.getElementById('connectionStatus').classList.add('connected');
-                document.getElementById('btnReset').style.display = 'inline-block';
-                log('¡Conexión establecida! Preparando batalla...', 'system');
-                initGame();
-            };
-
-            dataChannel.onmessage = (e) => {
-                const data = JSON.parse(e.data);
-                handleGameMessage(data);
-            };
-
-            dataChannel.onclose = () => {
-                log('Conexión cerrada', 'system');
-                isConnected = false;
-            };
-        }
-
-        function joinRoom() {
-            document.getElementById('joinRoomBox').classList.add('active');
-            document.getElementById('btnCreate').disabled = true;
-            document.getElementById('btnJoin').disabled = true;
-        }
-
-        // Game Functions
-        function initGame() {
-            const classType = document.getElementById('classSelect').value;
-            localPlayer = new Character(classType, true);
-            
-            // Enviar info al oponente
-            sendData({ type: 'init', class: classType, spd: localPlayer.spd });
-            
-            document.getElementById('battleArena').classList.add('active');
-            updateUI();
-        }
-
-        function startBattle(remoteClass, remoteSpd) {
-            remotePlayer = new Character(remoteClass, false);
-            
-            // Determinar quién empieza (más velocidad)
-            currentTurn = localPlayer.spd >= remoteSpd ? 0 : 1;
-            
-            gameActive = true;
-            updateUI();
-            log(`¡Batalla iniciada! ${localPlayer.name} vs ${remotePlayer.name}`, 'system');
-            log(`Turno ${turnCount}: ${currentTurn === 0 ? 'Tu turno' : 'Turno del oponente'}`, 'system');
-            
-            updateTurn();
-        }
-
-        function handleGameMessage(data) {
-            switch(data.type) {
-                case 'init':
-                    startBattle(data.class, data.spd);
-                    // Responder con nuestra info si somos el host
-                    if (isHost) {
-                        sendData({ 
-                            type: 'init-response', 
-                            class: localPlayer.class, 
-                            spd: localPlayer.spd 
-                        });
-                    }
-                    break;
-                case 'init-response':
-                    if (!remotePlayer) {
-                        startBattle(data.class, data.spd);
-                    }
-                    break;
-                case 'action':
-                    handleRemoteAction(data.action, data.value);
-                    break;
-                case 'end-turn':
-                    endTurn();
-                    break;
-            }
-        }
-
-        function sendData(data) {
-            if (dataChannel && dataChannel.readyState === 'open') {
-                dataChannel.send(JSON.stringify(data));
-            }
-        }
-
-        function action(type) {
-            if (!gameActive || currentTurn !== 0) return;
-
-            let value = 0;
-            let mpCost = 0;
-
-            switch(type) {
-                case 'attack':
-                    value = calculateDamage(localPlayer.atk, 10);
-                    const dmg = remotePlayer.takeDamage(value);
-                    sendData({ type: 'action', action: 'attack', value: dmg });
-                    showDamage(dmg, 'remoteCard');
-                    log(`Atacas por ${dmg} daño!`, 'damage');
-                    break;
-                case 'defend':
-                    localPlayer.defending = true;
-                    sendData({ type: 'action', action: 'defend' });
-                    log('Te pones en posición defensiva', 'special');
-                    break;
-                case 'special':
-                    mpCost = 20;
-                    if (!localPlayer.useMp(mpCost)) {
-                        log('¡No tienes suficiente MP!', 'system');
-                        return;
-                    }
-                    value = calculateDamage(localPlayer.mag * 2, 20);
-                    const specialDmg = remotePlayer.takeDamage(value);
-                    sendData({ type: 'action', action: 'special', value: specialDmg });
-                    showDamage(specialDmg, 'remoteCard');
-                    log(`¡Ataque especial mágico! ${specialDmg} daño!`, 'special');
-                    break;
-                case 'heal':
-                    mpCost = 15;
-                    if (!localPlayer.useMp(mpCost)) {
-                        log('¡No tienes suficiente MP!', 'system');
-                        return;
-                    }
-                    value = localPlayer.heal(localPlayer.mag * 3);
-                    sendData({ type: 'action', action: 'heal', value: value });
-                    log(`Te curas ${value} HP`, 'heal');
-                    break;
-            }
-
-            localPlayer.restoreMp(5);
-            updateUI();
-            checkWinCondition();
-            
-            if (gameActive) {
-                sendData({ type: 'end-turn' });
-                currentTurn = 1;
-                updateTurn();
-            }
-        }
-
-        function handleRemoteAction(action, value) {
-            switch(action) {
-                case 'attack':
-                    const dmg = localPlayer.takeDamage(value);
-                    showDamage(dmg, 'localCard');
-                    log(`Oponente ataca por ${dmg} daño!`, 'damage');
-                    break;
-                case 'defend':
-                    remotePlayer.defending = true;
-                    log('Oponente se defiende', 'special');
-                    break;
-                case 'special':
-                    const specialDmg = localPlayer.takeDamage(value);
-                    showDamage(specialDmg, 'localCard');
-                    log(`¡Ataque especial del oponente! ${specialDmg} daño!`, 'special');
-                    break;
-                case 'heal':
-                    remotePlayer.heal(value);
-                    log(`Oponente se cura ${value} HP`, 'heal');
-                    break;
-            }
-            remotePlayer.restoreMp(5);
-            updateUI();
-            checkWinCondition();
-        }
-
-        function calculateDamage(base, variance) {
-            const roll = Math.floor(Math.random() * variance) - (variance / 2);
-            return Math.max(1, Math.floor(base + roll));
-        }
-
-        function endTurn() {
-            currentTurn = 0;
-            turnCount++;
-            log(`Turno ${turnCount}: Tu turno`, 'system');
-            updateTurn();
-        }
-
-        function updateTurn() {
-            document.getElementById('localCard').classList.toggle('turn-active', currentTurn === 0);
-            document.getElementById('remoteCard').classList.toggle('turn-active', currentTurn === 1);
-            
-            const buttons = document.querySelectorAll('.action-btn');
-            buttons.forEach(btn => btn.disabled = currentTurn !== 0);
-        }
-
-        function checkWinCondition() {
-            if (localPlayer.hp <= 0) {
-                endGame(false);
-            } else if (remotePlayer.hp <= 0) {
-                endGame(true);
-            }
-        }
-
-        function endGame(victory) {
-            gameActive = false;
-            const overlay = document.getElementById('winnerOverlay');
-            const text = document.getElementById('winnerText');
-            
-            if (victory) {
-                text.innerHTML = '🎉 ¡VICTORIA! 🎉';
-                text.style.color = '#ffd700';
-            } else {
-                text.innerHTML = '💀 DERROTA 💀';
-                text.style.color = '#ef4444';
-            }
-            
-            setTimeout(() => overlay.classList.add('active'), 1000);
-        }
-
-        function updateUI() {
-            if (!localPlayer) return;
-
-            // Local Player
-            const localHpPercent = (localPlayer.hp / localPlayer.maxHp) * 100;
-            const localMpPercent = (localPlayer.mp / localPlayer.maxMp) * 100;
-            document.getElementById('localHpBar').style.width = localHpPercent + '%';
-            document.getElementById('localMpBar').style.width = localMpPercent + '%';
-            document.getElementById('localHpText').textContent = `${localPlayer.hp}/${localPlayer.maxHp}`;
-            document.getElementById('localMpText').textContent = `${localPlayer.mp}/${localPlayer.maxMp}`;
-            document.getElementById('localAvatar').textContent = localPlayer.emoji;
-            document.getElementById('localAvatar').setAttribute('data-class', localPlayer.name);
-            
-            document.getElementById('localStats').innerHTML = `
-                <div class="stat"><div class="stat-label">ATK</div><div class="stat-value">${localPlayer.atk}</div></div>
-                <div class="stat"><div class="stat-label">DEF</div><div class="stat-value">${localPlayer.def}</div></div>
-                <div class="stat"><div class="stat-label">SPD</div><div class="stat-value">${localPlayer.spd}</div></div>
-                <div class="stat"><div class="stat-label">MAG</div><div class="stat-value">${localPlayer.mag}</div></div>
-            `;
-
-            // Remote Player
-            if (remotePlayer) {
-                const remoteHpPercent = (remotePlayer.hp / remotePlayer.maxHp) * 100;
-                const remoteMpPercent = (remotePlayer.mp / remotePlayer.maxMp) * 100;
-                document.getElementById('remoteHpBar').style.width = remoteHpPercent + '%';
-                document.getElementById('remoteMpBar').style.width = remoteMpPercent + '%';
-                document.getElementById('remoteHpText').textContent = `${remotePlayer.hp}/${remotePlayer.maxHp}`;
-                document.getElementById('remoteMpText').textContent = `${remotePlayer.mp}/${remotePlayer.maxMp}`;
-                document.getElementById('remoteAvatar').textContent = remotePlayer.emoji;
-                document.getElementById('remoteAvatar').setAttribute('data-class', remotePlayer.name);
+        
+        // Clase Ragdoll
+        class Ragdoll {
+            constructor(x, y, team, type) {
+                this.x = x;
+                this.y = y;
+                this.team = team; // 0 = jugador (azul), 1 = enemigo (rojo)
+                this.type = type;
+                this.stats = { ...unitTypes[type] };
+                this.hp = this.stats.hp;
+                this.maxHp = this.stats.hp;
+                this.dead = false;
+                this.vx = 0;
+                this.vy = 0;
+                this.target = null;
+                this.attackCooldown = 0;
+                this.facing = team === 0 ? 1 : -1;
                 
-                document.getElementById('remoteStats').innerHTML = `
-                    <div class="stat"><div class="stat-label">ATK</div><div class="stat-value">${remotePlayer.atk}</div></div>
-                    <div class="stat"><div class="stat-label">DEF</div><div class="stat-value">${remotePlayer.def}</div></div>
-                    <div class="stat"><div class="stat-label">SPD</div><div class="stat-value">${remotePlayer.spd}</div></div>
-                    <div class="stat"><div class="stat-label">MAG</div><div class="stat-value">${remotePlayer.mag}</div></div>
-                `;
+                // Crear partes del cuerpo (física simple)
+                this.parts = this.createRagdoll();
+                this.limbs = [];
+            }
+            
+            createRagdoll() {
+                const size = this.stats.size;
+                const parts = {
+                    head: { x: this.x, y: this.y - size*1.5, r: size/2, angle: 0 },
+                    torso: { x: this.x, y: this.y, w: size, h: size*1.5 },
+                    armL: { x: this.x - size*0.8, y: this.y - size*0.2, w: size*0.3, h: size*1.2, angle: 0 },
+                    armR: { x: this.x + size*0.8, y: this.y - size*0.2, w: size*0.3, h: size*1.2, angle: 0 },
+                    legL: { x: this.x - size*0.3, y: this.y + size*1.2, w: size*0.4, h: size*1.5, angle: 0 },
+                    legR: { x: this.x + size*0.3, y: this.y + size*1.2, w: size*0.4, h: size*1.5, angle: 0 }
+                };
+                return parts;
+            }
+            
+            update() {
+                if (this.dead) {
+                    // Física de caída libre para ragdoll
+                    this.vy += 0.5;
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    
+                    // Rotar partes caóticamente
+                    for (let part in this.parts) {
+                        this.parts[part].angle += (Math.random() - 0.5) * 0.2;
+                        this.parts[part].x += this.vx + (Math.random() - 0.5) * 2;
+                        this.parts[part].y += this.vy + (Math.random() - 0.5) * 2;
+                    }
+                    
+                    if (this.y > canvas.height + 100) this.cleanup = true;
+                    return;
+                }
+                
+                // IA básica
+                if (!this.target || this.target.dead) {
+                    this.findTarget();
+                }
+                
+                if (this.target) {
+                    const dx = this.target.x - this.x;
+                    const dy = this.target.y - this.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist > this.stats.range) {
+                        // Mover hacia el objetivo
+                        const speed = this.stats.speed * 0.5;
+                        this.vx = (dx / dist) * speed;
+                        this.vy = (dy / dist) * speed * 0.3; // Menos movimiento vertical
+                        this.facing = this.vx > 0 ? 1 : -1;
+                    } else {
+                        // Atacar
+                        this.vx *= 0.5;
+                        this.vy *= 0.5;
+                        if (this.attackCooldown <= 0) {
+                            this.attack();
+                            this.attackCooldown = 60;
+                        }
+                    }
+                }
+                
+                // Aplicar velocidad
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // Gravedad suave
+                if (this.y < canvas.height - 100) {
+                    this.vy += 0.3;
+                } else {
+                    this.y = canvas.height - 100;
+                    this.vy = 0;
+                }
+                
+                // Fricción
+                this.vx *= 0.95;
+                
+                // Actualizar partes del cuerpo (animación procedural)
+                this.animateParts();
+                
+                if (this.attackCooldown > 0) this.attackCooldown--;
+            }
+            
+            animateParts() {
+                const time = Date.now() * 0.01;
+                const walkCycle = Math.sin(time * this.stats.speed) * 0.3;
+                
+                this.parts.head.x = this.x;
+                this.parts.head.y = this.y - this.stats.size * 1.5 + Math.abs(walkCycle) * 2;
+                
+                this.parts.torso.x = this.x;
+                this.parts.torso.y = this.y;
+                
+                // Brazos balanceándose
+                this.parts.armL.x = this.x - this.stats.size * 0.8 + walkCycle * 5;
+                this.parts.armL.y = this.y - this.stats.size * 0.2;
+                this.parts.armL.angle = walkCycle;
+                
+                this.parts.armR.x = this.x + this.stats.size * 0.8 - walkCycle * 5;
+                this.parts.armR.y = this.y - this.stats.size * 0.2;
+                this.parts.armR.angle = -walkCycle;
+                
+                // Piernas
+                this.parts.legL.x = this.x - this.stats.size * 0.3 - walkCycle * 3;
+                this.parts.legL.y = this.y + this.stats.size * 1.2;
+                
+                this.parts.legR.x = this.x + this.stats.size * 0.3 + walkCycle * 3;
+                this.parts.legR.y = this.y + this.stats.size * 1.2;
+            }
+            
+            findTarget() {
+                let closest = null;
+                let minDist = Infinity;
+                
+                for (let unit of units) {
+                    if (unit.team !== this.team && !unit.dead) {
+                        const dist = Math.hypot(unit.x - this.x, unit.y - this.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            closest = unit;
+                        }
+                    }
+                }
+                this.target = closest;
+            }
+            
+            attack() {
+                if (this.stats.ranged) {
+                    // Disparar proyectil
+                    projectiles.push(new Projectile(
+                        this.x, 
+                        this.y - this.stats.size, 
+                        this.target, 
+                        this.stats.dmg,
+                        this.team,
+                        this.stats.splash
+                    ));
+                } else {
+                    // Ataque cuerpo a cuerpo
+                    if (this.target && Math.hypot(this.target.x - this.x, this.target.y - this.y) <= this.stats.range) {
+                        this.target.takeDamage(this.stats.dmg);
+                        
+                        // Empujón físico
+                        const knockback = (this.target.x - this.x) / Math.abs(this.target.x - this.x) * 5;
+                        this.target.vx += knockback;
+                        this.target.vy -= 3;
+                    }
+                }
+                
+                // Efecto visual
+                createParticles(this.x + this.stats.size * this.facing, this.y, 5, '#fff');
+            }
+            
+            takeDamage(dmg) {
+                this.hp -= dmg;
+                
+                // Sangre
+                createParticles(this.x, this.y - this.stats.size, 10, '#ff0000');
+                
+                if (this.hp <= 0) {
+                    this.die();
+                }
+            }
+            
+            die() {
+                this.dead = true;
+                this.vx = (Math.random() - 0.5) * 10;
+                this.vy = -10;
+                
+                // Separar partes (efecto ragdoll)
+                for (let part in this.parts) {
+                    this.parts[part].vx = (Math.random() - 0.5) * 15;
+                    this.parts[part].vy = -Math.random() * 10;
+                }
+            }
+            
+            draw() {
+                ctx.save();
+                
+                // Dibujar partes
+                const color = this.team === 0 ? '#4169E1' : '#DC143C';
+                const baseColor = this.stats.color;
+                
+                // Piernas
+                this.drawLimb(this.parts.legL, baseColor);
+                this.drawLimb(this.parts.legR, baseColor);
+                
+                // Brazos
+                this.drawLimb(this.parts.armL, '#ffdbac');
+                this.drawLimb(this.parts.armR, '#ffdbac');
+                
+                // Torso
+                ctx.fillStyle = this.dead ? '#666' : baseColor;
+                ctx.fillRect(
+                    this.parts.torso.x - this.parts.torso.w/2,
+                    this.parts.torso.y - this.parts.torso.h/2,
+                    this.parts.torso.w,
+                    this.parts.torso.h
+                );
+                
+                // Cabeza
+                ctx.beginPath();
+                ctx.arc(this.parts.head.x, this.parts.head.y, this.parts.head.r, 0, Math.PI * 2);
+                ctx.fillStyle = this.dead ? '#999' : '#ffdbac';
+                ctx.fill();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Ojos
+                if (!this.dead) {
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(this.parts.head.x - 4 + this.facing * 2, this.parts.head.y - 2, 3, 3);
+                    ctx.fillRect(this.parts.head.x + 1 + this.facing * 2, this.parts.head.y - 2, 3, 3);
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(this.parts.head.x - 3 + this.facing * 3, this.parts.head.y - 1, 1, 1);
+                    ctx.fillRect(this.parts.head.x + 2 + this.facing * 3, this.parts.head.y - 1, 1, 1);
+                }
+                
+                // Arma
+                if (!this.dead && !this.stats.ranged) {
+                    ctx.save();
+                    ctx.translate(this.parts.armR.x, this.parts.armR.y);
+                    ctx.rotate(this.parts.armR.angle + Math.PI/4);
+                    ctx.fillStyle = '#silver';
+                    ctx.fillRect(0, -5, 25, 6);
+                    ctx.restore();
+                }
+                
+                // Barra de vida
+                if (!this.dead) {
+                    const hpPercent = this.hp / this.maxHp;
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(this.x - 20, this.y - this.stats.size * 2.5, 40, 5);
+                    ctx.fillStyle = '#0f0';
+                    ctx.fillRect(this.x - 20, this.y - this.stats.size * 2.5, 40 * hpPercent, 5);
+                }
+                
+                ctx.restore();
+            }
+            
+            drawLimb(limb, color) {
+                ctx.save();
+                ctx.translate(limb.x, limb.y);
+                ctx.rotate(limb.angle || 0);
+                ctx.fillStyle = this.dead ? '#666' : color;
+                ctx.fillRect(-limb.w/2, -limb.h/2, limb.w, limb.h);
+                ctx.restore();
             }
         }
-
-        function showDamage(amount, targetId) {
-            const card = document.getElementById(targetId);
-            const dmg = document.createElement('div');
-            dmg.className = 'damage-number';
-            dmg.textContent = amount;
-            dmg.style.color = '#ef4444';
-            dmg.style.left = Math.random() * 50 + 25 + '%';
-            dmg.style.top = '30%';
-            card.appendChild(dmg);
-            setTimeout(() => dmg.remove(), 1500);
+        
+        // Proyectiles
+        class Projectile {
+            constructor(x, y, target, dmg, team, splash) {
+                this.x = x;
+                this.y = y;
+                this.target = target;
+                this.dmg = dmg;
+                this.team = team;
+                this.splash = splash;
+                this.speed = 8;
+                this.active = true;
+                
+                if (target) {
+                    const dx = target.x - x;
+                    const dy = target.y - y - 50;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    this.vx = (dx / dist) * this.speed;
+                    this.vy = (dy / dist) * this.speed;
+                } else {
+                    this.vx = team === 0 ? this.speed : -this.speed;
+                    this.vy = 0;
+                }
+            }
+            
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.1; // Gravedad
+                
+                // Colisión con unidades
+                for (let unit of units) {
+                    if (unit.team !== this.team && !unit.dead) {
+                        const dist = Math.hypot(unit.x - this.x, unit.y - this.y);
+                        if (dist < unit.stats.size + 10) {
+                            this.hit(unit);
+                            return;
+                        }
+                    }
+                }
+                
+                // Fuera de pantalla
+                if (this.x < 0 || this.x > canvas.width || this.y > canvas.height) {
+                    this.active = false;
+                }
+            }
+            
+            hit(target) {
+                this.active = false;
+                
+                if (this.splash) {
+                    // Daño en área
+                    createParticles(this.x, this.y, 20, '#9932CC');
+                    for (let unit of units) {
+                        if (unit.team !== this.team && !unit.dead) {
+                            const dist = Math.hypot(unit.x - this.x, unit.y - this.y);
+                            if (dist < 100) {
+                                unit.takeDamage(this.dmg * (1 - dist/100));
+                                unit.vx += (unit.x - this.x) * 0.1;
+                                unit.vy -= 5;
+                            }
+                        }
+                    }
+                } else {
+                    target.takeDamage(this.dmg);
+                    target.vx += this.vx * 0.5;
+                    target.vy -= 3;
+                }
+            }
+            
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = this.splash ? '#9932CC' : '#000';
+                ctx.fill();
+            }
         }
-
-        function log(message, type = 'system') {
-            const log = document.getElementById('combatLog');
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-            const time = new Date().toLocaleTimeString();
-            entry.textContent = `[${time}] ${message}`;
-            log.appendChild(entry);
-            log.scrollTop = log.scrollHeight;
+        
+        // Partículas
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 10;
+                this.vy = (Math.random() - 0.5) * 10;
+                this.life = 30;
+                this.color = color;
+                this.size = Math.random() * 4 + 2;
+            }
+            
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.5;
+                this.life--;
+                this.size *= 0.95;
+            }
+            
+            draw() {
+                ctx.globalAlpha = this.life / 30;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+                ctx.globalAlpha = 1;
+            }
         }
-
-        function resetGame() {
-            location.reload();
+        
+        function createParticles(x, y, count, color) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
         }
-
-        // Inicializar UI
-        updateUI();
+        
+        // Input
+        document.querySelectorAll('.unit-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                selectedUnit = btn.dataset.type;
+            });
+        });
+        
+        canvas.addEventListener('mousedown', (e) => {
+            if (battleStarted) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if (e.button === 2) {
+                // Click derecho: eliminar unidad
+                units = units.filter(u => {
+                    if (u.team === 0 && Math.hypot(u.x - x, u.y - y) < u.stats.size) {
+                        budget += u.stats.cost;
+                        updateBudget();
+                        return false;
+                    }
+                    return true;
+                });
+            } else {
+                // Click izquierdo: colocar unidad (solo en lado izquierdo)
+                if (x < canvas.width / 2 - 50) {
+                    const typeData = unitTypes[selectedUnit];
+                    if (budget >= typeData.cost) {
+                        const unit = new Ragdoll(x, y, 0, selectedUnit);
+                        units.push(unit);
+                        budget -= typeData.cost;
+                        updateBudget();
+                        
+                        // Efecto de spawn
+                        createParticles(x, y, 10, '#4169E1');
+                    }
+                }
+            }
+        });
+        
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+        
+        function updateBudget() {
+            document.getElementById('money').textContent = budget;
+        }
+        
+        function clearUnits() {
+            if (battleStarted) return;
+            const playerUnits = units.filter(u => u.team === 0);
+            playerUnits.forEach(u => {
+                budget += u.stats.cost;
+            });
+            units = units.filter(u => u.team !== 0);
+            updateBudget();
+        }
+        
+        function startBattle() {
+            if (battleStarted) return;
+            battleStarted = true;
+            
+            // Generar ejército enemigo automáticamente (balanceado por presupuesto)
+            const enemyBudget = 1000;
+            let currentEnemyBudget = 0;
+            const enemyTypes = Object.keys(unitTypes);
+            
+            while (currentEnemyBudget < enemyBudget) {
+                const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+                const cost = unitTypes[type].cost;
+                
+                if (currentEnemyBudget + cost <= enemyBudget + 50) {
+                    const x = canvas.width / 2 + 100 + Math.random() * (canvas.width / 2 - 150);
+                    const y = 100 + Math.random() * (canvas.height - 200);
+                    units.push(new Ragdoll(x, y, 1, type));
+                    currentEnemyBudget += cost;
+                }
+            }
+            
+            document.getElementById('controls').style.display = 'none';
+        }
+        
+        function checkWinner() {
+            if (!battleStarted) return;
+            
+            const team0Alive = units.some(u => u.team === 0 && !u.dead);
+            const team1Alive = units.some(u => u.team === 1 && !u.dead);
+            
+            if (!team0Alive || !team1Alive) {
+                const winnerDiv = document.getElementById('winner');
+                if (!team0Alive && !team1Alive) {
+                    winnerDiv.innerHTML = '🤝 EMPATE 🤝<br><button onclick="location.reload()" style="font-size:30px; margin-top:20px; cursor:pointer;">Reintentar</button>';
+                    winnerDiv.style.color = '#FFD700';
+                } else if (team0Alive) {
+                    winnerDiv.innerHTML = '🎉 VICTORIA 🎉<br><button onclick="location.reload()" style="font-size:30px; margin-top:20px; cursor:pointer;">Jugar de nuevo</button>';
+                    winnerDiv.style.color = '#00ff00';
+                } else {
+                    winnerDiv.innerHTML = '💀 DERROTA 💀<br><button onclick="location.reload()" style="font-size:30px; margin-top:20px; cursor:pointer;">Reintentar</button>';
+                    winnerDiv.style.color = '#ff0000';
+                }
+                winnerDiv.style.display = 'block';
+                battleStarted = false;
+            }
+        }
+        
+        // Loop principal
+        function gameLoop() {
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Suelo
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+            
+            // Línea divisoria
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([20, 20]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Zonas
+            ctx.fillStyle = 'rgba(65,105,225,0.1)';
+            ctx.fillRect(0, 0, canvas.width / 2 - 50, canvas.height);
+            ctx.fillStyle = 'rgba(220,20,60,0.1)';
+            ctx.fillRect(canvas.width / 2 + 50, 0, canvas.width / 2 - 50, canvas.height);
+            
+            // Textos de zona
+            if (!battleStarted) {
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.font = 'bold 40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('TU ZONA', canvas.width / 4, 100);
+                ctx.fillText('ENEMIGO', canvas.width * 3 / 4, 100);
+            }
+            
+            // Actualizar y dibujar unidades
+            units = units.filter(u => !u.cleanup);
+            units.forEach(unit => {
+                unit.update();
+                unit.draw();
+            });
+            
+            // Proyectiles
+            projectiles = projectiles.filter(p => p.active);
+            projectiles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            
+            // Partículas
+            particles = particles.filter(p => p.life > 0);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            
+            checkWinner();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Redimensionar
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        gameLoop();
     </script>
 </body>
 </html>
