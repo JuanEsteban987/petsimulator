@@ -1,64 +1,482 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Doom Loader - GitHub Edition</title>
-    <script src="https://js-dos.com/v7/build/releases/latest/js-dos.js"></script>
-    <style>
-        body { background: #1a1a1a; color: #eee; font-family: 'Courier New', Courier, monospace; text-align: center; }
-        #dos-container { width: 640px; height: 400px; margin: 20px auto; border: 2px solid #ff0000; display: none; }
-        .upload-zone { border: 2px dashed #555; padding: 40px; width: 500px; margin: 50px auto; cursor: pointer; }
-        .upload-zone:hover { border-color: #ff0000; background: #222; }
-        input[type="file"] { display: none; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TABS: Madness Combat con Físicas</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Courier New', monospace; overflow: hidden; }
+    #game-container { width: 100vw; height: 100vh; max-width: 1400px; max-height: 900px; display: flex; flex-direction: column; background: #111; border: 3px solid #333; }
+    canvas { flex: 1; display: block; background: #1a1a1a; }
+    #ui-panel { background: #1e1e1e; padding: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 2px solid #444; min-height: 90px; z-index: 10; }
+    #points-display { background: #000; color: #d4a44c; padding: 10px 18px; border-radius: 20px; font-weight: bold; font-size: 1.2em; border: 2px solid #555; }
+    #points-display span { font-size: 1.6em; color: #ffd700; display: block; }
+    .unit-btn { background: #252525; border: 2px solid #444; color: #ddd; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-family: inherit; font-weight: bold; transition: 0.15s; display: flex; flex-direction: column; align-items: center; }
+    .unit-btn:hover { background: #3a3a3a; border-color: #888; }
+    .unit-btn.selected { border-color: #ffd700; background: #3a3020; }
+    .action-btn { padding: 10px 20px; border-radius: 25px; border: none; cursor: pointer; font-family: inherit; font-weight: bold; text-transform: uppercase; }
+    .action-btn.start { background: #c0392b; color: #fff; }
+    .action-btn.reset { background: #444; color: #ddd; }
+    .action-btn.wave { background: #8e44ad; color: #fff; }
+    .action-btn:disabled { opacity: 0.4; pointer-events: none; }
+    #wave-indicator { color: #aaa; background: #1a1a1a; padding: 8px 14px; border-radius: 15px; border: 1px solid #333; }
+  </style>
 </head>
 <body>
-
-    <h1>DOOM WAD PLAYER</h1>
-    
-    <div id="setup">
-        <div class="upload-zone" onclick="document.getElementById('wadInput').click()">
-            <p>Selecciona o arrastra tu archivo <b>.WAD</b> aquí</p>
-            <input type="file" id="wadInput" accept=".wad">
-        </div>
-        <p><small>El motor (Doom Shareware) se cargará automáticamente.</small></p>
+<div id="game-container">
+  <canvas id="canvas"></canvas>
+  <div id="ui-panel">
+    <div id="points-display">💰 Fondos <span id="points-value">500</span></div>
+    <button class="unit-btn" data-unit="grunt">👤 Grunt<br><small>50</small></button>
+    <button class="unit-btn" data-unit="hank">😎 Hank<br><small>200</small></button>
+    <button class="unit-btn" data-unit="sanford">💪 Sanford<br><small>250</small></button>
+    <button class="unit-btn" data-unit="deimos">⚡ Deimos<br><small>180</small></button>
+    <button class="unit-btn" data-unit="tricky">🤡 Tricky<br><small>350</small></button>
+    <button class="unit-btn" data-unit="jesus">👼 Jesus<br><small>500</small></button>
+    <div>
+      <button class="action-btn start" id="btn-start">⚔️ Iniciar</button>
+      <button class="action-btn wave" id="btn-wave">🌊 Oleada</button>
+      <button class="action-btn reset" id="btn-reset">🔄 Reiniciar</button>
     </div>
+    <div id="wave-indicator">Oleada: <strong id="wave-num">1</strong></div>
+  </div>
+</div>
 
-    <div id="dos-container"></div>
+<script>
+  // ==================== CONFIGURACIÓN DE PNGs ====================
+  const USE_PNGS = false; // Cambia a true para usar tus propias imágenes
 
-    <script>
-        const wadInput = document.getElementById('wadInput');
-        const setupDiv = document.getElementById('setup');
-        const container = document.getElementById('dos-container');
+  // Cache de imágenes (una por parte y tipo)
+  const spriteCache = {};
+  const unitTypesList = ['grunt', 'hank', 'sanford', 'deimos', 'tricky', 'jesus'];
+  const bodyParts = ['head', 'torso', 'arm', 'hand', 'leg', 'foot'];
 
-        wadInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+  if (USE_PNGS) {
+    unitTypesList.forEach(type => {
+      bodyParts.forEach(part => {
+        const img = new Image();
+        img.src = `${type}_${part}.png`; // Ej: grunt_head.png
+        spriteCache[`${type}_${part}`] = img;
+        img.onerror = () => console.warn(`Falta ${type}_${part}.png`);
+      });
+    });
+  }
 
-            // Ocultar interfaz de subida y mostrar juego
-            setupDiv.style.display = 'none';
-            container.style.display = 'block';
+  // ==================== MOTOR DE FÍSICAS ====================
+  const { Engine, World, Bodies, Body, Constraint, Composite, Events, Vector } = Matter;
+  const engine = Engine.create();
+  const world = engine.world;
+  engine.gravity.y = 1.2;
 
-            const runtime = await Dos(container);
-            
-            // 1. Descargamos el motor básico (shareware) desde un bundle público
-            const bundle = await runtime.download("https://js-dos.com/v7/build/archive/doom.zip");
+  // Dimensiones del canvas
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, groundY;
 
-            // 2. "Montamos" el archivo WAD del usuario dentro del sistema de archivos virtual
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                const wadData = new Uint8Array(event.target.result);
-                
-                // Escribimos el archivo en el disco virtual de DOS
-                await runtime.fs.extract(bundle);
-                await runtime.fs.writeFile("DOOM1.WAD", wadData); 
+  function resizeCanvas() {
+    const container = document.getElementById('game-container');
+    const panelH = document.getElementById('ui-panel').offsetHeight;
+    W = container.clientWidth;
+    H = container.clientHeight - panelH;
+    canvas.width = W;
+    canvas.height = H;
+    groundY = H * 0.8;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
 
-                // Ejecutamos el juego
-                // Nota: Si el usuario sube "DOOM2.WAD", deberías ajustar el comando
-                runtime.main(["DOOM.EXE"]);
-            };
-            reader.readAsArrayBuffer(file);
-        });
-    </script>
+  // Suelo estático
+  let ground;
+  function createGround() {
+    if (ground) World.remove(world, ground);
+    ground = Bodies.rectangle(W / 2, groundY + 50, W, 100, { isStatic: true, friction: 0.8 });
+    World.add(world, ground);
+  }
+
+  // ==================== DATOS DE UNIDADES ====================
+  const unitStats = {
+    grunt:  { hp: 80,  damage: 12, speed: 0.002, cost: 50,  color: '#888', headColor: '#bbb', torsoColor: '#555', special: null },
+    hank:   { hp: 180, damage: 35, speed: 0.003, cost: 200, color: '#1a1a1a', headColor: '#ccc', torsoColor: '#111', special: 'red_glasses' },
+    sanford:{ hp: 300, damage: 28, speed: 0.0018,cost: 250, color: '#2c2c2c', headColor: '#bbb', torsoColor: '#1a1a1a', special: 'tank' },
+    deimos: { hp: 140, damage: 22, speed: 0.0032,cost: 180, color: '#3a3a5c', headColor: '#ddd', torsoColor: '#222244', special: 'shield' },
+    tricky: { hp: 220, damage: 40, speed: 0.0038,cost: 350, color: '#2d5a1e', headColor: '#aaffaa', torsoColor: '#1a3d10', special: 'clown' },
+    jesus:  { hp: 400, damage: 55, speed: 0.0025,cost: 500, color: '#f5f0e8', headColor: '#fffef5', torsoColor: '#e8dcc8', special: 'halo' }
+  };
+
+  // ==================== CLASE RAGDOLL ====================
+  class Ragdoll {
+    constructor(type, x, y, isPlayer) {
+      this.type = type;
+      this.isPlayer = isPlayer;
+      this.team = isPlayer ? 'player' : 'enemy';
+      this.hp = unitStats[type].hp;
+      this.maxHp = unitStats[type].hp;
+      this.damage = unitStats[type].damage;
+      this.speed = unitStats[type].speed;
+      this.stats = unitStats[type];
+      this.alive = true;
+      this.attackCooldown = 0;
+      this.target = null;
+      this.facingRight = isPlayer;
+
+      // Escala base
+      const s = (type === 'sanford' ? 0.75 : type === 'jesus' ? 0.8 : 0.6);
+      const colors = unitStats[type];
+
+      // Crear partes del cuerpo
+      this.head = Bodies.circle(x, y - 50 * s, 12 * s, { friction: 0.5, restitution: 0.1, label: 'head' });
+      this.torso = Bodies.rectangle(x, y - 25 * s, 20 * s, 35 * s, { friction: 0.5, restitution: 0.1, label: 'torso', chamfer: { radius: 5 } });
+      this.upperArmLeft = Bodies.rectangle(x - 15 * s, y - 30 * s, 8 * s, 18 * s, { friction: 0.5, restitution: 0.1 });
+      this.lowerArmLeft = Bodies.rectangle(x - 20 * s, y - 15 * s, 6 * s, 16 * s, { friction: 0.5 });
+      this.handLeft = Bodies.circle(x - 22 * s, y - 5 * s, 4 * s, { friction: 0.5 });
+      this.upperArmRight = Bodies.rectangle(x + 15 * s, y - 30 * s, 8 * s, 18 * s, { friction: 0.5 });
+      this.lowerArmRight = Bodies.rectangle(x + 20 * s, y - 15 * s, 6 * s, 16 * s, { friction: 0.5 });
+      this.handRight = Bodies.circle(x + 22 * s, y - 5 * s, 4 * s, { friction: 0.5 });
+      this.upperLegLeft = Bodies.rectangle(x - 5 * s, y + 5 * s, 9 * s, 22 * s, { friction: 0.5 });
+      this.lowerLegLeft = Bodies.rectangle(x - 5 * s, y + 25 * s, 7 * s, 20 * s, { friction: 0.5 });
+      this.footLeft = Bodies.rectangle(x - 5 * s, y + 38 * s, 10 * s, 6 * s, { friction: 0.5 });
+      this.upperLegRight = Bodies.rectangle(x + 5 * s, y + 5 * s, 9 * s, 22 * s, { friction: 0.5 });
+      this.lowerLegRight = Bodies.rectangle(x + 5 * s, y + 25 * s, 7 * s, 20 * s, { friction: 0.5 });
+      this.footRight = Bodies.rectangle(x + 5 * s, y + 38 * s, 10 * s, 6 * s, { friction: 0.5 });
+
+      // Asignar etiquetas para identificar
+      this.parts = [this.head, this.torso, this.upperArmLeft, this.lowerArmLeft, this.handLeft,
+                    this.upperArmRight, this.lowerArmRight, this.handRight,
+                    this.upperLegLeft, this.lowerLegLeft, this.footLeft,
+                    this.upperLegRight, this.lowerLegRight, this.footRight];
+      this.parts.forEach(p => { p.ragdoll = this; p.team = this.team; });
+
+      // Juntas
+      this.joints = [
+        Constraint.create({ bodyA: this.torso, pointA: { x: 0, y: -17 * s }, bodyB: this.head, pointB: { x: 0, y: 10 * s }, stiffness: 0.8 }),
+        Constraint.create({ bodyA: this.torso, pointA: { x: -12 * s, y: -15 * s }, bodyB: this.upperArmLeft, pointB: { x: 4 * s, y: -7 * s }, stiffness: 0.6 }),
+        Constraint.create({ bodyA: this.upperArmLeft, pointA: { x: 0, y: 9 * s }, bodyB: this.lowerArmLeft, pointB: { x: 0, y: -7 * s }, stiffness: 0.4 }),
+        Constraint.create({ bodyA: this.lowerArmLeft, pointA: { x: 0, y: 8 * s }, bodyB: this.handLeft, pointB: { x: 0, y: -4 * s }, stiffness: 0.3 }),
+        Constraint.create({ bodyA: this.torso, pointA: { x: 12 * s, y: -15 * s }, bodyB: this.upperArmRight, pointB: { x: -4 * s, y: -7 * s }, stiffness: 0.6 }),
+        Constraint.create({ bodyA: this.upperArmRight, pointA: { x: 0, y: 9 * s }, bodyB: this.lowerArmRight, pointB: { x: 0, y: -7 * s }, stiffness: 0.4 }),
+        Constraint.create({ bodyA: this.lowerArmRight, pointA: { x: 0, y: 8 * s }, bodyB: this.handRight, pointB: { x: 0, y: -4 * s }, stiffness: 0.3 }),
+        Constraint.create({ bodyA: this.torso, pointA: { x: -7 * s, y: 17 * s }, bodyB: this.upperLegLeft, pointB: { x: 4 * s, y: -11 * s }, stiffness: 0.6 }),
+        Constraint.create({ bodyA: this.upperLegLeft, pointA: { x: 0, y: 11 * s }, bodyB: this.lowerLegLeft, pointB: { x: 0, y: -10 * s }, stiffness: 0.5 }),
+        Constraint.create({ bodyA: this.lowerLegLeft, pointA: { x: 0, y: 10 * s }, bodyB: this.footLeft, pointB: { x: 0, y: -3 * s }, stiffness: 0.3 }),
+        Constraint.create({ bodyA: this.torso, pointA: { x: 7 * s, y: 17 * s }, bodyB: this.upperLegRight, pointB: { x: -4 * s, y: -11 * s }, stiffness: 0.6 }),
+        Constraint.create({ bodyA: this.upperLegRight, pointA: { x: 0, y: 11 * s }, bodyB: this.lowerLegRight, pointB: { x: 0, y: -10 * s }, stiffness: 0.5 }),
+        Constraint.create({ bodyA: this.lowerLegRight, pointA: { x: 0, y: 10 * s }, bodyB: this.footRight, pointB: { x: 0, y: -3 * s }, stiffness: 0.3 })
+      ];
+
+      Composite.add(world, [...this.parts, ...this.joints]);
+    }
+
+    removeFromWorld() {
+      Composite.remove(world, [...this.parts, ...this.joints]);
+    }
+
+    getPosition() {
+      return this.torso.position;
+    }
+
+    setTarget(enemies) {
+      if (!this.alive) return;
+      let closest = null;
+      let minDist = Infinity;
+      enemies.forEach(e => {
+        if (!e.alive) return;
+        const dx = e.getPosition().x - this.getPosition().x;
+        const dy = e.getPosition().y - this.getPosition().y;
+        const dist = Math.sqrt(dx*dx+dy*dy);
+        if (dist < minDist) { minDist = dist; closest = e; }
+      });
+      this.target = closest;
+    }
+
+    moveTowardsTarget() {
+      if (!this.alive || !this.target || !this.target.alive) return;
+      const pos = this.getPosition();
+      const tpos = this.target.getPosition();
+      const dx = tpos.x - pos.x;
+      const force = this.speed;
+      Body.applyForce(this.torso, pos, { x: dx > 0 ? force : -force, y: -0.001 });
+      // Mantener orientación aproximada
+      if (Math.abs(dx) > 20) this.facingRight = dx > 0;
+    }
+
+    attackTarget() {
+      if (!this.alive || !this.target || !this.target.alive) return false;
+      if (this.attackCooldown > 0) return false;
+      const pos = this.getPosition();
+      const tpos = this.target.getPosition();
+      const dist = Vector.magnitude(Vector.sub(tpos, pos));
+      if (dist < 80) {
+        // Balancear brazo derecho (o izquierdo) hacia el objetivo
+        const arm = this.facingRight ? this.upperArmRight : this.upperArmLeft;
+        const hand = this.facingRight ? this.handRight : this.handLeft;
+        const angle = Vector.angle({ x: tpos.x - pos.x, y: tpos.y - pos.y });
+        Body.setAngularVelocity(arm, 0.2);
+        Body.applyForce(hand, hand.position, { x: Math.cos(angle)*0.005, y: Math.sin(angle)*0.005 });
+        // Daño
+        this.target.hp -= this.damage;
+        this.attackCooldown = 40;
+        return true;
+      }
+      return false;
+    }
+
+    update() {
+      if (!this.alive) return;
+      this.attackCooldown = Math.max(0, this.attackCooldown - 1);
+    }
+  }
+
+  // ==================== ESTADO DEL JUEGO ====================
+  let playerUnits = [];
+  let enemyUnits = [];
+  let particles = [];
+  let floatingTexts = [];
+  let playerPoints = 500;
+  let waveNumber = 1;
+  let battleStarted = false;
+  let battleOver = false;
+  let winner = null;
+  let selectedUnitType = null;
+  const playerSpawnZone = { xMin: 0.05, xMax: 0.4 };
+  const enemySpawnZone = { xMin: 0.6, xMax: 0.95 };
+
+  function spawnEnemyWave() {
+    // Eliminar enemigos anteriores
+    enemyUnits.forEach(u => u.removeFromWorld());
+    enemyUnits = [];
+    const w = waveNumber;
+    const add = (type, count) => {
+      for (let i = 0; i < count; i++) {
+        const x = W * (enemySpawnZone.xMin + Math.random() * (enemySpawnZone.xMax - enemySpawnZone.xMin));
+        const y = groundY - 100 - Math.random() * 50;
+        const ragdoll = new Ragdoll(type, x, y, false);
+        enemyUnits.push(ragdoll);
+      }
+    };
+    add('grunt', 3 + w * 2);
+    add('hank', Math.floor(w / 2));
+    add('sanford', Math.max(0, Math.floor((w - 2) / 2)));
+    add('deimos', Math.max(0, Math.floor((w - 1) / 3)));
+    add('tricky', w >= 4 ? Math.floor((w - 3) / 2) : 0);
+    add('jesus', w >= 6 ? 1 : 0);
+  }
+
+  function nextWave() {
+    waveNumber++;
+    document.getElementById('wave-num').textContent = waveNumber;
+    playerPoints += 150 + waveNumber * 50;
+    document.getElementById('points-value').textContent = playerPoints;
+    battleStarted = false;
+    battleOver = false;
+    winner = null;
+    selectedUnitType = null;
+    spawnEnemyWave();
+    document.getElementById('btn-start').disabled = false;
+  }
+
+  function resetGame() {
+    playerUnits.forEach(u => u.removeFromWorld());
+    enemyUnits.forEach(u => u.removeFromWorld());
+    playerUnits = [];
+    enemyUnits = [];
+    particles = [];
+    floatingTexts = [];
+    playerPoints = 500;
+    waveNumber = 1;
+    battleStarted = false;
+    battleOver = false;
+    winner = null;
+    selectedUnitType = null;
+    document.getElementById('points-value').textContent = playerPoints;
+    document.getElementById('wave-num').textContent = waveNumber;
+    document.getElementById('btn-start').disabled = false;
+    document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('selected'));
+    createGround();
+    spawnEnemyWave();
+  }
+
+  // ==================== RENDERIZADO ====================
+  function drawRagdoll(ragdoll) {
+    if (!ragdoll.alive) return;
+    const type = ragdoll.type;
+    const stats = unitStats[type];
+    const s = (type === 'sanford' ? 0.75 : type === 'jesus' ? 0.8 : 0.6);
+
+    // Función auxiliar para dibujar parte con PNG o color
+    function drawPart(part, partKey, color, w, h) {
+      const pos = part.position;
+      const angle = part.angle;
+      ctx.save();
+      ctx.translate(pos.x, pos.y);
+      ctx.rotate(angle);
+
+      const imgKey = `${type}_${partKey}`;
+      if (USE_PNGS && spriteCache[imgKey] && spriteCache[imgKey].complete && spriteCache[imgKey].naturalWidth > 0) {
+        const img = spriteCache[imgKey];
+        const scaleX = partKey === 'torso' ? w / img.width : (partKey === 'head' ? w / img.width : w / img.width);
+        const scaleY = partKey === 'torso' ? h / img.height : (partKey === 'head' ? h / img.height : h / img.height);
+        ctx.drawImage(img, -w/2, -h/2, w, h);
+      } else {
+        ctx.fillStyle = color;
+        if (partKey === 'head') {
+          ctx.beginPath();
+          ctx.arc(0, 0, w/2, 0, Math.PI*2);
+          ctx.fill();
+          // Cara estilo Madness
+          ctx.strokeStyle = '#333';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(-4, 0);
+          ctx.lineTo(4, 0);
+          ctx.moveTo(0, -4);
+          ctx.lineTo(0, 4);
+          ctx.stroke();
+          if (stats.special === 'red_glasses') {
+            ctx.fillStyle = '#cc0000';
+            ctx.fillRect(-6, -3, 5, 3);
+            ctx.fillRect(2, -3, 5, 3);
+          } else if (stats.special === 'clown') {
+            ctx.fillStyle = '#ff4444';
+            ctx.beginPath();
+            ctx.arc(0, 2, 3, 0, Math.PI*2);
+            ctx.fill();
+          }
+        } else {
+          ctx.fillRect(-w/2, -h/2, w, h);
+        }
+      }
+      ctx.restore();
+    }
+
+    drawPart(ragdoll.head, 'head', stats.headColor, 24*s, 24*s);
+    drawPart(ragdoll.torso, 'torso', stats.torsoColor, 20*s, 35*s);
+    drawPart(ragdoll.upperArmLeft, 'arm', stats.torsoColor, 8*s, 18*s);
+    drawPart(ragdoll.lowerArmLeft, 'arm', stats.torsoColor, 6*s, 16*s);
+    drawPart(ragdoll.handLeft, 'hand', stats.headColor, 8*s, 8*s);
+    drawPart(ragdoll.upperArmRight, 'arm', stats.torsoColor, 8*s, 18*s);
+    drawPart(ragdoll.lowerArmRight, 'arm', stats.torsoColor, 6*s, 16*s);
+    drawPart(ragdoll.handRight, 'hand', stats.headColor, 8*s, 8*s);
+    drawPart(ragdoll.upperLegLeft, 'leg', stats.torsoColor, 9*s, 22*s);
+    drawPart(ragdoll.lowerLegLeft, 'leg', stats.torsoColor, 7*s, 20*s);
+    drawPart(ragdoll.footLeft, 'foot', '#222', 10*s, 6*s);
+    drawPart(ragdoll.upperLegRight, 'leg', stats.torsoColor, 9*s, 22*s);
+    drawPart(ragdoll.lowerLegRight, 'leg', stats.torsoColor, 7*s, 20*s);
+    drawPart(ragdoll.footRight, 'foot', '#222', 10*s, 6*s);
+  }
+
+  // ==================== BUCLE PRINCIPAL ====================
+  function gameLoop() {
+    resizeCanvas();
+    Engine.update(engine, 1000 / 60);
+    ctx.clearRect(0, 0, W, H);
+
+    // Fondo
+    ctx.fillStyle = '#1a1020';
+    ctx.fillRect(0, 0, W, groundY);
+    ctx.fillStyle = '#2a1a1a';
+    ctx.fillRect(0, groundY, W, H - groundY);
+
+    // Actualizar IA solo si batalla iniciada
+    if (battleStarted && !battleOver) {
+      const allUnits = [...playerUnits, ...enemyUnits];
+      playerUnits.forEach(u => {
+        u.setTarget(enemyUnits);
+        u.moveTowardsTarget();
+        if (u.attackTarget()) {
+          // Partículas de impacto
+          const handPos = u.facingRight ? u.handRight.position : u.handLeft.position;
+          for (let i = 0; i < 5; i++) particles.push({ x: handPos.x, y: handPos.y, life: 10, color: '#ff4444' });
+        }
+        u.update();
+      });
+      enemyUnits.forEach(u => {
+        u.setTarget(playerUnits);
+        u.moveTowardsTarget();
+        if (u.attackTarget()) {
+          const handPos = u.facingRight ? u.handRight.position : u.handLeft.position;
+          for (let i = 0; i < 5; i++) particles.push({ x: handPos.x, y: handPos.y, life: 10, color: '#ffaa00' });
+        }
+        u.update();
+      });
+
+      // Verificar muertes
+      playerUnits.forEach(u => { if (u.hp <= 0 && u.alive) { u.alive = false; u.removeFromWorld(); } });
+      enemyUnits.forEach(u => { if (u.hp <= 0 && u.alive) { u.alive = false; u.removeFromWorld(); } });
+      playerUnits = playerUnits.filter(u => u.alive);
+      enemyUnits = enemyUnits.filter(u => u.alive);
+
+      if (playerUnits.length === 0 || enemyUnits.length === 0) {
+        battleOver = true;
+        winner = playerUnits.length > 0 ? 'player' : 'enemy';
+      }
+    }
+
+    // Dibujar todos los ragdolls
+    [...playerUnits, ...enemyUnits].forEach(u => drawRagdoll(u));
+
+    // Partículas y textos
+    particles = particles.filter(p => { p.life--; return p.life > 0; });
+    particles.forEach(p => { ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); });
+
+    if (battleOver) {
+      ctx.fillStyle = winner === 'player' ? '#ffd700' : '#ff3333';
+      ctx.font = 'bold 36px "Courier New"';
+      ctx.textAlign = 'center';
+      ctx.fillText(winner === 'player' ? '¡VICTORIA!' : 'DERROTA', W/2, H/2);
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // ==================== EVENTOS ====================
+  canvas.addEventListener('click', (e) => {
+    if (battleStarted || battleOver) return;
+    if (!selectedUnitType) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    if (mx > W * playerSpawnZone.xMin && mx < W * playerSpawnZone.xMax && my > groundY - 150 && my < groundY) {
+      const cost = unitStats[selectedUnitType].cost;
+      if (playerPoints >= cost) {
+        playerPoints -= cost;
+        document.getElementById('points-value').textContent = playerPoints;
+        const ragdoll = new Ragdoll(selectedUnitType, mx, Math.min(my, groundY - 80), true);
+        playerUnits.push(ragdoll);
+      }
+    }
+  });
+
+  document.querySelectorAll('.unit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (battleStarted) return;
+      document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('selected'));
+      selectedUnitType = btn.dataset.unit;
+      btn.classList.add('selected');
+    });
+  });
+
+  document.getElementById('btn-start').addEventListener('click', () => {
+    if (playerUnits.length === 0) return alert('¡Coloca al menos una unidad!');
+    battleStarted = true;
+    document.getElementById('btn-start').disabled = true;
+  });
+
+  document.getElementById('btn-wave').addEventListener('click', () => {
+    if (battleOver || !battleStarted) nextWave();
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', resetGame);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !battleStarted && playerUnits.length > 0) document.getElementById('btn-start').click();
+  });
+
+  // Inicializar
+  createGround();
+  spawnEnemyWave();
+  gameLoop();
+</script>
 </body>
 </html>
