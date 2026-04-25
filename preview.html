@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Madness TABS 2D (Partes)</title>
+<style>
+body { margin:0; background:#111; color:white; text-align:center; }
+canvas { background:#222; display:block; margin:auto; cursor:crosshair; }
+button { margin:5px; padding:10px; }
+</style>
+</head>
+<body>
+
+<h2>Madness Battle Simulator 2D</h2>
+
+<button onclick="team='red'">Rojo</button>
+<button onclick="team='blue'">Azul</button>
+<button onclick="startBattle()">Iniciar</button>
+
+<canvas id="game" width="800" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let units = [];
+let team = "red";
+let running = false;
+
+// cargar sprites
+const sprites = {
+  head: loadImg("head.svg"),
+  torso: loadImg("torso.svg"),
+  handFront: loadImg("hand_front.svg"),
+  handBack: loadImg("hand_back.svg"),
+  foot: loadImg("foot.svg")
+};
+
+function loadImg(src){
+  let img = new Image();
+  img.src = src;
+  return img;
+}
+
+class Unit {
+  constructor(x,y,team){
+    this.x=x;
+    this.y=y;
+    this.team=team;
+
+    this.hp=100;
+    this.speed=0.7;
+    this.attack=10;
+    this.range=25;
+
+    this.anim=0;
+  }
+
+  update(){
+    if(!running) return;
+
+    this.anim += 0.1;
+
+    let enemy=this.findEnemy();
+    if(!enemy) return;
+
+    let dx=enemy.x-this.x;
+    let dy=enemy.y-this.y;
+    let dist=Math.hypot(dx,dy);
+
+    if(dist>this.range){
+      this.x += dx/dist * this.speed;
+      this.y += dy/dist * this.speed;
+    } else {
+      enemy.hp -= 0.2;
+    }
+  }
+
+  findEnemy(){
+    let enemies=units.filter(u=>u.team!==this.team && u.hp>0);
+    let closest=null, min=99999;
+
+    for(let e of enemies){
+      let d=Math.hypot(this.x-e.x,this.y-e.y);
+      if(d<min){ min=d; closest=e; }
+    }
+    return closest;
+  }
+
+  draw(){
+    if(this.hp<=0) return;
+
+    ctx.save();
+    ctx.translate(this.x,this.y);
+
+    // color equipo
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = this.team==="red"?"red":"cyan";
+
+    // animación simple caminar
+    let walk = Math.sin(this.anim)*5;
+
+    // PIE ATRÁS
+    ctx.drawImage(sprites.foot, -8, 10 + walk, 16,16);
+
+    // PIE ADELANTE
+    ctx.drawImage(sprites.foot, 2, 10 - walk, 16,16);
+
+    // BRAZO ATRÁS
+    ctx.drawImage(sprites.handBack, -12, -5, 16,16);
+
+    // TORSO
+    ctx.drawImage(sprites.torso, -10, -10, 20,20);
+
+    // BRAZO ADELANTE
+    ctx.drawImage(sprites.handFront, 5, -5, 16,16);
+
+    // CABEZA
+    ctx.drawImage(sprites.head, -8, -25, 16,16);
+
+    ctx.restore();
+
+    // barra de vida
+    ctx.fillStyle="green";
+    ctx.fillRect(this.x-10,this.y-30,this.hp/5,3);
+  }
+}
+
+canvas.addEventListener("click", e=>{
+  if(running) return;
+
+  let rect=canvas.getBoundingClientRect();
+  let x=e.clientX-rect.left;
+  let y=e.clientY-rect.top;
+
+  units.push(new Unit(x,y,team));
+});
+
+function startBattle(){
+  running=true;
+}
+
+function update(){
+  units = units.filter(u=>u.hp>0);
+  for(let u of units) u.update();
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let u of units) u.draw();
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
